@@ -1,0 +1,5 @@
+# Dependențe SUPLIMENTARE, doar pentru rularea testelor (nu se instalează
+# în imaginea Docker de producție/development a serviciului).
+-r requirements.txt
+pytest==8.3.3
+pytest-asyncio==0.24.0

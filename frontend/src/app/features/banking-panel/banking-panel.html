@@ -1,0 +1,141 @@
+<section class="banking-panel">
+  <h2>🏦 MaestroBank — Core Banking Test Panel</h2>
+  <p class="flow-note">Register → Login → Cont RON + IBAN + Card (automat) → Alimentare demo → Transfer → Istoric</p>
+  <p class="dev-only-note">⚠️ Prototip / demo — operațiunile bancare sunt SIMULATE. Fără UI final, doar testare funcțională.</p>
+
+  @if (!currentUser()) {
+    <div class="auth-forms">
+      <div class="auth-form">
+        <h3>Register</h3>
+        <input type="text" placeholder="First name" [ngModel]="registerFirstName()" (ngModelChange)="registerFirstName.set($event)" />
+        <input type="text" placeholder="Last name" [ngModel]="registerLastName()" (ngModelChange)="registerLastName.set($event)" />
+        <input type="email" placeholder="Email" [ngModel]="registerEmail()" (ngModelChange)="registerEmail.set($event)" />
+        <input type="password" placeholder="Password" [ngModel]="registerPassword()" (ngModelChange)="registerPassword.set($event)" />
+        <p class="hint-note">Min. 8 caractere, cel puțin o literă și o cifră.</p>
+        <button type="button" (click)="register()">Create account</button>
+        @if (registerMessage()) {
+          <p class="success-message">{{ registerMessage() }}</p>
+        }
+        @if (registerError()) {
+          <p class="error-message">{{ registerError() }}</p>
+        }
+      </div>
+
+      <div class="auth-form">
+        <h3>Login</h3>
+        <input type="email" placeholder="Email" [ngModel]="loginEmail()" (ngModelChange)="loginEmail.set($event)" />
+        <input type="password" placeholder="Password" [ngModel]="loginPassword()" (ngModelChange)="loginPassword.set($event)" />
+        <button type="button" (click)="login()">Login</button>
+        @if (loginError()) {
+          <p class="error-message">{{ loginError() }}</p>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="authenticated-area">
+      <div class="user-bar">
+        <span>
+          Autentificat ca <strong>{{ currentUser()?.first_name }} {{ currentUser()?.last_name }}</strong>
+          ({{ currentUser()?.email }})
+        </span>
+        <button type="button" (click)="logout()">Logout</button>
+      </div>
+
+      @if (bankingError()) {
+        <p class="error-message">{{ bankingError() }}</p>
+      }
+
+      <div class="banking-grid">
+        <div class="banking-card">
+          <h3>My Account</h3>
+          @if (account(); as acc) {
+            <p>IBAN: <strong>{{ acc.iban }}</strong></p>
+            <p>Sold: <strong>{{ acc.balance }} {{ acc.currency }}</strong></p>
+            <p>Status: {{ acc.status }}</p>
+          } @else {
+            <p><em>Se încarcă...</em></p>
+          }
+        </div>
+
+        <div class="banking-card">
+          <h3>My Card</h3>
+          @for (card of cards(); track card.id) {
+            <p>**** **** **** {{ card.last_four }}</p>
+            <p>Expiră: {{ card.expiry_month }}/{{ card.expiry_year }}</p>
+            <p>Status: {{ card.status }} ({{ card.type }})</p>
+          } @empty {
+            <p><em>Niciun card încă.</em></p>
+          }
+        </div>
+
+        <div class="banking-card">
+          <h3>Demo Funding</h3>
+          <p class="dev-only-note">⚠️ Strict development — nu e depunere reală.</p>
+          <div class="input-row">
+            <input type="number" min="1" step="1" [ngModel]="fundAmountRon()" (ngModelChange)="fundAmountRon.set($event)" />
+            <span>RON</span>
+          </div>
+          <button type="button" [disabled]="isFunding()" (click)="addDemoFunds()">
+            {{ isFunding() ? 'Se procesează...' : 'Add demo funds' }}
+          </button>
+        </div>
+
+        <div class="banking-card">
+          <h3>Transfer</h3>
+          <input type="text" placeholder="Destination IBAN" [ngModel]="transferToIban()" (ngModelChange)="transferToIban.set($event)" />
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="Amount RON"
+            [ngModel]="transferAmountRon()"
+            (ngModelChange)="transferAmountRon.set($event)"
+          />
+          <input type="text" placeholder="Description" [ngModel]="transferDescription()" (ngModelChange)="transferDescription.set($event)" />
+          <button type="button" [disabled]="isTransferring()" (click)="sendTransfer()">
+            {{ isTransferring() ? 'Se trimite...' : 'Send transfer' }}
+          </button>
+          @if (transferMessage()) {
+            <p class="success-message">{{ transferMessage() }}</p>
+          }
+          @if (transferError()) {
+            <p class="error-message">{{ transferError() }}</p>
+          }
+        </div>
+      </div>
+
+      <div class="transactions-section">
+        <h3>Transactions</h3>
+        <button type="button" (click)="loadTransactions()">Reîmprospătează</button>
+        <table class="transactions-table">
+          <thead>
+            <tr>
+              <th>Direcție</th>
+              <th>Sumă</th>
+              <th>Descriere</th>
+              <th>Contrapartidă</th>
+              <th>Status</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (tx of transactions(); track tx.id) {
+              <tr [class.incoming]="tx.direction === 'incoming'" [class.outgoing]="tx.direction === 'outgoing'">
+                <td>{{ tx.direction === 'incoming' ? '⬇️ incoming' : '⬆️ outgoing' }}</td>
+                <td>{{ tx.direction === 'incoming' ? '+' : '-' }}{{ tx.amount }} {{ tx.currency }}</td>
+                <td>{{ tx.description }}</td>
+                <td>{{ tx.counterparty_iban }}</td>
+                <td>{{ tx.status }}</td>
+                <td>{{ tx.created_at | date: 'short' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6"><em>Nicio tranzacție încă.</em></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</section>

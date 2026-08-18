@@ -1,0 +1,35 @@
+"""auth-service — users, autentificare, JWT, hashing parole (bcrypt).
+
+Responsabilități actuale: register / login / me. NU implementează încă
+OAuth, MFA sau integrare bancară reală.
+"""
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.database import close_database_connection, ping_database
+from app.routers.auth import router as auth_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [auth-service] %(levelname)s %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await close_database_connection()
+
+
+app = FastAPI(title="MaestroBank Auth Service", lifespan=lifespan)
+app.include_router(auth_router)
+
+
+@app.get("/health")
+async def health_check():
+    is_connected = await ping_database()
+    return {
+        "status": "ok" if is_connected else "error",
+        "service": "auth-service",
+        "database": "connected" if is_connected else "disconnected",
+    }

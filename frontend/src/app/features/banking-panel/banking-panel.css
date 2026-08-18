@@ -1,0 +1,132 @@
+.banking-panel {
+  max-width: 900px;
+  margin: 1.5rem auto;
+  padding: 1rem 1.5rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: monospace;
+  background: #fafafa;
+  color: #222;
+  text-align: left;
+}
+
+.banking-panel h2,
+.banking-panel h3 {
+  margin-top: 0;
+}
+
+.flow-note {
+  font-size: 0.8rem;
+  color: #555;
+  margin-bottom: 0.25rem;
+}
+
+.hint-note {
+  font-size: 0.75rem;
+  color: #555;
+  margin: -0.25rem 0 0.5rem 0;
+}
+
+.dev-only-note {
+  font-size: 0.78rem;
+  color: #9a6700;
+  margin-bottom: 1rem;
+}
+
+.auth-forms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 700px) {
+  .auth-forms {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auth-form,
+.banking-card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  background: #fff;
+}
+
+.auth-form input,
+.banking-card input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.input-row input {
+  margin-bottom: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.user-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.banking-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .banking-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.transactions-table th,
+.transactions-table td {
+  border: 1px solid #ddd;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+}
+
+.transactions-table tr.outgoing td:nth-child(2) {
+  color: #cf222e;
+}
+
+.transactions-table tr.incoming td:nth-child(2) {
+  color: #1a7f37;
+}
+
+.success-message {
+  color: #1a7f37;
+}
+
+.error-message {
+  color: #cf222e;
+}
