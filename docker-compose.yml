@@ -1,0 +1,51 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: maestrobank-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - maestrobank-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: maestrobank-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/maestrobank
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - mongodb
+    networks:
+      - maestrobank-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: maestrobank-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - maestrobank-network
+
+networks:
+  maestrobank-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

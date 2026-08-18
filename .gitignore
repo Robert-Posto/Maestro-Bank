@@ -1,0 +1,17 @@
+# Node / Angular
+node_modules/
+.angular/
+dist/
+
+# Python / FastAPI
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment
+.env
+
+# Editors
+.idea/
+.vscode/
