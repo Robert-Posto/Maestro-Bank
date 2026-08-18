@@ -1,3 +1,54 @@
+<!-- ================================================================= -->
+<!-- Panou temporar de dezvoltare/test — verifică arhitectura          -->
+<!-- Angular -> FastAPI -> MongoDB. Fără styling elaborat, doar        -->
+<!-- funcțional. De înlocuit cu UI-ul real MaestroBank mai târziu.     -->
+<!-- ================================================================= -->
+<section class="dev-panel">
+  <h2>🔧 MaestroBank — panou de test arhitectură</h2>
+  <p class="flow-note">Angular → Nginx (8080) → API Gateway (8000) → microservicii → MongoDB</p>
+
+  <div class="status-row">
+    <span>Backend (Gateway + Nginx):</span>
+    <strong
+      class="status-value"
+      [class.ok]="systemStatus() === 'ok'"
+      [class.error]="systemStatus() === 'error'"
+      [class.warn]="systemStatus() === 'degraded'"
+    >
+      {{ systemStatus() }}
+    </strong>
+  </div>
+
+  <div class="status-row">
+    <span>MongoDB:</span>
+    <strong
+      class="status-value"
+      [class.ok]="mongoStatus() === 'connected'"
+      [class.error]="mongoStatus() === 'error' || mongoStatus() === 'disconnected'"
+    >
+      {{ mongoStatus() }}
+    </strong>
+  </div>
+
+  <h3>Servicii</h3>
+  <ul class="services-list">
+    @for (entry of serviceEntries(); track entry[0]) {
+      <li>
+        <span>{{ entry[0] }}:</span>
+        <strong [class.ok]="entry[1] === 'connected'" [class.error]="entry[1] !== 'connected'">
+          {{ entry[1] }}
+        </strong>
+      </li>
+    } @empty {
+      <li><em>Se verifică...</em></li>
+    }
+  </ul>
+
+  <button type="button" (click)="checkHealth()">Reverifică status</button>
+</section>
+
+<app-banking-panel />
+
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
 <!-- * * * * * * * * * * * The content below * * * * * * * * * * * -->
 <!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * -->

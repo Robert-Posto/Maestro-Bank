@@ -1,0 +1,79 @@
+/* Panou temporar de test — vezi app.html. Doar funcțional, fără design elaborat. */
+.dev-panel {
+  max-width: 480px;
+  margin: 1rem auto;
+  padding: 1rem 1.5rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: monospace;
+  background: #fafafa;
+  color: #222;
+  text-align: left;
+}
+
+.dev-panel h2,
+.dev-panel h3 {
+  margin-top: 0;
+}
+
+.dev-panel .status-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.dev-panel .status-value.ok {
+  color: #1a7f37;
+  font-weight: bold;
+}
+
+.dev-panel .status-value.error {
+  color: #cf222e;
+  font-weight: bold;
+}
+
+.dev-panel .status-value.warn {
+  color: #9a6700;
+  font-weight: bold;
+}
+
+.dev-panel .flow-note {
+  font-size: 0.8rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.dev-panel ul {
+  padding-left: 1.25rem;
+}
+
+.dev-panel .services-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 0.75rem 0;
+}
+
+.dev-panel .services-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.15rem 0;
+}
+
+.dev-panel .services-list .ok {
+  color: #1a7f37;
+}
+
+.dev-panel .services-list .error {
+  color: #cf222e;
+}
+
+.dev-panel .add-item-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dev-panel .error-message {
+  color: #cf222e;
+}
+

@@ -1,0 +1,78 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, signal } from '@angular/core';
+import { Observable, tap } from 'rxjs';
+
+import { API_BASE_URL } from '../core/api-config';
+
+const TOKEN_STORAGE_KEY = 'maestrobank_dev_jwt';
+
+export interface RegisterPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+/**
+ * ⚠️ NOTĂ IMPORTANT — implementare de DEVELOPMENT, NU arhitectură de
+ * securitate pentru producție: tokenul JWT e ținut în `sessionStorage`,
+ * doar ca să putem testa manual din browser fluxul register -> login ->
+ * acțiuni protejate. Într-o aplicație reală, stocarea/reînnoirea
+ * tokenului ar necesita o strategie mult mai atentă (ex. httpOnly
+ * cookies, refresh tokens, protecție XSS/CSRF) — nu prezenta această
+ * alegere drept soluție finală.
+ */
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  readonly currentUser = signal<AuthUser | null>(null);
+
+  constructor(private readonly http: HttpClient) {}
+
+  register(payload: RegisterPayload): Observable<AuthUser> {
+    return this.http.post<AuthUser>(`${API_BASE_URL}/auth/register`, payload);
+  }
+
+  login(payload: LoginPayload): Observable<TokenResponse> {
+    return this.http
+      .post<TokenResponse>(`${API_BASE_URL}/auth/login`, payload)
+      .pipe(tap((response) => this.setToken(response.access_token)));
+  }
+
+  fetchCurrentUser(): Observable<AuthUser> {
+    return this.http.get<AuthUser>(`${API_BASE_URL}/auth/me`).pipe(tap((user) => this.currentUser.set(user)));
+  }
+
+  logout(): void {
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    this.currentUser.set(null);
+  }
+
+  getToken(): string | null {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  }
+
+  isAuthenticated(): boolean {
+    return this.getToken() !== null;
+  }
+
+  private setToken(token: string): void {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  }
+}
