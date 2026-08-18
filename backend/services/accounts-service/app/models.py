@@ -1,33 +1,9 @@
-"""Modele Pydantic pentru accounts-service (accounts_db).
-
-TestItem* rămân TEMPORARE (endpoint-uri de debugging, nu mai sunt
-afișate în UI-ul principal Angular — vezi routers/test_items.py).
-Restul modelelor din acest fișier sunt cele reale, pentru core banking.
-"""
+"""Modele Pydantic pentru accounts-service (accounts_db)."""
 
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-# --- TEMPORAR — vezi routers/test_items.py -----------------------------
-
-
-class TestItemCreate(BaseModel):
-    name: str
-
-
-class TestItemOut(BaseModel):
-    id: str = Field(alias="_id")
-    name: str
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    @field_validator("id", mode="before")
-    @classmethod
-    def convert_object_id(cls, value: Any) -> str:
-        return str(value)
-
 
 # --- Core banking --------------------------------------------------------
 

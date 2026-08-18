@@ -85,9 +85,9 @@ def mock_accounts(monkeypatch):
             "to_balance_minor": state["destination"]["balance_minor"],
         }
 
-    monkeypatch.setattr("app.routers.transfers._get_account_by_user", fake_get_by_user)
-    monkeypatch.setattr("app.routers.transfers._get_account_by_iban", fake_get_by_iban)
-    monkeypatch.setattr("app.routers.transfers._apply_transfer", fake_apply_transfer)
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
+    monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)
+    monkeypatch.setattr("app.service._apply_transfer", fake_apply_transfer)
     return state
 
 
@@ -166,8 +166,8 @@ async def test_invalid_destination_rejected(client: AsyncClient, monkeypatch):
     async def fake_get_by_iban(iban: str):
         return None  # IBAN inexistent
 
-    monkeypatch.setattr("app.routers.transfers._get_account_by_user", fake_get_by_user)
-    monkeypatch.setattr("app.routers.transfers._get_account_by_iban", fake_get_by_iban)
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
+    monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)
 
     response = await client.post(
         "/transactions/transfers",

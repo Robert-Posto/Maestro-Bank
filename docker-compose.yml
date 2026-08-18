@@ -11,6 +11,12 @@ services:
       - "27018:27017"
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     networks:
       - maestrobank-network
 
@@ -39,9 +45,17 @@ services:
       - ./backend/services/auth-service/app:/app/app
       - ./backend/services/auth-service/tests:/app/tests
       - ./backend/services/auth-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - mongodb
-      - accounts-service
+      mongodb:
+        condition: service_healthy
+      accounts-service:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -61,8 +75,15 @@ services:
       - ./backend/services/accounts-service/app:/app/app
       - ./backend/services/accounts-service/tests:/app/tests
       - ./backend/services/accounts-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -83,9 +104,17 @@ services:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
       - ./backend/services/transactions-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - mongodb
-      - accounts-service
+      mongodb:
+        condition: service_healthy
+      accounts-service:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -101,30 +130,15 @@ services:
       - MONGO_URL=mongodb://mongodb:27017/budgets_db
     volumes:
       - ./backend/services/budgets-service/app:/app/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - mongodb
-    networks:
-      - maestrobank-network
-
-  future-service-1:
-    build:
-      context: ./backend/services/future-service-1
-      dockerfile: Dockerfile
-    container_name: maestrobank-future-service-1
-    restart: unless-stopped
-    volumes:
-      - ./backend/services/future-service-1/app:/app/app
-    networks:
-      - maestrobank-network
-
-  future-service-2:
-    build:
-      context: ./backend/services/future-service-2
-      dockerfile: Dockerfile
-    container_name: maestrobank-future-service-2
-    restart: unless-stopped
-    volumes:
-      - ./backend/services/future-service-2/app:/app/app
+      mongodb:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -153,12 +167,23 @@ services:
       - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
     volumes:
       - ./backend/gateway/app:/app/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - mongodb
-      - auth-service
-      - accounts-service
-      - transactions-service
-      - budgets-service
+      mongodb:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      accounts-service:
+        condition: service_healthy
+      transactions-service:
+        condition: service_healthy
+      budgets-service:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -173,8 +198,17 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      # Verifică și că Nginx e sus, ȘI că poate ajunge la Gateway prin proxy
+      # (exact traseul care s-a stricat la un rebuild anterior al gateway-ului).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -192,7 +226,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - nginx
+      nginx:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
