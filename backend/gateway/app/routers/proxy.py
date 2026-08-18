@@ -8,9 +8,9 @@ văzute doar în interiorul rețelei, browserul nu le poate accesa).
 NOTĂ despre prefixe interne: auth-service și transactions-service își
 expun propriile rute sub un prefix cu numele lor (ex. intern:
 /auth/register, /transactions/transfers), pe când accounts-service și
-budgets-service expun rute fără prefix suplimentar (ex. intern: /me,
-/test-items). De aceea fiecare intrare din SERVICES are propriul
-`internal_prefix`, aplicat înainte de forwarding.
+budgets-service expun rute fără prefix suplimentar (ex. intern: /me).
+De aceea fiecare intrare din SERVICES are propriul `internal_prefix`,
+aplicat înainte de forwarding.
 
 JWT: rutele "sensibile" (orice ține de bani/identitate) sunt validate AICI
 — în Gateway — înainte de orice forwarding, folosind `_is_protected`. Un
@@ -46,10 +46,7 @@ def _is_protected(service: str, path: str) -> bool:
 
     Regulă:
       - auth: doar "me" e protejat (register/login rămân publice);
-      - accounts: TOT e protejat, CU EXCEPȚIA "test-items" (endpoint
-        temporar de debugging, păstrat public — vezi
-        services/accounts-service/app/routers/test_items.py; nu mai e
-        afișat în UI, dar rămâne accesibil pentru debugging manual);
+      - accounts: TOT e protejat (me, me/cards, dev/fund, {id});
       - transactions: TOT e protejat (nu există rute publice, inclusiv
         path="" pentru GET /api/transactions);
       - budgets: nimic protejat încă (nu există rute bancare acolo).
@@ -57,7 +54,7 @@ def _is_protected(service: str, path: str) -> bool:
     if service == "auth":
         return path == "me"
     if service == "accounts":
-        return path != "test-items"
+        return True
     if service == "transactions":
         return True
     return False

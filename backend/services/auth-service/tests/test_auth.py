@@ -33,7 +33,7 @@ def mock_provisioning(monkeypatch):
     async def _noop(user_id: str) -> None:
         return None
 
-    monkeypatch.setattr("app.routers.auth._provision_bank_account", _noop)
+    monkeypatch.setattr("app.service._provision_bank_account", _noop)
 
 
 @pytest.fixture(autouse=True)

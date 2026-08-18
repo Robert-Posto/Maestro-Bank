@@ -21,8 +21,6 @@ auth-service   accounts-service  transactions-service  budgets-service
      ▼              ▼                  ▼                ▼
   auth_db       accounts_db          tx_db           budgets_db
                                                     (aceeași instanță MongoDB, 27017)
-
-future-service-1 / future-service-2 — placeholder-e rezervate, fără rută prin Gateway încă.
 ```
 
 Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceeași instanță MongoDB**, fiecare cu propria bază de date. Niciun microserviciu nu citește direct baza altui microserviciu — comunicarea între ele se face doar prin API (ex. `transactions-service` nu citește `accounts_db`, cere datele prin API-ul intern al `accounts-service`).
@@ -37,11 +35,27 @@ Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceea�
 | **auth-service** | users, autentificare, JWT, hash parole (bcrypt), provizionare automată cont bancar | `auth_db` | 8001 |
 | **accounts-service** | conturi RON, IBAN demo, carduri virtuale demo, solduri | `accounts_db` | 8002 |
 | **transactions-service** | transferuri, istoric tranzacții | `tx_db` | 8003 |
-| **budgets-service** | bugete, abonamente, limite de cheltuieli (viitor) | `budgets_db` | 8004 |
-| **future-service-1/2** | rezervate pentru funcționalități viitoare nedecise | `future1_db` / `future2_db` (nefolosite încă) | — (intern) |
+| **budgets-service** | bugete, abonamente, limite de cheltuieli (viitor — deocamdată doar health check, fără rute reale) | `budgets_db` | 8004 |
 | **mongodb** | baza de date, comună tuturor serviciilor de mai sus | — | 27018 (host) → 27017 (container) |
 
 Angular **nu** vorbește niciodată direct cu un microserviciu — trece mereu prin Nginx → Gateway.
+
+### Structura internă a unui serviciu
+
+`auth-service`, `accounts-service` și `transactions-service` respectă aceeași separare:
+
+```text
+app/
+├── main.py      # app factory FastAPI, health check, includerea router-elor
+├── config.py    # settings din variabile de mediu (pydantic-settings)
+├── database.py  # conexiunea Motor la MongoDB
+├── models.py    # documente Mongo + DTO-uri Pydantic (request/response)
+├── security.py  # dependency de validare JWT (get_current_user_id)
+├── routers/     # DOAR HTTP: validare input, apel service.py, returnare
+└── service.py   # TOATĂ logica de business + acces la bază de date
+```
+
+Regula: `routers/*.py` nu atinge niciodată direct baza de date — doar validează și deleagă către `service.py`. `budgets-service` e încă doar un schelet (health check), fără `service.py`/`router.py` proprii, pentru că nu are încă nicio funcționalitate implementată.
 
 ## Fluxul Core Banking
 
@@ -129,6 +143,12 @@ Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `
 - **JWT în frontend**: ținut în `sessionStorage`, alegere de DEVELOPMENT, nu arhitectură de securitate pentru producție.
 - **IBAN demo**: cifrele de control sunt pseudo-aleatoare, NU calculate conform standardului real (MOD-97) — suficient pentru UI, nu valid ca IBAN real.
 
-## Ce NU implementăm încă
+## Ce lipsește față de planul complet (Cumpăna)
 
-Agenți AI, integrare OpenAI, plăți reale, Visa/Mastercard, SEPA, Open Banking/PSD2, IBAN-uri bancare reale, business logic complex de bugete/abonamente, designul final al aplicației Angular.
+Fundația de backend + frontend (subiectul acestui README) e considerată prioritară și trebuie să fie solidă înainte de a trece la etapa de AI. Ce nu există încă, planificat pentru etapele următoare:
+
+- **RabbitMQ** — nu rulează încă în `docker-compose.yml`. Necesar pentru fluxul asincron (`transaction.created` → analiză Guardian în fundal, fără să blocheze userul).
+- **ai-orchestrator-service** — orchestratorul + cei 3 agenți AI (Spending, Budget, Guardian) + integrarea cu Azure AI Foundry. Nu există niciun folder/serviciu pentru el încă.
+- **budgets-service** — doar schelet (health check), fără bugete/abonamente/detecție reale.
+- Plăți reale, Visa/Mastercard, SEPA, Open Banking/PSD2, IBAN-uri bancare reale — intenționat, niciodată planificate (proiect demo).
+- Designul final al aplicației Angular (UI-ul curent, `banking-panel`, e explicit un panou de test funcțional, nu design-ul final).
