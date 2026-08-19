@@ -211,6 +211,10 @@ import { Component, input } from '@angular/core';
           <path d="M9 8h6" />
           <path d="M9 12h6" />
         }
+        @case ('send') {
+          <path d="M4.5 12L20 4l-6.5 16-2.7-6.8L4.5 12z" />
+          <path d="M10.8 13.2L20 4" />
+        }
       }
     </svg>
   `,
