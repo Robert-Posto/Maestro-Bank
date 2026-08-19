@@ -56,6 +56,10 @@ class TransactionOut(BaseModel):
     amount: str
     currency: str
     counterparty_iban: str
+    # "Prenume Nume" al contrapărții, DOAR pentru transferuri către/de la
+    # un user MaestroBank real — None pentru plăți către comercianți
+    # (acolo frontendul afișează descrierea, ex. numele comerciantului).
+    counterparty_name: str | None = None
     description: str
     category: str = "other"
     status: str

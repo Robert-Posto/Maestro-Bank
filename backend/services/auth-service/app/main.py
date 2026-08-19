@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from app.database import close_database_connection, ping_database
 from app.routers.auth import router as auth_router
+from app.routers.internal import router as internal_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [auth-service] %(levelname)s %(message)s")
 
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MaestroBank Auth Service", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(internal_router)
 
 
 @app.get("/health")

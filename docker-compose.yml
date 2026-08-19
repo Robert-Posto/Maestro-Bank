@@ -45,6 +45,7 @@ services:
       - ./backend/services/auth-service/app:/app/app
       - ./backend/services/auth-service/tests:/app/tests
       - ./backend/services/auth-service/pytest.ini:/app/pytest.ini
+      - ./scripts:/app/scripts
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 5s
@@ -101,6 +102,7 @@ services:
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
+      - AUTH_SERVICE_URL=http://auth-service:8000
     volumes:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
@@ -117,6 +119,8 @@ services:
       accounts-service:
         condition: service_healthy
       budgets-service:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     networks:
       - maestrobank-network

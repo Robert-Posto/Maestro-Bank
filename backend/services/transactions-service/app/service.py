@@ -11,6 +11,7 @@ localhost. Vezi `_get_account_by_user` / `_get_account_by_iban` /
 `_apply_transfer` mai jos.
 """
 
+import asyncio
 import csv
 import io
 import logging
@@ -59,6 +60,25 @@ async def _get_account_by_iban(iban: str) -> dict | None:
     return response.json()
 
 
+async def _get_user_name(user_id: str) -> str | None:
+    """Rezolvă "Prenume Nume" pentru un user real, prin auth-service.
+
+    Întoarce None dacă lookup-ul eșuează — ex. contrapartida e un cont-
+    pseudo de comerciant (fără user real în auth_db), sau auth-service e
+    indisponibil. Degradare grațioasă: frontendul cade atunci înapoi pe
+    descriere/IBAN, exact ca înainte (vezi to_transaction_view).
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.auth_service_url}/internal/users/{user_id}")
+        if response.status_code == 200:
+            body = response.json()
+            return f"{body['first_name']} {body['last_name']}"
+    except httpx.RequestError:
+        logger.warning("transactions-service: auth-service indisponibil la rezolvarea numelui (user_id=%s)", user_id)
+    return None
+
+
 async def _apply_transfer(from_account_id: str, to_account_id: str, amount_minor: int) -> dict:
     """Cere accounts-service să aplice EFECTIV mutarea de sold (debit + credit)."""
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -93,6 +113,11 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "amount": format_minor_amount(doc["amount_minor"]),
         "currency": doc["currency"],
         "counterparty_iban": doc["to_iban"] if is_outgoing else doc["from_iban"],
+        # Nume "Prenume Nume" al contrapărții, DOAR dacă e un user real —
+        # salvat ca snapshot la creare transfer (vezi create_transfer),
+        # nu recalculat live. None pentru plăți către comercianți/nume
+        # care nu au fost rezolvate — frontendul cade pe descriere/IBAN.
+        "counterparty_name": doc.get("to_name") if is_outgoing else doc.get("from_name"),
         "description": doc.get("description", ""),
         "category": doc.get("category", "other"),
         "status": doc["status"],
@@ -138,12 +163,23 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
 
     # 10. descriere limitată rezonabil — garantat de validarea Pydantic (max_length=140)
 
+    # Nume snapshot pentru contrapartidă (afișat în UI în loc de IBAN brut —
+    # ex. "Ai primit 100 RON de la Andrei Popescu"). Rezolvat o singură
+    # dată, la creare, prin auth-service — None pentru conturi fără user
+    # real (comercianți), degradare grațioasă dacă auth-service pică.
+    from_name, to_name = await asyncio.gather(
+        _get_user_name(source["user_id"]),
+        _get_user_name(destination["user_id"]),
+    )
+
     now = datetime.now(timezone.utc)
     transaction_doc = {
         "from_account_id": source["id"],
         "to_account_id": destination["id"],
         "from_iban": source["iban"],
         "to_iban": destination["iban"],
+        "from_name": from_name,
+        "to_name": to_name,
         "amount_minor": payload.amount_minor,
         "currency": source["currency"],
         "description": payload.description,

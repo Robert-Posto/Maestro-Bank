@@ -84,8 +84,8 @@
             <tr (click)="openDetails(tx.id)" [class.tx-table__row--active]="selectedId() === tx.id">
               <td>{{ tx.created_at | date: 'dd MMM yyyy' }}</td>
               <td class="tx-table__merchant">
-                <span class="tx-table__avatar">{{ (tx.description || tx.counterparty_iban).charAt(0).toUpperCase() }}</span>
-                {{ tx.description || tx.counterparty_iban }}
+                <span class="tx-table__avatar">{{ displayName(tx).charAt(0).toUpperCase() }}</span>
+                {{ displayName(tx) }}
               </td>
               <td>{{ categoryLabel(tx.category) }}</td>
               <td>Cont curent RON</td>

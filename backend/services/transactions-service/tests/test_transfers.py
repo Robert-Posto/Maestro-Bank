@@ -2,10 +2,10 @@
 Teste pentru transactions-service.
 
 Apelurile către accounts-service (_get_account_by_user, _get_account_by_iban,
-_apply_transfer) sunt MOCK-uite aici, intenționat — nu e responsabilitatea
-acestor teste să (re)verifice accounts-service (are propriile teste), iar
-altfel ar fi nevoie de accounts-service pornit și s-ar polua accounts_db
-real la fiecare rulare.
+_apply_transfer) și auth-service (_get_user_name) sunt MOCK-uite aici,
+intenționat — nu e responsabilitatea acestor teste să (re)verifice acele
+servicii (au propriile teste), iar altfel ar fi nevoie de ele pornite și
+s-ar polua bazele lor reale la fiecare rulare.
 
 Rulare (cu stack-ul pornit prin `docker compose up`, bază de TEST
 separată pentru tx_db):
@@ -85,9 +85,14 @@ def mock_accounts(monkeypatch):
             "to_balance_minor": state["destination"]["balance_minor"],
         }
 
+    async def fake_get_user_name(user_id: str) -> str | None:
+        names = {SOURCE_ACCOUNT["user_id"]: "Octavia Stefan", DEST_ACCOUNT["user_id"]: "Andrei Popescu"}
+        return names.get(user_id)
+
     monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
     monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)
     monkeypatch.setattr("app.service._apply_transfer", fake_apply_transfer)
+    monkeypatch.setattr("app.service._get_user_name", fake_get_user_name)
     return state
 
 
@@ -113,7 +118,59 @@ async def test_transfer_succeeds(client: AsyncClient, mock_accounts):
 
     # sold sursă a scăzut / sold destinație a crescut (verificat via mock)
     assert mock_accounts["source"]["balance_minor"] == 50_000
-    assert mock_accounts["destination"]["balance_minor"] == 50_000
+    assert body["counterparty_name"] == "Andrei Popescu"
+
+
+async def test_counterparty_name_appears_for_both_sides(client: AsyncClient, mock_accounts, monkeypatch):
+    """Transferul apare cu numele corect pentru AMBELE părți: destinatarul
+    vede numele expeditorului, nu doar IBAN-ul (vezi feedback utilizator)."""
+    await client.post(
+        "/transactions/transfers",
+        json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 10_000, "description": ""},
+        headers=AUTH_HEADER,
+    )
+
+    # comutăm "viewer"-ul pe contul destinație, ca să vedem tranzacția din perspectiva lui Andrei
+    async def fake_get_by_user_as_destination(user_id: str) -> dict:
+        return mock_accounts["destination"]
+
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user_as_destination)
+
+    response = await client.get("/transactions", headers=AUTH_HEADER)
+    items = response.json()
+    assert items[0]["direction"] == "incoming"
+    assert items[0]["counterparty_name"] == "Octavia Stefan"
+
+
+async def test_counterparty_name_null_for_merchant_without_real_user(client: AsyncClient, monkeypatch):
+    """Plată către un cont-pseudo de comerciant (fără user real în auth_db)
+    -> counterparty_name None, frontendul cade pe descriere (numele comerciantului)."""
+
+    async def fake_get_by_user(user_id: str) -> dict:
+        return dict(SOURCE_ACCOUNT)
+
+    async def fake_get_by_iban(iban: str):
+        return dict(DEST_ACCOUNT)
+
+    async def fake_apply_transfer(from_id: str, to_id: str, amount_minor: int) -> dict:
+        return {"from_balance_minor": 0, "to_balance_minor": 0}
+
+    async def fake_get_user_name(user_id: str) -> str | None:
+        return None  # simulează un cont-pseudo de comerciant, fără user real
+
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
+    monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)
+    monkeypatch.setattr("app.service._apply_transfer", fake_apply_transfer)
+    monkeypatch.setattr("app.service._get_user_name", fake_get_user_name)
+
+    response = await client.post(
+        "/transactions/transfers",
+        json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 5_000, "description": "Kaufland"},
+        headers=AUTH_HEADER,
+    )
+    body = response.json()
+    assert body["counterparty_name"] is None
+    assert body["description"] == "Kaufland"
 
 
 async def test_transaction_is_saved_and_listed(client: AsyncClient, mock_accounts):

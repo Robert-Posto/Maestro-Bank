@@ -116,6 +116,12 @@
   overflow-wrap: anywhere;
 }
 
+.details-panel__iban-secondary {
+  display: block;
+  margin-top: 2px;
+  color: var(--mb-text-tertiary);
+}
+
 .details-panel__actions {
   display: flex;
   flex-direction: column;

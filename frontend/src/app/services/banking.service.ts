@@ -53,6 +53,8 @@ export interface TransactionView {
   amount: string;
   currency: string;
   counterparty_iban: string;
+  /** "Prenume Nume", doar pentru transferuri către/de la un user MaestroBank real — null pentru comercianți. */
+  counterparty_name: string | null;
   description: string;
   category: string;
   status: string;
