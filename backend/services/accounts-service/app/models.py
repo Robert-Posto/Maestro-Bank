@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 # Design-urile disponibile pentru un card nou — vezi app/service.py::create_card.
 # Sursa de adevăr pentru randare (gradient/culori) rămâne în frontend
@@ -11,6 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 # reale, nu un string arbitrar.
 CardDesign = Literal["midnight", "aurora", "rose-gold", "graphite", "arctic"]
 CardType = Literal["virtual", "physical"]
+
+# "current" e contul unic, provizionat automat la înregistrare (vezi
+# service.py::provision_account) — NU poate fi creat manual, de-aia
+# AccountCreateRequest de mai jos restricționează la celelalte 3 tipuri.
+AccountType = Literal["current", "savings", "deposit", "student"]
+CreatableAccountType = Literal["savings", "deposit", "student"]
 
 # --- Core banking --------------------------------------------------------
 
@@ -25,6 +31,11 @@ class AccountOut(BaseModel):
     balance_minor: int
     status: str
     created_at: datetime
+    # Default "current" — conturile create ÎNAINTE de introducerea tipurilor
+    # de cont nu au acest câmp în Mongo; lipsa lui cade automat pe "current",
+    # fără nicio migrare de date necesară (același pattern ca la CardOut).
+    account_type: AccountType = "current"
+    verification_document_name: str | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -35,7 +46,7 @@ class AccountOut(BaseModel):
 
 
 class AccountPublicOut(BaseModel):
-    """DTO expus prin GET /accounts/me și GET /accounts/{id}.
+    """DTO expus prin GET /accounts/me, /accounts/all și GET /accounts/{id}.
 
     `balance` e doar pentru convenience în UI — valoarea CANONICĂ rămâne
     `balance_minor` (întreg, în bani, NU float).
@@ -48,6 +59,44 @@ class AccountPublicOut(BaseModel):
     balance: str
     status: str
     created_at: datetime
+    account_type: AccountType = "current"
+    # Numele fișierului încărcat la deschidere (ex. cont student) — vezi
+    # AccountCreateRequest. NU stocăm conținutul documentului (fără storage
+    # de fișiere real în acest demo — vezi service.py::create_additional_account),
+    # doar metadata, suficientă pentru a arăta userului "ai atașat un document".
+    verification_document_name: str | None = None
+
+
+class AccountCreateRequest(BaseModel):
+    """POST /accounts/new — deschide un cont suplimentar (economii/depozit/student).
+
+    Un singur cont per tip, per user (vezi service.py::create_additional_account)
+    — suficient pentru acest demo, evită conturi duplicate fără sens.
+
+    Contul de student cere un document justificativ (adeverință/carnet de
+    student) — DOAR numele fișierului e trimis către backend (vezi nota de
+    la `verification_document_name` din AccountPublicOut); nu există o
+    verificare/aprobare umană reală în acest demo, e acceptat automat, la
+    fel cum reveal-ul de card e plauzibil vizual dar nu trece printr-un
+    procesator real.
+    """
+
+    account_type: CreatableAccountType
+    document_filename: str | None = Field(default=None, max_length=200)
+
+    @field_validator("document_filename")
+    @classmethod
+    def _strip_filename(cls, value: str | None) -> str | None:
+        return value.strip() if value else value
+
+    @model_validator(mode="after")
+    def _require_document_for_student(self) -> "AccountCreateRequest":
+        # `field_validator` NU rulează pe valoarea implicită (None) când
+        # câmpul lipsește din payload — de-aia verificarea trăiește aici,
+        # la nivel de model, care rulează întotdeauna.
+        if self.account_type == "student" and not self.document_filename:
+            raise ValueError("Contul de student necesită un document justificativ (adeverință sau carnet de student).")
+        return self
 
 
 class CardOut(BaseModel):
@@ -237,6 +286,7 @@ class InternalAccountView(BaseModel):
     currency: str
     balance_minor: int
     status: str
+    account_type: AccountType = "current"
 
 
 class InternalTransferRequest(BaseModel):

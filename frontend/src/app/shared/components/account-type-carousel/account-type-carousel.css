@@ -1,0 +1,196 @@
+.atc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.atc__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--mb-radius-lg);
+  scrollbar-width: none;
+}
+
+.atc__track::-webkit-scrollbar {
+  display: none;
+}
+
+.atc__card {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  padding: var(--mb-space-2) 2px var(--mb-space-2);
+}
+
+.atc__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--mb-radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--mb-space-2);
+}
+
+.atc__card h3 {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-navy-900);
+}
+
+.atc__tagline {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  line-height: var(--mb-line-height-base);
+  margin-bottom: var(--mb-space-1);
+}
+
+.atc__rate {
+  display: inline-block;
+  width: fit-content;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  background: var(--mb-surface-muted);
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--mb-radius-pill);
+  margin-bottom: var(--mb-space-2);
+}
+
+.atc__benefits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  margin: 0 0 var(--mb-space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.atc__benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.atc__benefits li app-icon {
+  color: var(--mb-positive);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.atc__dropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  border: 1.5px dashed var(--mb-border-strong);
+  border-radius: var(--mb-radius-sm);
+  padding: 0.7rem var(--mb-space-3);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  cursor: pointer;
+  transition: border-color var(--mb-transition-fast), background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.atc__dropzone:hover {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.atc__dropzone--filled {
+  border-style: solid;
+  border-color: var(--mb-positive);
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+}
+
+.atc__dropzone span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atc__dropzone input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.atc__document-hint {
+  font-size: 0.7rem;
+  color: var(--mb-text-tertiary);
+  margin: 0.35rem 0 var(--mb-space-3);
+  line-height: var(--mb-line-height-base);
+}
+
+.atc__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mb-space-4);
+}
+
+.atc__arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--mb-border-strong);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.atc__arrow:hover:not(:disabled) {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.atc__arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.atc__arrow-icon--prev {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+
+.atc__dots {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+}
+
+.atc__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--mb-border-strong);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--mb-transition-fast), transform var(--mb-transition-fast);
+}
+
+.atc__dot--active {
+  background: var(--mb-blue-500);
+  transform: scale(1.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atc__track {
+    scroll-behavior: auto;
+  }
+}

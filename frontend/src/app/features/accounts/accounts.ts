@@ -1,9 +1,10 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { DatePipe } from '@angular/common';
+import { DatePipe, LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { AccountView, BankingService, PocketView } from '../../services/banking.service';
+import { AccountType, AccountView, BankingService, CreatableAccountType, PocketView } from '../../services/banking.service';
+import { ACCOUNT_TYPE_CATALOG, CREATABLE_ACCOUNT_TYPES } from '../../shared/account-types';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
@@ -12,13 +13,22 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Modal } from '../../shared/components/modal/modal';
+import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
+import { AccountCreateEvent, AccountTypeCarousel } from '../../shared/components/account-type-carousel/account-type-carousel';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 /**
- * Conturi — vezi task-ul MaestroBank, secțiunea 8. MVP-ul are un singur
- * cont curent RON per user (provizionat automat la register). Pagina e
- * pregătită pentru a afișa mai multe conturi când backendul le va oferi.
+ * Conturi — vezi task-ul MaestroBank, secțiunea 8, extins cu deschiderea
+ * de conturi suplimentare (economii/depozit/student — accounts-service
+ * POST /accounts/new). Contul curent rămâne SINGURUL cont sursă pentru
+ * transferuri (vezi accounts-service::get_account_for_user) — conturile
+ * noi se alimentează prin Transferuri, folosind IBAN-ul lor propriu.
+ *
+ * Extinsă și cu Pockets (obiective de economisire, în interiorul
+ * contului curent RON) — vezi secțiunea dedicată mai jos, complet
+ * separată de fluxul de conturi multiple (nume distincte pentru modale,
+ * ca să nu se suprapună cu cel de deschidere cont nou).
  */
 @Component({
   selector: 'app-accounts',
@@ -33,7 +43,10 @@ import { extractErrorMessage } from '../../shared/error-utils';
     MoneyPipe,
     DatePipe,
     FormsModule,
+    LowerCasePipe,
     Modal,
+    ConfirmDialog,
+    AccountTypeCarousel,
   ],
   templateUrl: './accounts.html',
   styleUrl: './accounts.css',
@@ -43,19 +56,38 @@ export class Accounts implements OnInit {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
 
-  protected readonly account = signal<AccountView | null>(null);
+  protected readonly catalog = ACCOUNT_TYPE_CATALOG;
+
+  protected readonly accounts = signal<AccountView[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly copied = signal(false);
-
-  // --- Pockets (obiective de economisire) ---------------------------------
-  protected readonly pockets = signal<PocketView[]>([]);
-  protected readonly pocketsLoading = signal(true);
-  protected readonly totalAllocatedMinor = computed(() =>
-    this.pockets().reduce((sum, p) => sum + p.saved_minor, 0),
-  );
+  protected readonly copiedId = signal<string | null>(null);
 
   protected readonly createModalOpen = signal(false);
+  protected readonly creatingType = signal<AccountType | null>(null);
+
+  protected readonly pendingDeleteAccount = signal<AccountView | null>(null);
+  protected readonly deleting = signal(false);
+
+  protected readonly availableTypes = computed(() => {
+    const owned = new Set(this.accounts().map((a) => a.account_type));
+    return CREATABLE_ACCOUNT_TYPES.filter((t) => !owned.has(t)).map((t) => this.catalog[t]);
+  });
+
+  protected readonly totalBalanceMinor = computed(() => this.accounts().reduce((sum, a) => sum + a.balance_minor, 0));
+  protected readonly currentAccount = computed(() => this.accounts().find((a) => a.account_type === 'current') ?? null);
+  protected readonly setAsideMinor = computed(() =>
+    this.accounts()
+      .filter((a) => a.account_type === 'savings' || a.account_type === 'deposit')
+      .reduce((sum, a) => sum + a.balance_minor, 0),
+  );
+
+  // --- Pockets (obiective de economisire, în contul curent) ---------------
+  protected readonly pockets = signal<PocketView[]>([]);
+  protected readonly pocketsLoading = signal(true);
+  protected readonly totalAllocatedMinor = computed(() => this.pockets().reduce((sum, p) => sum + p.saved_minor, 0));
+
+  protected readonly pocketCreateModalOpen = signal(false);
   protected readonly newPocketName = signal('');
   protected readonly newPocketTargetRon = signal(500);
   protected readonly creatingPocket = signal(false);
@@ -72,13 +104,13 @@ export class Accounts implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.banking.getMyAccount().subscribe({
-      next: (account) => {
-        this.account.set(account);
+    this.banking.getAllAccounts().subscribe({
+      next: (accounts) => {
+        this.accounts.set(accounts);
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Nu am putut încărca contul.');
+        this.error.set('Nu am putut încărca conturile.');
         this.loading.set(false);
       },
     });
@@ -95,10 +127,10 @@ export class Accounts implements OnInit {
     });
   }
 
-  protected openCreateModal(): void {
+  protected openPocketCreateModal(): void {
     this.newPocketName.set('');
     this.newPocketTargetRon.set(500);
-    this.createModalOpen.set(true);
+    this.pocketCreateModalOpen.set(true);
   }
 
   protected saveNewPocket(): void {
@@ -114,7 +146,7 @@ export class Accounts implements OnInit {
       next: (pocket) => {
         this.pockets.update((list) => [...list, pocket]);
         this.creatingPocket.set(false);
-        this.createModalOpen.set(false);
+        this.pocketCreateModalOpen.set(false);
         this.toast.success(`Obiectiv "${pocket.name}" creat.`);
       },
       error: (err) => {
@@ -170,13 +202,11 @@ export class Accounts implements OnInit {
     });
   }
 
-  protected copyIban(): void {
-    const iban = this.account()?.iban;
-    if (!iban) return;
-    navigator.clipboard?.writeText(iban).then(() => {
-      this.copied.set(true);
+  protected copyIban(account: AccountView): void {
+    navigator.clipboard?.writeText(account.iban).then(() => {
+      this.copiedId.set(account.id);
       this.toast.success('IBAN copiat în clipboard.');
-      setTimeout(() => this.copied.set(false), 2000);
+      setTimeout(() => this.copiedId.set(null), 2000);
     });
   }
 
@@ -186,5 +216,64 @@ export class Accounts implements OnInit {
 
   protected goToTransactions(): void {
     this.router.navigate(['/app/transactions']);
+  }
+
+  protected openCreateModal(): void {
+    this.createModalOpen.set(true);
+  }
+
+  protected closeCreateModal(): void {
+    if (this.creatingType()) return; // nu închide în timp ce o cerere e în curs
+    this.createModalOpen.set(false);
+  }
+
+  protected createAccount(event: AccountCreateEvent): void {
+    const { type: accountType, documentFilename } = event;
+    if (!CREATABLE_ACCOUNT_TYPES.includes(accountType as CreatableAccountType)) return;
+    this.creatingType.set(accountType);
+    this.banking.createAccount(accountType as CreatableAccountType, documentFilename).subscribe({
+      next: (account) => {
+        this.accounts.update((list) => [...list, account]);
+        this.creatingType.set(null);
+        this.createModalOpen.set(false);
+        this.toast.success(`${this.catalog[accountType].label} deschis cu succes.`);
+      },
+      error: (err) => {
+        this.creatingType.set(null);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut deschide contul.'));
+      },
+    });
+  }
+
+  protected canDelete(account: AccountView): boolean {
+    return account.account_type !== 'current';
+  }
+
+  protected requestDelete(account: AccountView): void {
+    if (!this.canDelete(account)) return;
+    if (account.balance_minor > 0) {
+      this.toast.error('Golește mai întâi contul — transferă soldul rămas către alt cont al tău, prin Transferuri.');
+      return;
+    }
+    this.pendingDeleteAccount.set(account);
+  }
+
+  protected confirmDelete(): void {
+    const account = this.pendingDeleteAccount();
+    if (!account) return;
+    this.deleting.set(true);
+    this.banking.deleteAccount(account.id).subscribe({
+      next: () => {
+        this.accounts.update((list) => list.filter((a) => a.id !== account.id));
+        this.deleting.set(false);
+        this.pendingDeleteAccount.set(null);
+        this.toast.success(`${this.catalog[account.account_type].label} șters.`);
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        this.pendingDeleteAccount.set(null);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge contul.'));
+      },
+    });
   }
 }

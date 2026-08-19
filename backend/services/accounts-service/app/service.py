@@ -25,6 +25,7 @@ from app.models import (
     CardCreateRequest,
     CardLimitUpdate,
     CardSettingsUpdate,
+    CreatableAccountType,
     InternalAccountView,
     InternalTransferResponse,
     PocketOut,
@@ -53,6 +54,8 @@ def to_public_account(account: dict) -> AccountPublicOut:
         balance=format_minor_amount(account["balance_minor"]),
         status=account["status"],
         created_at=account["created_at"],
+        account_type=account.get("account_type", "current"),
+        verification_document_name=account.get("verification_document_name"),
     )
 
 
@@ -64,6 +67,7 @@ def _to_internal_view(account: dict) -> InternalAccountView:
         currency=account["currency"],
         balance_minor=account["balance_minor"],
         status=account["status"],
+        account_type=account.get("account_type", "current"),
     )
 
 
@@ -103,14 +107,151 @@ async def _ensure_card_secrets(card: dict) -> dict:
 
 
 async def get_account_for_user(user_id: str) -> dict:
+    """Rezolvă STRICT contul curent ("current") al userului.
+
+    Filtrăm explicit după `account_type` — de când un user poate avea mai
+    multe conturi (economii/depozit/student, vezi create_additional_account),
+    un `find_one({"user_id": ...})` fără filtru ar fi ambiguu (Mongo nu
+    garantează care document îl întoarce). Toate fluxurile existente
+    (emitere card, dev/fund, sursa unui transfer) trebuie să rămână legate
+    STRICT de contul curent — cel puțin până când Transferurile vor putea
+    alege explicit contul sursă.
+    """
     db = get_database()
-    account = await db.accounts.find_one({"user_id": user_id})
+    account = await db.accounts.find_one({"user_id": user_id, "account_type": "current"})
     if account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Nu există niciun cont pentru acest utilizator.",
         )
     return account
+
+
+async def backfill_missing_account_types() -> None:
+    """Migrare idempotentă, rulată la fiecare pornire (vezi main.py::lifespan).
+
+    Conturile create ÎNAINTE de introducerea `account_type` nu au acest
+    câmp în Mongo deloc — și un filtru de query `{"account_type": "current"}`
+    NU se potrivește cu un document unde câmpul lipsește (spre deosebire de
+    citirea prin Pydantic, unde lipsa cade automat pe default). Fără acest
+    backfill, TOATE conturile existente (inclusiv userii demo din
+    scripts/seed_demo_data.py) ar deveni brusc "invizibile" pentru
+    get_account_for_user/get_account_by_user -> transferuri, emitere card,
+    dev/fund ar întoarce 404. Rulăm asta o dată la boot, cost neglijabil
+    (un singur update_many, afectează 0 documente după prima rulare).
+    """
+    db = get_database()
+    result = await db.accounts.update_many(
+        {"account_type": {"$exists": False}},
+        {"$set": {"account_type": "current"}},
+    )
+    if result.modified_count:
+        logger.info("accounts-service: backfill account_type=current aplicat pe %s conturi vechi", result.modified_count)
+
+
+async def list_accounts_for_user(user_id: str) -> list[dict]:
+    """Toate conturile userului (curent + economii/depozit/student), cel mai vechi primul."""
+    db = get_database()
+    cursor = db.accounts.find({"user_id": user_id}).sort("created_at", 1)
+    return await cursor.to_list(length=10)
+
+
+_MAX_ACCOUNTS_PER_USER = 4  # current + savings + deposit + student — suficient pentru acest demo
+
+_ACCOUNT_TYPE_LABELS: dict[str, str] = {
+    "savings": "economii",
+    "deposit": "depozit",
+    "student": "student",
+}
+
+
+async def create_additional_account(
+    user_id: str, account_type: CreatableAccountType, document_filename: str | None = None
+) -> AccountPublicOut:
+    """Deschide un cont suplimentar (economii/depozit/student) pentru userul curent.
+
+    Maxim UN cont per tip, per user — evită duplicate fără sens într-un
+    demo unde oricum nu există un motiv real să ai două conturi de economii.
+    Pentru "student", `document_filename` a fost deja validat ca fiind
+    prezent de AccountCreateRequest — aici doar îl persistăm (metadata,
+    nu conținutul fișierului, vezi nota din models.py).
+    """
+    db = get_database()
+
+    existing = await db.accounts.find_one({"user_id": user_id, "account_type": account_type})
+    if existing is not None:
+        label = _ACCOUNT_TYPE_LABELS.get(account_type, account_type)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Ai deja un cont de {label}.",
+        )
+
+    total = await db.accounts.count_documents({"user_id": user_id})
+    if total >= _MAX_ACCOUNTS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ai atins numărul maxim de conturi ({_MAX_ACCOUNTS_PER_USER}).",
+        )
+
+    iban = await generate_unique_demo_iban(db)
+    now = datetime.now(timezone.utc)
+    account_doc = {
+        "user_id": user_id,
+        "iban": iban,
+        "currency": "RON",
+        "balance_minor": 0,
+        "status": "active",
+        "account_type": account_type,
+        "verification_document_name": document_filename,
+        "created_at": now,
+    }
+    result = await db.accounts.insert_one(account_doc)
+    logger.info(
+        "accounts-service: cont suplimentar deschis (user_id=%s, account_id=%s, type=%s, iban=%s, document=%s)",
+        user_id,
+        result.inserted_id,
+        account_type,
+        iban,
+        bool(document_filename),
+    )
+    created = await db.accounts.find_one({"_id": result.inserted_id})
+    return to_public_account(created)
+
+
+async def delete_account(user_id: str, account_id: str) -> None:
+    """Închide un cont suplimentar (economii/depozit/student) — NICIODATĂ contul curent.
+
+    Reguli, ca la orice bancă reală:
+      - contul curent nu poate fi șters (e sursa tuturor transferurilor și
+        a cardurilor — vezi get_account_for_user);
+      - contul trebuie golit înainte (balance_minor == 0) — userul își
+        transferă soldul rămas către alt cont al lui, prin Transferuri,
+        folosind IBAN-ul propriu (deja posibil, vezi Transfers feature).
+    """
+    db = get_database()
+    try:
+        object_id = ObjectId(account_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+
+    account = await db.accounts.find_one({"_id": object_id})
+    if account is None or account["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contul nu există.")
+
+    if account.get("account_type", "current") == "current":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contul curent nu poate fi șters.",
+        )
+
+    if account["balance_minor"] != 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Golește mai întâi contul (transferă soldul rămas) înainte să-l ștergi.",
+        )
+
+    await db.accounts.delete_one({"_id": object_id})
+    logger.info("accounts-service: cont șters (user_id=%s, account_id=%s, type=%s)", user_id, object_id, account.get("account_type"))
 
 
 async def get_cards_for_user(user_id: str) -> list[dict]:
@@ -483,6 +624,7 @@ async def provision_account(user_id: str) -> tuple[dict, dict]:
         "currency": "RON",
         "balance_minor": 0,
         "status": "active",
+        "account_type": "current",
         "created_at": now,
     }
     account_result = await db.accounts.insert_one(account_doc)
@@ -526,9 +668,14 @@ async def provision_account(user_id: str) -> tuple[dict, dict]:
 
 
 async def get_account_by_user(user_id: str) -> InternalAccountView:
-    """Folosit de transactions-service pentru a determina contul SURSĂ al userului autentificat."""
+    """Folosit de transactions-service pentru a determina contul SURSĂ al userului autentificat.
+
+    Filtrat strict pe "current" — vezi nota din get_account_for_user. Sursa
+    unui transfer rămâne mereu contul curent, chiar dacă userul are și
+    conturi de economii/depozit/student.
+    """
     db = get_database()
-    account = await db.accounts.find_one({"user_id": user_id})
+    account = await db.accounts.find_one({"user_id": user_id, "account_type": "current"})
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu există cont pentru acest user_id.")
     return _to_internal_view(account)

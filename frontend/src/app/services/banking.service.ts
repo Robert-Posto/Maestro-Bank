@@ -4,6 +4,10 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../core/api-config';
 
+/** "current" e provizionat automat la înregistrare — celelalte 3 se deschid manual, vezi CreatableAccountType. */
+export type AccountType = 'current' | 'savings' | 'deposit' | 'student';
+export type CreatableAccountType = 'savings' | 'deposit' | 'student';
+
 export interface AccountView {
   id: string;
   iban: string;
@@ -12,6 +16,9 @@ export interface AccountView {
   balance: string;
   status: string;
   created_at: string;
+  account_type: AccountType;
+  /** Numele fișierului atașat la deschidere (ex. cont student) — metadata, nu conținutul fișierului. */
+  verification_document_name: string | null;
 }
 
 export type CardDesign = 'midnight' | 'aurora' | 'rose-gold' | 'graphite' | 'arctic';
@@ -125,6 +132,29 @@ export class BankingService {
 
   getMyAccount(): Observable<AccountView> {
     return this.http.get<AccountView>(`${API_BASE_URL}/accounts/me`);
+  }
+
+  /** Toate conturile userului: curent + economii/depozit/student (dacă au fost deschise). */
+  getAllAccounts(): Observable<AccountView[]> {
+    return this.http.get<AccountView[]>(`${API_BASE_URL}/accounts/all`);
+  }
+
+  /**
+   * Deschide un cont suplimentar. Un singur cont per tip — vezi
+   * accounts-service::create_additional_account. `documentFilename` e
+   * obligatoriu pentru "student" (doar numele fișierului — nu încărcăm
+   * conținutul, vezi nota din accounts-service/app/models.py).
+   */
+  createAccount(accountType: CreatableAccountType, documentFilename?: string | null): Observable<AccountView> {
+    return this.http.post<AccountView>(`${API_BASE_URL}/accounts/new`, {
+      account_type: accountType,
+      document_filename: documentFilename ?? null,
+    });
+  }
+
+  /** Închide un cont suplimentar — contul curent nu poate fi șters, contul trebuie golit întâi. */
+  deleteAccount(accountId: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/accounts/${accountId}`);
   }
 
   getMyCards(): Observable<CardView[]> {
