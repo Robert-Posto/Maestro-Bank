@@ -26,7 +26,7 @@ router = APIRouter(tags=["exchange"])
 
 @router.get("/rates", response_model=list[RateOut])
 async def get_rates(user_id: str = CurrentUserId):
-    return service.get_demo_rates()
+    return await service.get_current_rates()
 
 
 @router.get("/quote", response_model=QuoteOut)
@@ -37,7 +37,7 @@ async def get_quote(
     user_id: str = CurrentUserId,
 ):
     payload = QuoteRequest(from_currency=from_currency, to_currency=to_currency, amount_minor=amount_minor)
-    return service.compute_quote(payload)
+    return await service.compute_quote(payload)
 
 
 @router.post("/demo", response_model=DemoExchangeOut, response_model_by_alias=False, status_code=201)

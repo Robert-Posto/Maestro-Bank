@@ -9,6 +9,8 @@ export interface ExchangeRate {
   mid_rate: number;
   spread_percent: number;
   commission_minor: number;
+  /** "BNR" = curs oficial al zilei (Banca Națională a României); "demo-fallback" = BNR indisponibil momentan. */
+  source: string;
   is_demo: boolean;
 }
 
@@ -23,6 +25,7 @@ export interface ExchangeQuote {
   commission_minor: number;
   total_cost_minor: number;
   total_cost_percent: number;
+  source: string;
   is_demo: boolean;
   generated_at: string;
 }
@@ -42,8 +45,10 @@ export interface DemoExchangeReceipt {
 }
 
 /**
- * exchange-service — motor de schimb valutar DEMO (prin /api/exchange/*).
- * ⚠️ NU e o integrare FX reală — vezi backend/services/exchange-service/app/config.py.
+ * exchange-service — motor de schimb valutar (prin /api/exchange/*).
+ * Cursul de bază (mid_rate) e REAL — preluat zilnic de la BNR. Spread-ul,
+ * comisionul și execuția (POST /demo) rămân o simulare MaestroBank, fără
+ * mutare reală de fonduri — vezi backend/services/exchange-service/app/config.py.
  */
 @Injectable({ providedIn: 'root' })
 export class ExchangeService {

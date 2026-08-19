@@ -231,6 +231,13 @@
   font-size: var(--mb-font-size-sm);
 }
 
+.fx-rate-source {
+  margin-left: var(--mb-space-1);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+  text-transform: uppercase;
+}
+
 .fx-rate-row:last-child {
   border-bottom: none;
 }

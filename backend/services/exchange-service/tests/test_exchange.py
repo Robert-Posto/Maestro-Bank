@@ -36,8 +36,10 @@ AUTH_HEADER = {"Authorization": f"Bearer {_make_token(USER_ID)}"}
 @pytest.fixture(autouse=True)
 async def clean_collections():
     await get_database().demo_exchanges.delete_many({})
+    await get_database().daily_rates.delete_many({})
     yield
     await get_database().demo_exchanges.delete_many({})
+    await get_database().daily_rates.delete_many({})
 
 
 @pytest.fixture
@@ -77,6 +79,42 @@ async def test_quote_unsupported_pair_rejected(client: AsyncClient):
         "/quote", params={"from_currency": "EUR", "to_currency": "USD", "amount_minor": 1_000}, headers=AUTH_HEADER
     )
     assert response.status_code == 400
+
+
+async def test_rates_fall_back_to_demo_when_bnr_unavailable(client: AsyncClient, monkeypatch):
+    """Fără niciun curs BNR salvat în DB (fetch eșuat/nerulat încă) ->
+    cade pe fallback-ul demo static, nu lasă pagina goală/eroare."""
+
+    async def fake_fetch_bnr_rates():
+        raise ConnectionError("BNR indisponibil (simulat în test)")
+
+    monkeypatch.setattr("app.service.fetch_bnr_rates", fake_fetch_bnr_rates)
+
+    response = await client.get("/rates", headers=AUTH_HEADER)
+    assert response.status_code == 200
+    body = response.json()
+    assert all(rate["source"] == "demo-fallback" for rate in body)
+    assert all(rate["mid_rate"] > 0 for rate in body)
+
+
+async def test_rates_use_bnr_after_successful_refresh(client: AsyncClient, monkeypatch):
+    """După un refresh BNR reușit, /rates raportează sursa 'BNR' cu cursul primit."""
+
+    async def fake_fetch_bnr_rates():
+        return {"EUR": 5.1234, "USD": 4.7, "GBP": 5.9}, "2026-08-19"
+
+    monkeypatch.setattr("app.service.fetch_bnr_rates", fake_fetch_bnr_rates)
+
+    from app.service import refresh_rates_from_bnr
+
+    refreshed = await refresh_rates_from_bnr()
+    assert refreshed is True
+
+    response = await client.get("/rates", headers=AUTH_HEADER)
+    body = response.json()
+    eur = next(r for r in body if r["currency"] == "EUR")
+    assert eur["source"] == "BNR"
+    assert eur["mid_rate"] == 5.1234
 
 
 async def test_demo_exchange_is_recorded_and_isolated(client: AsyncClient):
