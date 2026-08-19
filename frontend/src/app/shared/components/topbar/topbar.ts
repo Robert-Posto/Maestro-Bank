@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
@@ -26,6 +26,7 @@ const NOTIFICATIONS_POLL_INTERVAL_MS = 30_000;
 export class Topbar implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef<HTMLElement>);
   protected readonly notificationsService = inject(NotificationsService);
   protected readonly themeService = inject(ThemeService);
 
@@ -86,5 +87,14 @@ export class Topbar implements OnInit, OnDestroy {
   protected logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.notificationsOpen() && !this.profileMenuOpen()) return;
+    if (!this.elementRef.nativeElement.contains(event.target as Node)) {
+      this.notificationsOpen.set(false);
+      this.profileMenuOpen.set(false);
+    }
   }
 }

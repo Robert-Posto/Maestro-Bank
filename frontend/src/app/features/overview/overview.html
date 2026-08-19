@@ -8,21 +8,21 @@
   <div class="overview-stats">
     <article class="overview-stat-card">
       <div class="overview-stat-card__top"><span>Sold total</span><app-icon name="info" [size]="15" /></div>
-      <strong>{{ account()?.balance_minor ?? 0 | money: account()?.currency }}</strong>
+      <strong>{{ balanceDisplayMinor() | money: account()?.currency }}</strong>
       <p>Sold disponibil în conturile tale</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--blue"><app-icon name="wallet" [size]="22" /></span>
     </article>
 
     <article class="overview-stat-card">
       <div class="overview-stat-card__top"><span>Cheltuieli în această lună</span></div>
-      <strong>{{ spending()?.total_spent_minor ?? 0 | money: 'RON' }}</strong>
+      <strong>{{ spendingDisplayMinor() | money: 'RON' }}</strong>
       <p class="overview-stat-card__trend--red">Total cheltuit luna aceasta</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--red"><app-icon name="arrow-up-right" [size]="22" /></span>
     </article>
 
     <article class="overview-stat-card">
       <div class="overview-stat-card__top"><span>Venituri în această lună</span></div>
-      <strong>{{ monthlyIncomeMinor() | money: 'RON' }}</strong>
+      <strong>{{ incomeDisplayMinor() | money: 'RON' }}</strong>
       <p class="overview-stat-card__trend--green">Total încasat luna aceasta</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--green"><app-icon name="arrow-down-right" [size]="22" /></span>
     </article>
@@ -30,20 +30,19 @@
     <article class="overview-stat-card overview-stat-card--progress">
       <div>
         <div class="overview-stat-card__top"><span>Progres obiective de economii</span></div>
-        <strong>{{ budgetProgress() ? budgetProgress()!.percent + '%' : '—' }}</strong>
+        <strong>{{ budgetProgress() ? progressDisplayPercent() + '%' : '—' }}</strong>
         @if (budgetProgress()) {
           <p>{{ budgetProgress()!.totalSpent | money: 'RON' }} din {{ budgetProgress()!.totalLimit | money: 'RON' }}</p>
         } @else {
           <p><a routerLink="/app/budgets">Creează un buget</a></p>
         }
       </div>
-      <div class="overview-progress-ring">
-        <svg viewBox="0 0 42 42" aria-hidden="true">
+      <div class="overview-progress-ring" aria-hidden="true">
+        <svg viewBox="0 0 42 42">
           <circle class="overview-progress-ring__track" cx="21" cy="21" r="16" />
           <circle class="overview-progress-ring__value" cx="21" cy="21" r="16" pathLength="100"
-            [attr.stroke-dasharray]="(budgetProgress() ? Math.min(budgetProgress()!.percent, 100) : 0) + ' 100'" />
+            [attr.stroke-dasharray]="(budgetProgress() ? Math.min(progressDisplayPercent(), 100) : 0) + ' 100'" />
         </svg>
-        <span>{{ budgetProgress() ? budgetProgress()!.percent + '%' : '—' }}</span>
       </div>
     </article>
   </div>
@@ -74,7 +73,7 @@
       </div>
       <div class="overview-actions">
         @for (action of quickActions; track action.route) {
-          <button type="button" class="overview-action" (click)="goTo(action.route)">
+          <button type="button" class="overview-action" (click)="goToQuickAction(action)">
             <app-icon [name]="action.icon" [size]="18" />
             <span>{{ action.label }}</span>
           </button>
@@ -130,7 +129,7 @@
         </div>
         <div>
           <p>Descoperă tendințele, analizează cheltuielile și ia decizii mai bune.</p>
-          <a routerLink="/app/spending-forecast">Deschide Analytics <span aria-hidden="true">›</span></a>
+          <a routerLink="/app/spending-forecast" fragment="forecast">Deschide Forecast <span aria-hidden="true">›</span></a>
         </div>
       </div>
     </section>

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, WritableSignal, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
@@ -17,12 +17,16 @@ interface QuickAction {
   label: string;
   icon: string;
   route: string;
+  queryParams?: Record<string, string>;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Transfer', icon: 'transfer', route: '/app/transfers' },
   { label: 'Schimb valutar', icon: 'exchange', route: '/app/exchange' },
-  { label: 'Plată factură', icon: 'receipt', route: '/app/transfers' },
+  // Aceeași pagină ca "Transfer", dar cu categoria presetată pe "bills" —
+  // altfel cele 2 tile-uri ar duce spre exact aceeași destinație, fără
+  // nicio diferență vizibilă pentru user (duplicare confuză).
+  { label: 'Plată factură', icon: 'receipt', route: '/app/transfers', queryParams: { category: 'bills' } },
   { label: 'Control card', icon: 'cards', route: '/app/cards' },
 ];
 
@@ -61,6 +65,14 @@ export class Overview implements OnInit {
   protected readonly monthlyIncomeMinor = signal(0);
   protected readonly budgets = signal<Budget[]>([]);
   protected readonly upcomingSubscriptions = signal<Subscription[]>([]);
+
+  // Valori "animate" pentru stat-card-urile de sus — pornesc de la 0 și
+  // urcă spre valoarea reală la fiecare încărcare (count-up), independent
+  // de valoarea propriu-zisă folosită restul aplicației.
+  protected readonly balanceDisplayMinor = signal(0);
+  protected readonly spendingDisplayMinor = signal(0);
+  protected readonly incomeDisplayMinor = signal(0);
+  protected readonly progressDisplayPercent = signal(0);
 
   protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
 
@@ -113,6 +125,11 @@ export class Overview implements OnInit {
             .slice(0, 3),
         );
         this.loading.set(false);
+
+        this.animateTo(this.balanceDisplayMinor, account.balance_minor);
+        this.animateTo(this.spendingDisplayMinor, spending?.total_spent_minor ?? 0);
+        this.animateTo(this.incomeDisplayMinor, this.monthlyIncomeMinor());
+        this.animateTo(this.progressDisplayPercent, this.budgetProgress()?.percent ?? 0);
       },
       error: () => {
         this.error.set('Nu am putut încărca datele contului. Încearcă din nou.');
@@ -125,7 +142,23 @@ export class Overview implements OnInit {
     this.router.navigate([route]);
   }
 
+  protected goToQuickAction(action: QuickAction): void {
+    this.router.navigate([action.route], action.queryParams ? { queryParams: action.queryParams } : {});
+  }
+
   protected retry(): void {
     this.loadOverview();
+  }
+
+  /** Anima o valoare întreagă de la 0 spre `target` (ease-out) — folosit doar pentru count-up-ul stat-card-urilor. */
+  private animateTo(target: WritableSignal<number>, value: number, durationMs = 600): void {
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min((now - start) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      target.set(Math.round(value * eased));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 }

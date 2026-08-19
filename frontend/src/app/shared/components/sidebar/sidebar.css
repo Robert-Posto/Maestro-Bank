@@ -103,26 +103,6 @@
   text-decoration: underline;
 }
 
-.sidebar__logout {
-  display: flex;
-  align-items: center;
-  gap: var(--mb-space-3);
-  background: transparent;
-  border: none;
-  color: var(--mb-navy-text-muted);
-  padding: 0.5rem var(--mb-space-3);
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-medium);
-  cursor: pointer;
-  border-radius: var(--mb-radius-sm);
-  text-align: left;
-}
-
-.sidebar__logout:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-}
-
 @media (max-width: 1024px) {
   .sidebar {
     position: fixed;

@@ -23,6 +23,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 type TransferStep = 'form' | 'review' | 'success';
+type MainTab = 'new' | 'scheduled';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -45,6 +46,7 @@ export class Transfers implements OnInit {
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
+  protected readonly mainTab = signal<MainTab>('new');
 
   protected readonly account = signal<AccountView | null>(null);
   protected readonly beneficiaries = signal<Beneficiary[]>([]);

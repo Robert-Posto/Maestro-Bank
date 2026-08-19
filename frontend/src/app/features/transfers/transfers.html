@@ -1,5 +1,18 @@
 <app-page-header title="Plăți & Transferuri" subtitle="Trimite bani către un IBAN, în câțiva pași." />
 
+<div class="transfers-tabs">
+  <button type="button" [class.transfers-tab--active]="mainTab() === 'new'" (click)="mainTab.set('new')">
+    <app-icon name="transfer" [size]="15" /> Transfer nou
+  </button>
+  <button type="button" [class.transfers-tab--active]="mainTab() === 'scheduled'" (click)="mainTab.set('scheduled')">
+    <app-icon name="calendar" [size]="15" /> Programate
+    @if (scheduledTransfers().length > 0) {
+      <span class="transfers-tabs__count">{{ scheduledTransfers().length }}</span>
+    }
+  </button>
+</div>
+
+@if (mainTab() === 'new') {
 <ol class="transfer-stepper">
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'form'" [class.transfer-stepper__step--done]="step() !== 'form'">
     <span class="transfer-stepper__dot">@if (step() !== 'form') {<app-icon name="check" [size]="12" />} @else {1}</span>
@@ -204,7 +217,9 @@
     </div>
   </div>
 }
+}
 
+@if (mainTab() === 'scheduled') {
 <section class="scheduled-section">
   <div class="scheduled-section__header">
     <div>
@@ -244,6 +259,7 @@
     </div>
   }
 </section>
+}
 
 @if (scheduleModalOpen()) {
   <app-modal title="Transfer programat nou" (closed)="scheduleModalOpen.set(false)">

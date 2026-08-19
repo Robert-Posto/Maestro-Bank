@@ -46,19 +46,9 @@
     @if (quote(); as q) {
       <div class="fx-mini-stats">
         <div>
-          <span>Curs curent</span>
-          <strong>{{ q.mid_rate }}</strong>
-          <small>{{ q.from_currency }} / {{ q.to_currency }}</small>
-        </div>
-        <div>
           <span>Spread</span>
           <strong>{{ q.spread_percent }}%</strong>
           <small>Inclus în curs</small>
-        </div>
-        <div>
-          <span>Comision</span>
-          <strong>{{ q.commission_minor | money: 'RON' }}</strong>
-          <small>Fix</small>
         </div>
         <div class="fx-mini-stats__highlight">
           <span>Cost total estimat</span>
@@ -67,6 +57,9 @@
         </div>
       </div>
 
+      <!-- Curs curent, comision și costul total apar detaliat mai jos, în
+           fx-breakdown — nu le mai repetăm și aici, ca să nu arate aceeași
+           cifră de 2 ori pe pagină. -->
       <div class="fx-breakdown">
         <div class="fx-breakdown__row">
           <span>Curs curent (mid)</span>

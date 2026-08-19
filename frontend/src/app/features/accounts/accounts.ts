@@ -18,6 +18,8 @@ import { AccountCreateEvent, AccountTypeCarousel } from '../../shared/components
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
+type Tab = 'accounts' | 'pockets';
+
 /**
  * Conturi — vezi task-ul MaestroBank, secțiunea 8, extins cu deschiderea
  * de conturi suplimentare (economii/depozit/student — accounts-service
@@ -57,6 +59,8 @@ export class Accounts implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly catalog = ACCOUNT_TYPE_CATALOG;
+
+  protected readonly tab = signal<Tab>('accounts');
 
   protected readonly accounts = signal<AccountView[]>([]);
   protected readonly loading = signal(true);

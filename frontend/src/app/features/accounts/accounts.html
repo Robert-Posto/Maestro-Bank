@@ -40,6 +40,20 @@
     </div>
   </div>
 
+  <div class="accounts-tabs">
+    <button type="button" [class.accounts-tab--active]="tab() === 'accounts'" (click)="tab.set('accounts')">
+      <app-icon name="accounts" [size]="15" /> Conturi
+      <span class="accounts-tabs__count">{{ accounts().length }}</span>
+    </button>
+    <button type="button" [class.accounts-tab--active]="tab() === 'pockets'" (click)="tab.set('pockets')">
+      <app-icon name="wallet" [size]="15" /> Obiective
+      @if (pockets().length > 0) {
+        <span class="accounts-tabs__count">{{ pockets().length }}</span>
+      }
+    </button>
+  </div>
+
+  @if (tab() === 'accounts') {
   <div class="accounts-grid">
     @for (account of accounts(); track account.id) {
       <div class="account-card">
@@ -114,7 +128,9 @@
       <app-icon name="transactions" [size]="16" /> Vezi toate tranzacțiile
     </app-action-button>
   </div>
+  }
 
+  @if (tab() === 'pockets') {
   <section class="pockets-section">
     <div class="pockets-section__header">
       <div>
@@ -180,6 +196,7 @@
       </p>
     }
   </section>
+  }
 }
 
 @if (createModalOpen()) {
