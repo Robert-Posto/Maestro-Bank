@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app import service
 from app.database import close_database_connection, ping_database
 from app.routers.accounts import router as accounts_router
 from app.routers.beneficiaries import router as beneficiaries_router
@@ -21,6 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [accounts-service] %
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await service.backfill_missing_account_types()
     yield
     await close_database_connection()
 
