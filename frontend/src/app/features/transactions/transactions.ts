@@ -59,6 +59,8 @@ export class Transactions implements OnInit {
   protected readonly page = signal(0);
   protected readonly hasNextPage = signal(false);
 
+  protected readonly filtersOpen = signal(false);
+
   protected readonly search = signal('');
   protected readonly category = signal('');
   protected readonly direction = signal('');
@@ -114,6 +116,10 @@ export class Transactions implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  protected toggleFilters(): void {
+    this.filtersOpen.update((open) => !open);
   }
 
   protected applyFilters(): void {
@@ -188,7 +194,16 @@ export class Transactions implements OnInit {
   }
 
   protected contactSupport(): void {
-    this.router.navigate(['/app/support'], { queryParams: { newTicket: '1', category: 'transfer' } });
+    const tx = this.selectedTransaction();
+    // "transfer" doar dacă e chiar un transfer către alt user MaestroBank
+    // (counterparty_name e populat STRICT pentru asta) — altfel categoria
+    // reală a tranzacției (shopping, bills etc.) nu are un echivalent 1:1
+    // în categoriile de tichet (card/transfer/account/technical/other),
+    // deci "account" e cel mai potrivit generic pentru "ceva legat de o
+    // tranzacție din contul meu", nu presetăm orbește "transfer" pentru
+    // orice tranzacție.
+    const category = tx?.counterparty_name ? 'transfer' : 'account';
+    this.router.navigate(['/app/support'], { queryParams: { newTicket: '1', category } });
   }
 
   protected exportCsv(): void {

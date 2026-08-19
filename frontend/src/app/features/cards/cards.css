@@ -9,7 +9,7 @@
 .cards-side {
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-5);
+  gap: var(--mb-space-6);
 }
 
 /* Carusel */
@@ -248,6 +248,71 @@
   margin-bottom: var(--mb-space-4);
 }
 
+/* --- Accordion (Detalii / Control / Security) --- */
+/* Cele 3 secțiuni trăiesc într-un SINGUR .card-panel (accordion-group),
+   nu fiecare în cutia ei — divizor subțire între ele, nu 3 borduri. */
+
+.accordion-group {
+  padding: 0;
+}
+
+.accordion-item + .accordion-item {
+  border-top: 1px solid var(--mb-border);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--mb-space-5);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.accordion-header h2 {
+  margin-bottom: 0;
+}
+
+.accordion-chevron {
+  flex: 0 0 auto;
+  color: var(--mb-text-tertiary);
+  transition: transform var(--mb-transition-base);
+}
+
+.accordion-chevron--open {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--mb-transition-base);
+}
+
+.accordion-body--open {
+  grid-template-rows: 1fr;
+}
+
+.accordion-body__inner {
+  overflow: hidden;
+  padding: 0 var(--mb-space-5);
+}
+
+.accordion-body--open .accordion-body__inner {
+  padding-bottom: var(--mb-space-5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion-chevron,
+  .accordion-body {
+    transition: none;
+  }
+}
+
 .card-detail-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -356,6 +421,17 @@
   border-radius: var(--mb-radius-sm);
   padding: 0.4rem 0.7rem;
   cursor: pointer;
+}
+
+.cards-side__stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.cards-side__stat + .cards-side__stat {
+  padding-top: var(--mb-space-4);
+  border-top: 1px solid var(--mb-border);
 }
 
 .cards-side__label {

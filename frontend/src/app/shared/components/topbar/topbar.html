@@ -17,6 +17,15 @@
       <span class="topbar__new-tx-label">Tranzacție nouă</span>
     </button>
 
+    <button
+      type="button"
+      class="topbar__icon-btn"
+      [attr.aria-label]="themeService.theme() === 'dark' ? 'Comută la tema deschisă' : 'Comută la tema închisă'"
+      (click)="themeService.toggle()"
+    >
+      <app-icon [name]="themeService.theme() === 'dark' ? 'sun' : 'moon'" [size]="20" />
+    </button>
+
     <div class="topbar__notifications">
       <button
         type="button"

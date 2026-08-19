@@ -1,8 +1,15 @@
+/* Un singur bloc cu 4 coloane, nu 4 cutii separate — divizoarele sunt
+   golul de 1px dintre celulele grid-ului, umplut cu culoarea bordurii. */
 .overview-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-4);
+  gap: 1px;
+  background: var(--mb-border);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--mb-shadow-xs);
+  margin-bottom: var(--mb-space-6);
 }
 
 .overview-stat-card {
@@ -11,10 +18,30 @@
   min-height: 162px;
   overflow: hidden;
   padding: var(--mb-space-5);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-lg);
   background: var(--mb-surface);
-  box-shadow: var(--mb-shadow-xs);
+  animation: stat-card-in 420ms ease backwards;
+}
+
+.overview-stat-card:nth-child(1) { animation-delay: 0ms; }
+.overview-stat-card:nth-child(2) { animation-delay: 70ms; }
+.overview-stat-card:nth-child(3) { animation-delay: 140ms; }
+.overview-stat-card:nth-child(4) { animation-delay: 210ms; }
+
+@keyframes stat-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-stat-card {
+    animation: none;
+  }
 }
 
 .overview-stat-card__top {
@@ -89,24 +116,14 @@
 .overview-progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .overview-progress-ring circle { fill: none; stroke-width: 4; }
 .overview-progress-ring__track { stroke: var(--mb-border); }
-.overview-progress-ring__value { stroke: var(--mb-blue-500); stroke-linecap: round; }
-
-.overview-progress-ring span {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--mb-navy-900);
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-semibold);
-}
+.overview-progress-ring__value { stroke: var(--mb-blue-500); stroke-linecap: round; transition: stroke-dasharray var(--mb-transition-base); }
 
 .overview-insight {
   display: flex;
   align-items: center;
   gap: var(--mb-space-4);
   min-height: 72px;
-  margin-bottom: var(--mb-space-5);
+  margin-bottom: var(--mb-space-6);
   padding: var(--mb-space-4) var(--mb-space-5);
   border: 1px solid var(--mb-blue-100);
   border-radius: var(--mb-radius-lg);
@@ -165,7 +182,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-5);
+  margin-bottom: var(--mb-space-6);
   align-items: stretch;
 }
 

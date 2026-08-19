@@ -28,6 +28,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 type ToggleKey = 'online_payments_enabled' | 'contactless_enabled' | 'atm_withdrawals_enabled' | 'international_payments_enabled';
+type AccordionSection = 'details' | 'control' | 'security';
 
 const REVEAL_AUTO_HIDE_MS = 20_000;
 
@@ -89,6 +90,15 @@ export class Cards implements OnInit, OnDestroy {
 
   protected readonly spending = signal<SpendingAnalytics | null>(null);
   protected readonly recentTransactions = signal<TransactionRowData[]>([]);
+
+  // --- Accordion (Detalii / Control / Security) ------------------------
+  // Doar o secțiune deschisă simultan — pagina asta era cea mai "densă"
+  // din audit (3 secțiuni mereu întinse una sub alta).
+  protected readonly openSection = signal<AccordionSection | null>('details');
+
+  protected toggleSection(section: AccordionSection): void {
+    this.openSection.update((current) => (current === section ? null : section));
+  }
 
   protected readonly freezeBusy = signal(false);
   protected readonly settingsBusy = signal<ToggleKey | null>(null);

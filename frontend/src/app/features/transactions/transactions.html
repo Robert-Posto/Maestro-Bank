@@ -1,52 +1,5 @@
 <app-page-header title="Tranzacții" subtitle="Istoric complet și analiză inteligentă." />
 
-<div class="tx-filters">
-  <label class="tx-filter">
-    <span>Perioadă</span>
-    <div class="tx-filter__range">
-      <app-icon name="calendar" [size]="16" />
-      <input type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" />
-      <span>–</span>
-      <input type="date" [ngModel]="dateTo()" (ngModelChange)="dateTo.set($event)" />
-    </div>
-  </label>
-
-  <label class="tx-filter">
-    <span>Categorie</span>
-    <div class="tx-filter__control">
-      <app-icon name="cards" [size]="16" />
-      <select [ngModel]="category()" (ngModelChange)="category.set($event)">
-        <option value="">Toate categoriile</option>
-        @for (cat of categories; track cat.value) {
-          <option [value]="cat.value">{{ cat.label }}</option>
-        }
-      </select>
-    </div>
-  </label>
-
-  <label class="tx-filter">
-    <span>Direcție</span>
-    <div class="tx-filter__control">
-      <app-icon name="transfer" [size]="16" />
-      <select [ngModel]="direction()" (ngModelChange)="direction.set($event)">
-        <option value="">Toate</option>
-        <option value="incoming">Încasări</option>
-        <option value="outgoing">Plăți</option>
-      </select>
-    </div>
-  </label>
-
-  <label class="tx-filter">
-    <span>Sumă (lei)</span>
-    <div class="tx-filter__range">
-      <app-icon name="exchange" [size]="16" />
-      <input type="number" min="0" placeholder="Min" [ngModel]="minAmount()" (ngModelChange)="minAmount.set($event)" />
-      <span>–</span>
-      <input type="number" min="0" placeholder="Max" [ngModel]="maxAmount()" (ngModelChange)="maxAmount.set($event)" />
-    </div>
-  </label>
-</div>
-
 <div class="tx-searchbar">
   <div class="tx-search">
     <app-icon name="search" [size]="18" />
@@ -58,13 +11,66 @@
       (keydown.enter)="applyFilters()"
     />
   </div>
-  <app-action-button variant="secondary" (pressed)="applyFilters()">
+
+  <label class="tx-filter tx-filter--inline">
+    <div class="tx-filter__control">
+      <app-icon name="cards" [size]="16" />
+      <select [ngModel]="category()" (ngModelChange)="category.set($event)">
+        <option value="">Toate categoriile</option>
+        @for (cat of categories; track cat.value) {
+          <option [value]="cat.value">{{ cat.label }}</option>
+        }
+      </select>
+    </div>
+  </label>
+
+  <app-action-button variant="secondary" (pressed)="toggleFilters()">
     <app-icon name="filter" [size]="16" /> Filtre avansate
+    <app-icon name="chevron-down" [size]="14" class="tx-filters-chevron" [class.tx-filters-chevron--open]="filtersOpen()" />
   </app-action-button>
   <app-action-button variant="ghost" (pressed)="resetFilters()">Resetează</app-action-button>
   <app-action-button variant="secondary" [loading]="exporting()" (pressed)="exportCsv()">
     <app-icon name="download" [size]="16" /> Exportă
   </app-action-button>
+</div>
+
+<div class="tx-filters-advanced" [class.tx-filters-advanced--open]="filtersOpen()">
+  <div class="tx-filters-advanced__inner">
+    <div class="tx-filters">
+      <label class="tx-filter">
+        <span>Perioadă</span>
+        <div class="tx-filter__range">
+          <app-icon name="calendar" [size]="16" />
+          <input type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" />
+          <span>–</span>
+          <input type="date" [ngModel]="dateTo()" (ngModelChange)="dateTo.set($event)" />
+        </div>
+      </label>
+
+      <label class="tx-filter">
+        <span>Direcție</span>
+        <div class="tx-filter__control">
+          <app-icon name="transfer" [size]="16" />
+          <select [ngModel]="direction()" (ngModelChange)="direction.set($event)">
+            <option value="">Toate</option>
+            <option value="incoming">Încasări</option>
+            <option value="outgoing">Plăți</option>
+          </select>
+        </div>
+      </label>
+
+      <label class="tx-filter">
+        <span>Sumă (lei)</span>
+        <div class="tx-filter__range">
+          <app-icon name="exchange" [size]="16" />
+          <input type="number" min="0" placeholder="Min" [ngModel]="minAmount()" (ngModelChange)="minAmount.set($event)" />
+          <span>–</span>
+          <input type="number" min="0" placeholder="Max" [ngModel]="maxAmount()" (ngModelChange)="maxAmount.set($event)" />
+        </div>
+      </label>
+    </div>
+    <app-action-button (pressed)="applyFilters()">Aplică filtrele</app-action-button>
+  </div>
 </div>
 
 <div class="tx-layout" [class.tx-layout--split]="selectedTransaction()">

@@ -17,5 +17,9 @@ class Settings:
     # a pornit.
     auth_service_url: str = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
 
+    # La fel — folosită doar runtime (notificare la blocare card), nu e
+    # dependență de pornire, din același motiv (evită ciclu în depends_on).
+    support_service_url: str = os.getenv("SUPPORT_SERVICE_URL", "http://support-service:8000")
+
 
 settings = Settings()

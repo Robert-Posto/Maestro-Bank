@@ -1,15 +1,27 @@
+/* Doar 2 stat-card-uri aici (celelalte 2 KPI-uri sunt deja detaliate mai
+   jos, în Forecast lunar — nu repetăm aceleași cifre de 2 ori pe pagină) —
+   unite într-un singur bloc cu divizor, nu 2 cutii separate. */
 .sf-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-5);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--mb-border);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--mb-shadow-xs);
+  margin-bottom: var(--mb-space-6);
+}
+
+.sf-stats app-stat-card {
+  min-width: 0;
 }
 
 .sf-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-4);
+  margin-bottom: var(--mb-space-6);
   align-items: start;
 }
 

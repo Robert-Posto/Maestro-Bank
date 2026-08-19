@@ -1,5 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import { Sidebar } from '../sidebar/sidebar';
@@ -24,16 +24,10 @@ import { ToastContainer } from '../toast/toast-container';
 })
 export class AppShell implements OnInit {
   private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
 
   ngOnInit(): void {
     if (!this.auth.currentUser()) {
       this.auth.fetchCurrentUser().subscribe();
     }
-  }
-
-  protected onLogout(): void {
-    this.auth.logout();
-    this.router.navigate(['/login']);
   }
 }

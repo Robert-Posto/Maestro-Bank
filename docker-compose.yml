@@ -1,4 +1,10 @@
 services:
+  # Container local, folosit ca FALLBACK când Atlas nu e accesibil (ex.
+  # rețeaua companiei blochează portul 27017 spre exterior). Pornește
+  # mereu alături de restul (nu costă mult, doar RAM/disc idle), dar
+  # NIMENI nu-l folosește automat — fiecare decide prin propriul
+  # MONGODB_URI_BASE din .env dacă vorbește cu ăsta sau cu Atlas. Vezi
+  # .env.example pentru ambele variante.
   mongodb:
     image: mongo:7
     container_name: maestrobank-mongodb
@@ -6,8 +12,7 @@ services:
     ports:
       # Host port 27018 -> container port 27017, ca să nu intre în conflict
       # cu alte instanțe MongoDB care ar putea rula deja pe portul 27017 al
-      # mașinii tale. Comunicarea între containere (servicii -> mongodb)
-      # rămâne neschimbată, pe portul intern 27017.
+      # mașinii tale.
       - "27018:27017"
     volumes:
       - mongodb_data:/data/db
@@ -21,7 +26,9 @@ services:
       - maestrobank-network
 
   # --- Microservicii FastAPI ------------------------------------------
-  # Toate folosesc ACEEAȘI instanță MongoDB, dar fiecare cu propria bază
+  # Toate folosesc ACEEAȘI instanță MongoDB — Atlas (implicit, partajat
+  # de toată echipa) SAU containerul local `mongodb` de mai sus, în
+  # funcție de MONGODB_URI_BASE din .env — dar fiecare cu propria bază
   # de date (izolare logică, nu fizică). Niciun serviciu nu citește
   # direct din baza altui serviciu — comunicarea între ele se face doar
   # prin API, via Gateway.
@@ -36,7 +43,7 @@ services:
       # Expus doar pentru debugging direct în development.
       - "8001:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/auth_db
+      - MONGO_URL=${MONGODB_URI_BASE}/auth_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRES_MINUTES=${JWT_EXPIRES_MINUTES:-60}
@@ -53,8 +60,6 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      mongodb:
-        condition: service_healthy
       accounts-service:
         condition: service_healthy
     networks:
@@ -69,13 +74,14 @@ services:
     ports:
       - "8002:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/accounts_db
+      - MONGO_URL=${MONGODB_URI_BASE}/accounts_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
-      # Folosit DOAR runtime (verificare parolă la reveal card) — fără
-      # depends_on către auth-service aici, ca să nu creăm o dependență
-      # circulară de pornire (auth-service deja depinde de accounts-service).
+      # Folosite DOAR runtime (verificare parolă la reveal card, notificare
+      # la blocare card) — fără depends_on către aceste servicii aici, ca
+      # să nu creăm dependențe circulare de pornire.
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - SUPPORT_SERVICE_URL=http://support-service:8000
     volumes:
       - ./backend/services/accounts-service/app:/app/app
       - ./backend/services/accounts-service/tests:/app/tests
@@ -86,9 +92,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    depends_on:
-      mongodb:
-        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -101,12 +104,13 @@ services:
     ports:
       - "8003:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/tx_db
+      - MONGO_URL=${MONGODB_URI_BASE}/tx_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - SUPPORT_SERVICE_URL=http://support-service:8000
     volumes:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
@@ -118,8 +122,6 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      mongodb:
-        condition: service_healthy
       accounts-service:
         condition: service_healthy
       budgets-service:
@@ -138,7 +140,7 @@ services:
     ports:
       - "8004:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/budgets_db
+      - MONGO_URL=${MONGODB_URI_BASE}/budgets_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
     volumes:
@@ -151,9 +153,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    depends_on:
-      mongodb:
-        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -166,7 +165,7 @@ services:
     ports:
       - "8005:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/support_db
+      - MONGO_URL=${MONGODB_URI_BASE}/support_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
     volumes:
@@ -179,9 +178,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    depends_on:
-      mongodb:
-        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -194,7 +190,7 @@ services:
     ports:
       - "8006:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/exchange_db
+      - MONGO_URL=${MONGODB_URI_BASE}/exchange_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       # Curs valutar real (BNR) — vezi app/bnr_rates.py. Reîmprospătat la
@@ -210,9 +206,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    depends_on:
-      mongodb:
-        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -229,7 +222,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
+      - MONGO_URL=${MONGODB_URI_BASE}/?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - AUTH_SERVICE_URL=http://auth-service:8000
@@ -250,8 +243,6 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      mongodb:
-        condition: service_healthy
       auth-service:
         condition: service_healthy
       accounts-service:

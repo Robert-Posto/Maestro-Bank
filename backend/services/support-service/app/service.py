@@ -13,7 +13,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.database import get_database
-from app.models import TicketCreate
+from app.models import NotificationCreate, TicketCreate
 
 logger = logging.getLogger("support-service")
 
@@ -53,3 +53,33 @@ async def get_ticket_for_user(ticket_id: str, user_id: str) -> dict:
         # Nu dezvăluim că tichetul există dar nu-i aparține — 404 în ambele cazuri.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tichetul nu există.")
     return doc
+
+
+# --- Notificări -------------------------------------------------------------
+
+
+async def create_notification(payload: NotificationCreate) -> dict:
+    """Apelat DOAR intern, de alte servicii (accounts/budgets/transactions) —
+    vezi app/routers/notifications.py. Userul nu poate crea notificări direct."""
+    db = get_database()
+    doc = {
+        "user_id": payload.user_id,
+        "kind": payload.kind,
+        "text": payload.text,
+        "read": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = await db.notifications.insert_one(doc)
+    logger.info("support-service: notificare creată (user_id=%s, kind=%s)", payload.user_id, payload.kind)
+    return await db.notifications.find_one({"_id": result.inserted_id})
+
+
+async def list_notifications_for_user(user_id: str) -> list[dict]:
+    db = get_database()
+    cursor = db.notifications.find({"user_id": user_id}).sort("created_at", -1).limit(30)
+    return await cursor.to_list(length=30)
+
+
+async def mark_all_read(user_id: str) -> None:
+    db = get_database()
+    await db.notifications.update_many({"user_id": user_id, "read": False}, {"$set": {"read": True}})
