@@ -470,3 +470,158 @@
     padding: var(--mb-space-4);
   }
 }
+
+/* Visual refinement aligned with the MaestroBank application shell. */
+.support-chat {
+  min-height: 600px;
+  box-shadow: 0 4px 16px rgba(16, 24, 48, 0.05);
+}
+
+.support-chat__header {
+  padding: var(--mb-space-4) var(--mb-space-5);
+  background: linear-gradient(120deg, #fff, #f7faff);
+}
+
+.support-chat__identity {
+  gap: var(--mb-space-3);
+}
+
+.support-chat__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--mb-navy-800), var(--mb-navy-950));
+  box-shadow: 0 7px 16px rgba(10, 18, 38, 0.2);
+}
+
+.support-chat__identity h2 {
+  font-size: var(--mb-font-size-base);
+}
+
+.support-chat__identity p {
+  font-size: var(--mb-font-size-xs);
+}
+
+.support-chat__status {
+  padding: 0.35rem 0.7rem;
+  color: var(--mb-blue-700);
+  background: var(--mb-blue-50);
+  font-size: var(--mb-font-size-xs);
+}
+
+.support-chat__messages {
+  gap: var(--mb-space-5);
+  padding: var(--mb-space-6) var(--mb-space-5);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(47, 111, 237, 0.04), transparent 18rem),
+    var(--mb-surface-muted);
+}
+
+.support-chat__message-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.support-chat__bubble {
+  padding: 0.75rem 0.9rem;
+  font-size: var(--mb-font-size-sm);
+}
+
+.support-chat__time {
+  font-size: var(--mb-font-size-xs);
+}
+
+.support-chat__quick-replies {
+  margin: 0 var(--mb-space-5) var(--mb-space-3);
+  padding-top: var(--mb-space-4);
+}
+
+.support-chat__quick-reply {
+  padding: 0.45rem 0.75rem;
+  font-size: var(--mb-font-size-xs);
+}
+
+.support-chat__composer {
+  margin: 0 var(--mb-space-5) var(--mb-space-3);
+  padding-left: var(--mb-space-4);
+  border-radius: 13px;
+}
+
+.support-chat__composer input {
+  height: 44px;
+  font-size: var(--mb-font-size-sm);
+}
+
+.support-chat__composer button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--mb-navy-900);
+}
+
+.support-chat__composer button:not(:disabled):hover {
+  background: var(--mb-navy-800);
+}
+
+.support-chat__notice {
+  padding: 0 var(--mb-space-5) var(--mb-space-4);
+}
+
+.support-sidebar {
+  gap: var(--mb-space-4);
+}
+
+.support-panel {
+  padding: var(--mb-space-5);
+  box-shadow: 0 2px 8px rgba(16, 24, 48, 0.04);
+}
+
+.support-panel h2 {
+  margin-bottom: var(--mb-space-3);
+  padding-bottom: var(--mb-space-3);
+  border-bottom: 1px solid var(--mb-border);
+  font-size: var(--mb-font-size-base);
+}
+
+.support-ticket {
+  padding: var(--mb-space-3) 0;
+}
+
+.support-ticket__subject,
+.support-faq-item summary {
+  font-size: var(--mb-font-size-sm);
+}
+
+.support-ticket__meta,
+.support-faq-item p {
+  font-size: var(--mb-font-size-xs);
+}
+
+.support-faq {
+  gap: var(--mb-space-2);
+}
+
+.support-faq-item {
+  padding: var(--mb-space-3);
+  background: var(--mb-surface-muted);
+}
+
+.support-faq-item[open] {
+  border-color: var(--mb-blue-100);
+  background: var(--mb-surface);
+}
+
+.support-form input,
+.support-form select,
+.support-form textarea {
+  padding: 0.7rem var(--mb-space-3);
+  border-radius: 10px;
+}
+
+.support-form input:focus,
+.support-form select:focus,
+.support-form textarea:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
