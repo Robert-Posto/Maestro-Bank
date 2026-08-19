@@ -193,6 +193,9 @@ services:
       - MONGO_URL=mongodb://mongodb:27017/exchange_db
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      # Curs valutar real (BNR) — vezi app/bnr_rates.py. Reîmprospătat la
+      # fiecare N secunde (implicit 6h); BNR publică o dată/zi lucrătoare.
+      - RATES_REFRESH_INTERVAL_SECONDS=${RATES_REFRESH_INTERVAL_SECONDS:-21600}
     volumes:
       - ./backend/services/exchange-service/app:/app/app
       - ./backend/services/exchange-service/tests:/app/tests

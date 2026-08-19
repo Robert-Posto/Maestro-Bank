@@ -15,6 +15,9 @@ class RateOut(BaseModel):
     mid_rate: float
     spread_percent: float
     commission_minor: int
+    # "BNR" = curs oficial al zilei (Banca Națională a României);
+    # "demo-fallback" = BNR indisponibil, folosim ultima valoare cunoscută.
+    source: str = "BNR"
     is_demo: bool = True
 
 
@@ -40,6 +43,7 @@ class QuoteOut(BaseModel):
     commission_minor: int
     total_cost_minor: int
     total_cost_percent: float
+    source: str = "BNR"
     is_demo: bool = True
     generated_at: datetime
 

@@ -1,8 +1,8 @@
-<app-page-header title="Schimb valutar" subtitle="Cursuri, costuri și simulare — motor DEMO." />
+<app-page-header title="Schimb valutar" subtitle="Curs oficial BNR + costuri MaestroBank." />
 
 <div class="fx-demo-banner">
   <app-icon name="info" [size]="16" />
-  Demo exchange rate — cursurile, spread-ul și comisioanele sunt simulate pentru acest prototip, NU provin dintr-o piață valutară reală.
+  Cursul de bază e cel oficial, publicat zilnic de Banca Națională a României. Spread-ul, comisionul și execuția schimbului sunt o simulare MaestroBank pentru acest prototip — NU se mută fonduri reale.
 </div>
 
 <div class="fx-layout">
@@ -35,7 +35,7 @@
             }
           </select>
         </div>
-        <span class="fx-hint">Estimat la cursul demo curent</span>
+        <span class="fx-hint">Estimat la cursul BNR al zilei</span>
       </div>
     </div>
 
@@ -105,7 +105,7 @@
         <strong>Cum calculăm costul</strong>
       </div>
       <ol class="fx-explain-list">
-        <li>Pornim de la cursul interbancar (mid) — punctul de plecare al pieței valutare demo.</li>
+        <li>Pornim de la cursul oficial BNR al zilei (mid) — publicat de Banca Națională a României.</li>
         <li>Adăugăm spread-ul MaestroBank — diferența noastră, inclusă transparent în curs.</li>
         <li>Adăugăm comisionul fix, afișat înainte de confirmare.</li>
         <li>Rezultă costul total estimat — exact cât te costă schimbul, în simulare.</li>
@@ -114,12 +114,15 @@
 
     <div class="fx-side-card">
       <div class="fx-side-card__header">
-        <strong>Rate disponibile (demo)</strong>
+        <strong>Rate disponibile</strong>
       </div>
       @for (rate of rates(); track rate.currency) {
         <div class="fx-rate-row">
           <span>RON / {{ rate.currency }}</span>
-          <span>{{ rate.mid_rate }}</span>
+          <span>
+            {{ rate.mid_rate }}
+            <small class="fx-rate-source">{{ rate.source === 'BNR' ? 'BNR' : 'demo' }}</small>
+          </span>
         </div>
       }
     </div>

@@ -13,9 +13,10 @@ import { extractErrorMessage } from '../../shared/error-utils';
 
 /**
  * Schimb valutar — vezi UI reference/Exchange.png și task-ul MaestroBank,
- * secțiunea 15. ⚠️ FX DEMO ENGINE — nu e integrare valutară reală.
- * Ratele, spread-ul și comisionul vin din exchange-service, un motor
- * explicit marcat "is_demo: true" pe fiecare răspuns.
+ * secțiunea 15. Cursul de bază (mid_rate) e REAL — preluat zilnic de la
+ * BNR de către exchange-service. ⚠️ Spread-ul, comisionul și execuția
+ * (confirmarea schimbului) rămân o simulare MaestroBank — fără mutare
+ * reală de fonduri, "is_demo: true" pe fiecare răspuns.
  */
 @Component({
   selector: 'app-exchange',

@@ -1,9 +1,13 @@
-"""Logica de business a exchange-service — motor FX DEMO.
+"""Logica de business a exchange-service — motor FX cu curs REAL (BNR) +
+politică de business SIMULATĂ.
 
-⚠️ Simulare, NU integrare bancară/valutară reală (vezi app/config.py).
-Formula e intenționat simplă și transparentă (vezi task-ul MaestroBank,
-secțiunea 15): cost total = cost de spread + comision fix, aplicat pe
-suma trimisă; suma primită = (sumă - comision) / curs aplicat.
+⚠️ Simularea e doar la nivelul spread/comision și al execuției
+(POST /exchange/demo NU mută fonduri reale — vezi app/config.py). Cursul
+de bază (mid_rate) e cel oficial publicat zilnic de Banca Națională a
+României (vezi app/bnr_rates.py), cu fallback pe un curs demo static dacă
+BNR e indisponibil. Formula de cost: cost total = cost de spread +
+comision fix, aplicat pe suma trimisă; suma primită = (sumă - comision) /
+curs aplicat.
 """
 
 import logging
@@ -11,11 +15,13 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
+from app.bnr_rates import fetch_bnr_rates
 from app.config import (
     BASE_CURRENCY,
     DEMO_COMMISSION_MINOR,
     DEMO_MID_RATES,
     DEMO_SPREAD_PERCENT,
+    SUPPORTED_FOREIGN_CURRENCIES,
 )
 from app.database import get_database
 from app.models import QuoteRequest
@@ -23,48 +29,88 @@ from app.models import QuoteRequest
 logger = logging.getLogger("exchange-service")
 
 
-def get_demo_rates() -> list[dict]:
-    return [
-        {
-            "currency": currency,
-            "mid_rate": DEMO_MID_RATES[currency],
-            "spread_percent": DEMO_SPREAD_PERCENT[currency],
-            "commission_minor": DEMO_COMMISSION_MINOR[currency],
-            "is_demo": True,
-        }
-        for currency in DEMO_MID_RATES
-    ]
+async def refresh_rates_from_bnr() -> bool:
+    """Preia cursul zilei de la BNR și îl salvează în exchange_db.daily_rates.
+
+    Apelat periodic dintr-un task de fundal (vezi app/main.py::lifespan).
+    NU aruncă excepții către apelant — dacă BNR e indisponibil sau
+    răspunde cu un format neașteptat, logăm și păstrăm cursul anterior
+    (sau fallback-ul demo, dacă nu avem încă niciunul salvat).
+    """
+    try:
+        rates, rate_date = await fetch_bnr_rates()
+    except Exception as exc:  # httpx.RequestError, httpx.HTTPStatusError, ET.ParseError, ValueError
+        logger.warning("exchange-service: nu am putut prelua cursul BNR (%s). Păstrez ultimul curs cunoscut.", exc)
+        return False
+
+    db = get_database()
+    now = datetime.now(timezone.utc)
+    for currency, mid_rate in rates.items():
+        await db.daily_rates.update_one(
+            {"currency": currency},
+            {"$set": {"mid_rate": mid_rate, "source": "BNR", "rate_date": rate_date, "fetched_at": now}},
+            upsert=True,
+        )
+
+    logger.info("exchange-service: curs BNR actualizat (data=%s, valute=%s)", rate_date, sorted(rates))
+    return True
+
+
+async def _get_mid_rate(currency: str) -> tuple[float, str]:
+    """(curs, sursă). Prioritate: curs BNR salvat în DB -> fallback demo static."""
+    db = get_database()
+    doc = await db.daily_rates.find_one({"currency": currency})
+    if doc is not None:
+        return doc["mid_rate"], doc.get("source", "BNR")
+    return DEMO_MID_RATES[currency], "demo-fallback"
+
+
+async def get_current_rates() -> list[dict]:
+    rates = []
+    for currency in SUPPORTED_FOREIGN_CURRENCIES:
+        mid_rate, source = await _get_mid_rate(currency)
+        rates.append(
+            {
+                "currency": currency,
+                "mid_rate": mid_rate,
+                "spread_percent": DEMO_SPREAD_PERCENT[currency],
+                "commission_minor": DEMO_COMMISSION_MINOR[currency],
+                "source": source,
+                "is_demo": True,
+            }
+        )
+    return rates
 
 
 def _foreign_currency(from_currency: str, to_currency: str) -> tuple[str, bool]:
     """Determină valuta străină implicată și direcția (RON->străină sau invers).
 
     Returnează (valuta_straina, is_ron_to_foreign). Aruncă 400 dacă
-    perechea nu implică RON sau valuta străină nu e în dataset-ul demo.
+    perechea nu implică RON sau valuta străină nu e în dataset-ul suportat.
     """
-    if from_currency == BASE_CURRENCY and to_currency in DEMO_MID_RATES:
+    if from_currency == BASE_CURRENCY and to_currency in SUPPORTED_FOREIGN_CURRENCIES:
         return to_currency, True
-    if to_currency == BASE_CURRENCY and from_currency in DEMO_MID_RATES:
+    if to_currency == BASE_CURRENCY and from_currency in SUPPORTED_FOREIGN_CURRENCIES:
         return from_currency, False
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Pereche valutară nesuportată în demo. Perechi disponibile: RON <-> {', '.join(DEMO_MID_RATES)}.",
+        detail=f"Pereche valutară nesuportată. Perechi disponibile: RON <-> {', '.join(SUPPORTED_FOREIGN_CURRENCIES)}.",
     )
 
 
-def compute_quote(payload: QuoteRequest) -> dict:
+async def compute_quote(payload: QuoteRequest) -> dict:
     foreign_currency, is_ron_to_foreign = _foreign_currency(payload.from_currency, payload.to_currency)
 
-    mid_rate = DEMO_MID_RATES[foreign_currency]
+    mid_rate, source = await _get_mid_rate(foreign_currency)
     spread_percent = DEMO_SPREAD_PERCENT[foreign_currency]
     commission_minor = DEMO_COMMISSION_MINOR[foreign_currency]
-    applied_rate = round(mid_rate * (1 + spread_percent / 100), 4)
 
     if is_ron_to_foreign:
         # RON -> valută străină: comisionul se scade din suma în RON
         # ÎNAINTE de conversie, apoi convertim la cursul aplicat (RON per
         # unitate valută străină). Costul total = comisionul fix + costul
         # de spread (diferența față de cursul mid), ambele în RON.
+        applied_rate = round(mid_rate * (1 + spread_percent / 100), 4)
         net_ron_minor = max(payload.amount_minor - commission_minor, 0)
         received_minor = round(net_ron_minor / applied_rate)
         total_cost_minor = commission_minor + round(payload.amount_minor * spread_percent / 100)
@@ -90,6 +136,7 @@ def compute_quote(payload: QuoteRequest) -> dict:
         "commission_minor": commission_minor,
         "total_cost_minor": total_cost_minor,
         "total_cost_percent": total_cost_percent,
+        "source": source,
         "is_demo": True,
         "generated_at": datetime.now(timezone.utc),
     }
@@ -100,7 +147,7 @@ async def execute_demo_exchange(user_id: str, payload: QuoteRequest) -> dict:
     accounts-service NU e apelat aici, intenționat (vezi task-ul
     MaestroBank, secțiunea 15: "Nu avem integrare FX reală").
     """
-    quote = compute_quote(payload)
+    quote = await compute_quote(payload)
 
     db = get_database()
     doc = {
