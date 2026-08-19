@@ -1,0 +1,64 @@
+<app-page-header title="Support" subtitle="How can we help?">
+  <app-action-button (pressed)="openModal()"><app-icon name="plus" [size]="16" /> New support request</app-action-button>
+</app-page-header>
+
+<div class="support-grid">
+  <section class="support-panel">
+    <h2>My requests</h2>
+    @if (loading()) {
+      <app-loading-skeleton [rows]="3" [height]="60" />
+    } @else if (tickets().length === 0) {
+      <app-empty-state icon="support" title="No support requests" description="Trimite prima ta solicitare — răspundem cât mai curând." />
+    } @else {
+      <div class="support-tickets">
+        @for (t of tickets(); track t.id) {
+          <div class="support-ticket">
+            <div class="support-ticket__main">
+              <p class="support-ticket__subject">{{ t.subject }}</p>
+              <p class="support-ticket__meta">{{ categoryLabels[t.category] }} · {{ t.created_at | date: 'dd MMM yyyy' }}</p>
+            </div>
+            <app-status-badge [status]="t.status" />
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="support-panel">
+    <h2>FAQ</h2>
+    <div class="support-faq">
+      @for (item of faqItems; track item.q) {
+        <details class="support-faq-item">
+          <summary>{{ item.q }}</summary>
+          <p>{{ item.a }}</p>
+        </details>
+      }
+    </div>
+  </section>
+</div>
+
+@if (modalOpen()) {
+  <app-modal title="New support request" (closed)="modalOpen.set(false)">
+    <div class="support-form">
+      <label>
+        <span>Categorie</span>
+        <select [ngModel]="category()" (ngModelChange)="category.set($event)">
+          <option value="card">Card</option>
+          <option value="transfer">Transfer</option>
+          <option value="account">Cont</option>
+          <option value="technical">Tehnic</option>
+          <option value="other">Altele</option>
+        </select>
+      </label>
+      <label>
+        <span>Subiect</span>
+        <input type="text" placeholder="Ex: Cardul nu funcționează" [ngModel]="subject()" (ngModelChange)="subject.set($event)" />
+      </label>
+      <label>
+        <span>Mesaj</span>
+        <textarea rows="4" placeholder="Descrie problema ta..." [ngModel]="message()" (ngModelChange)="message.set($event)"></textarea>
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="saving()" (pressed)="submitTicket()">Trimite solicitarea</app-action-button>
+    </div>
+  </app-modal>
+}

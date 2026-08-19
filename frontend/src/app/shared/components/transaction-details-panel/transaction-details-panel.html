@@ -1,0 +1,81 @@
+<aside class="details-panel">
+  <div class="details-panel__header">
+    <h3>Detalii tranzacție</h3>
+    <button type="button" class="details-panel__close" aria-label="Închide" (click)="closed.emit()">×</button>
+  </div>
+
+  <div class="details-panel__hero">
+    <div class="details-panel__merchant">
+      <span class="details-panel__avatar">{{ displayName().charAt(0).toUpperCase() }}</span>
+      <div>
+        <p class="details-panel__name">{{ displayName() }}</p>
+        <p class="details-panel__date">{{ transaction().created_at | date: 'dd MMM yyyy, HH:mm' }}</p>
+      </div>
+    </div>
+    <p
+      class="details-panel__amount"
+      [class.details-panel__amount--in]="transaction().direction === 'incoming'"
+    >
+      {{ transaction().direction === 'incoming' ? '+' : '-' }}{{ transaction().amount_minor | money: transaction().currency : false }}
+      {{ transaction().currency === 'RON' ? 'lei' : transaction().currency }}
+    </p>
+  </div>
+
+  <dl class="details-panel__grid">
+    <div class="details-panel__field">
+      <dt>Cont / Card</dt>
+      <dd>{{ accountLabel() }}</dd>
+    </div>
+    <div class="details-panel__field">
+      <dt>Categorie</dt>
+      <dd>{{ categoryLabel() }}</dd>
+    </div>
+    <div class="details-panel__field">
+      <dt>Contrapartidă</dt>
+      <dd class="details-panel__mono">{{ transaction().counterparty_iban }}</dd>
+    </div>
+    <div class="details-panel__field">
+      <dt>Status</dt>
+      <dd><app-status-badge [status]="transaction().status" /></dd>
+    </div>
+    <div class="details-panel__field details-panel__field--wide">
+      <dt>ID tranzacție</dt>
+      <dd class="details-panel__mono">{{ transaction().id }}</dd>
+    </div>
+  </dl>
+
+  <div class="details-panel__actions">
+    <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
+      🚩 Nu recunosc această tranzacție
+    </app-action-button>
+    <app-action-button
+      variant="secondary"
+      [fullWidth]="true"
+      [disabled]="transaction().recognized"
+      [loading]="recognizing()"
+      (pressed)="recognize.emit()"
+    >
+      {{ transaction().recognized ? '✓ Marcată ca recunoscută' : '✓ Marchează ca recunoscută' }}
+    </app-action-button>
+  </div>
+
+  @if (transaction().reported) {
+    <p class="details-panel__reported-note">Tranzacția a fost raportată echipei de suport MaestroBank.</p>
+  }
+
+  <div class="details-panel__guardian">
+    <div class="details-panel__guardian-header">
+      <span aria-hidden="true">🛡️</span>
+      <strong>Financial Guardian</strong>
+      <span class="details-panel__coming-soon">Coming in AI phase</span>
+    </div>
+    <p>Detectarea automată a tranzacțiilor neobișnuite va fi disponibilă într-o etapă viitoare (AI).</p>
+  </div>
+
+  <div class="details-panel__support">
+    <p>Ai nevoie de ajutor cu această tranzacție?</p>
+    <button type="button" class="details-panel__support-link" (click)="contactSupport.emit()">
+      Contactează suportul MaestroBank →
+    </button>
+  </div>
+</aside>

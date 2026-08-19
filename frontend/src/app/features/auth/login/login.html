@@ -1,0 +1,51 @@
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <p class="auth-brand__name">MaestroBank</p>
+      <p class="auth-brand__tagline">maestrul tău în banking</p>
+    </div>
+
+    <h1 class="auth-title">Autentificare</h1>
+    <p class="auth-subtitle">Accesează contul tău MaestroBank.</p>
+
+    @if (sessionExpired) {
+      <p class="auth-notice">Sesiunea a expirat. Te rugăm să te autentifici din nou.</p>
+    }
+
+    <form class="auth-form" (ngSubmit)="submit()">
+      <label class="auth-field">
+        <span>Email</span>
+        <input
+          type="email"
+          autocomplete="email"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+          name="email"
+          placeholder="nume@exemplu.com"
+        />
+      </label>
+
+      <label class="auth-field">
+        <span>Parolă</span>
+        <input
+          type="password"
+          autocomplete="current-password"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+          name="password"
+          placeholder="••••••••"
+        />
+      </label>
+
+      @if (error()) {
+        <p class="auth-error">{{ error() }}</p>
+      }
+
+      <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Se autentifică...' : 'Autentifică-te' }}
+      </button>
+    </form>
+
+    <p class="auth-switch">Nu ai cont? <a routerLink="/register">Creează unul</a></p>
+  </div>
+</div>

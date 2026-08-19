@@ -1,0 +1,61 @@
+<app-page-header title="Conturi" subtitle="Contul tău curent MaestroBank." />
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="3" [height]="70" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca conturile" [description]="error()!" />
+} @else if (!account()) {
+  <app-empty-state icon="wallet" title="Niciun cont încă" description="Contul tău se creează automat la înregistrare." />
+} @else {
+  <div class="account-detail-card">
+    <div class="account-detail-card__top">
+      <div class="account-detail-card__identity">
+        <span class="account-detail-card__avatar">{{ account()!.currency }}</span>
+        <div>
+          <p class="account-detail-card__name">Cont curent {{ account()!.currency }}</p>
+          <p class="account-detail-card__iban">{{ account()!.iban }}</p>
+        </div>
+      </div>
+      <app-status-badge [status]="account()!.status" />
+    </div>
+
+    <div class="account-detail-card__balance">
+      <span class="account-detail-card__balance-label">Sold disponibil</span>
+      <span class="account-detail-card__balance-value">{{ account()!.balance_minor | money: account()!.currency }}</span>
+    </div>
+
+    <dl class="account-detail-card__meta">
+      <div>
+        <dt>Monedă</dt>
+        <dd>{{ account()!.currency }}</dd>
+      </div>
+      <div>
+        <dt>Creat la</dt>
+        <dd>{{ account()!.created_at | date: 'dd MMM yyyy' }}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd>{{ account()!.status === 'active' ? 'Activ' : account()!.status }}</dd>
+      </div>
+    </dl>
+
+    <div class="account-detail-card__actions">
+      <app-action-button variant="secondary" (pressed)="copyIban()">
+        <app-icon name="copy" [size]="16" />
+        {{ copied() ? 'Copiat!' : 'Copiază IBAN' }}
+      </app-action-button>
+      <app-action-button variant="primary" (pressed)="goToTransfer()">
+        <app-icon name="transfer" [size]="16" />
+        Transfer
+      </app-action-button>
+      <app-action-button variant="secondary" (pressed)="goToTransactions()">
+        <app-icon name="transactions" [size]="16" />
+        Vezi tranzacții
+      </app-action-button>
+    </div>
+  </div>
+
+  <p class="accounts-note">
+    MaestroBank pregătește suport pentru mai multe conturi (economii, valutare) într-o etapă viitoare.
+  </p>
+}

@@ -1,0 +1,215 @@
+<app-page-header title="Cardurile mele" subtitle="Detalii, control și securitate pentru cardul tău." />
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="5" [height]="80" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca cardul" [description]="error()!" />
+} @else if (!card()) {
+  <app-empty-state icon="cards" title="Niciun card încă" description="Cardul virtual demo se creează automat la înregistrare." />
+} @else {
+  <div class="cards-layout">
+    <div class="cards-main">
+      <div class="card-visual" [class.card-visual--frozen]="card()!.is_frozen">
+        <div class="card-visual__top">
+          <span class="card-visual__brand">MaestroBank</span>
+          <span class="card-visual__type">Virtual Debit</span>
+        </div>
+        <div class="card-visual__chip-row">
+          <span class="card-visual__chip" aria-hidden="true"></span>
+          <app-icon name="contactless" [size]="20" />
+        </div>
+        <p class="card-visual__number">**** **** **** {{ card()!.last_four }}</p>
+        <div class="card-visual__bottom">
+          <div>
+            <span class="card-visual__label">Cardholder</span>
+            <span class="card-visual__value">{{ cardholderName() }}</span>
+          </div>
+          <div>
+            <span class="card-visual__label">Expiră</span>
+            <span class="card-visual__value">{{ card()!.expiry_month.toString().padStart(2, '0') }}/{{ card()!.expiry_year.toString().slice(-2) }}</span>
+          </div>
+        </div>
+        @if (card()!.is_frozen) {
+          <div class="card-visual__frozen-badge">
+            <app-icon name="lock" [size]="14" /> Blocat temporar
+          </div>
+        }
+      </div>
+
+      <section class="card-panel">
+        <h2>Detalii card</h2>
+        <dl class="card-detail-grid">
+          <div>
+            <dt>Status</dt>
+            <dd><app-status-badge [status]="card()!.is_frozen ? 'frozen' : card()!.status" /></dd>
+          </div>
+          <div>
+            <dt>Tip card</dt>
+            <dd>Premium Debit (virtual)</dd>
+          </div>
+          <div>
+            <dt>Ultimele 4 cifre</dt>
+            <dd>{{ card()!.last_four }}</dd>
+          </div>
+          <div>
+            <dt>Cont asociat</dt>
+            <dd>Cont curent {{ account()?.currency }}</dd>
+          </div>
+          <div>
+            <dt>Expirare</dt>
+            <dd>{{ card()!.expiry_month.toString().padStart(2, '0') }}/{{ card()!.expiry_year }}</dd>
+          </div>
+          <div>
+            <dt>IBAN asociat</dt>
+            <dd class="card-detail-grid__mono">{{ account()?.iban }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card-panel">
+        <h2>Control card</h2>
+
+        <div class="card-control">
+          <app-icon name="lock" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Blocare temporară card</p>
+            <p class="card-control__desc">Blochează cardul pentru o perioadă scurtă.</p>
+          </div>
+          <app-toggle-control [checked]="card()!.is_frozen" [disabled]="freezeBusy()" (toggled)="toggleFreeze()" />
+        </div>
+
+        <div class="card-control">
+          <app-icon name="globe" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Plăți online</p>
+            <p class="card-control__desc">Permite plățile online cu cardul.</p>
+          </div>
+          <app-toggle-control
+            [checked]="card()!.online_payments_enabled"
+            [disabled]="settingsBusy() === 'online_payments_enabled'"
+            (toggled)="toggleSetting('online_payments_enabled', $event)"
+          />
+        </div>
+
+        <div class="card-control">
+          <app-icon name="contactless" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Contactless</p>
+            <p class="card-control__desc">Plăți rapide prin apropierea cardului.</p>
+          </div>
+          <app-toggle-control
+            [checked]="card()!.contactless_enabled"
+            [disabled]="settingsBusy() === 'contactless_enabled'"
+            (toggled)="toggleSetting('contactless_enabled', $event)"
+          />
+        </div>
+
+        <div class="card-control">
+          <app-icon name="building" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Retrageri ATM</p>
+            <p class="card-control__desc">Permite retragerile de numerar de la ATM.</p>
+          </div>
+          <app-toggle-control
+            [checked]="card()!.atm_withdrawals_enabled"
+            [disabled]="settingsBusy() === 'atm_withdrawals_enabled'"
+            (toggled)="toggleSetting('atm_withdrawals_enabled', $event)"
+          />
+        </div>
+
+        <div class="card-control">
+          <app-icon name="globe" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Plăți internaționale</p>
+            <p class="card-control__desc">Permite utilizarea cardului în străinătate.</p>
+          </div>
+          <app-toggle-control
+            [checked]="card()!.international_payments_enabled"
+            [disabled]="settingsBusy() === 'international_payments_enabled'"
+            (toggled)="toggleSetting('international_payments_enabled', $event)"
+          />
+        </div>
+
+        <div class="card-control">
+          <app-icon name="calendar" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Limită zilnică</p>
+            <p class="card-control__desc">Valoarea maximă pentru plăți și retrageri.</p>
+          </div>
+          @if (editingLimit()) {
+            <div class="card-control__limit-edit">
+              <input type="number" min="1" step="1" [ngModel]="limitInput()" (ngModelChange)="limitInput.set($event)" />
+              <button type="button" class="card-control__limit-save" [disabled]="limitBusy()" (click)="saveLimit()">Salvează</button>
+            </div>
+          } @else {
+            <button type="button" class="card-control__limit-value" (click)="editingLimit.set(true)">
+              {{ card()!.daily_limit_minor | money: account()?.currency }}
+              <app-icon name="chevron-right" [size]="14" />
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="card-panel">
+        <h2>Security settings</h2>
+        <div class="card-control card-control--muted">
+          <app-icon name="lock" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Change PIN</p>
+            <p class="card-control__desc">Schimbă codul PIN al cardului.</p>
+          </div>
+          <span class="card-control__soon">Coming soon</span>
+        </div>
+        <div class="card-control card-control--muted">
+          <app-icon name="bell" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Transaction alerts</p>
+            <p class="card-control__desc">Notificări la fiecare tranzacție cu cardul.</p>
+          </div>
+          <span class="card-control__soon">Coming soon</span>
+        </div>
+        <div class="card-control card-control--muted">
+          <app-icon name="shield" [size]="18" />
+          <div class="card-control__info">
+            <p class="card-control__title">Payment confirmation</p>
+            <p class="card-control__desc">Confirmare suplimentară pentru plăți mari.</p>
+          </div>
+          <span class="card-control__soon">Coming soon</span>
+        </div>
+      </section>
+    </div>
+
+    <aside class="cards-side">
+      <div class="card-panel">
+        <p class="cards-side__label">Sold disponibil</p>
+        <p class="cards-side__value">{{ account()?.balance_minor ?? 0 | money: account()?.currency }}</p>
+        <p class="cards-side__hint">Cont curent {{ account()?.currency }}</p>
+      </div>
+
+      <div class="card-panel">
+        <p class="cards-side__label">Cheltuieli cu cardul în luna aceasta</p>
+        <p class="cards-side__value">{{ spending()?.total_spent_minor ?? 0 | money: 'RON' }}</p>
+      </div>
+
+      <div class="card-panel">
+        <h2>Tranzacții recente cu acest card</h2>
+        @if (recentTransactions().length === 0) {
+          <app-empty-state icon="receipt" title="Nicio tranzacție încă" />
+        } @else {
+          @for (tx of recentTransactions(); track tx.id) {
+            <app-transaction-row [transaction]="tx" />
+          }
+        }
+      </div>
+
+      <div class="card-panel cards-guardian">
+        <div class="cards-guardian__header">
+          <app-icon name="shield" [size]="18" />
+          <strong>Financial Guardian</strong>
+          <span class="card-control__soon">Coming in AI phase</span>
+        </div>
+        <p>Monitorizarea automată a tranzacțiilor neobișnuite va fi disponibilă într-o etapă viitoare.</p>
+      </div>
+    </aside>
+  </div>
+}

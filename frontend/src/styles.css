@@ -1,1 +1,176 @@
-/* You can add global styles to this file, and also import other style files */
+/* ==========================================================================
+   MaestroBank — Design tokens
+   "maestrul tău în banking" — premium, modern, minimalist, aerisit.
+   Reprodus după mockup-urile din "UI reference/" (Overview, Cards,
+   Transactions, Exchange, AI Copilot). Sursă unică de adevăr pentru
+   culori/spacing/radius/shadows/typography — nu redefini aceste valori
+   direct în componente, importă tokenii de aici.
+   ========================================================================== */
+
+:root {
+  /* --- Culori: brand (sidebar bleumarin + accent albastru) --- */
+  --mb-navy-950: #0a1226;
+  --mb-navy-900: #0d1930;
+  --mb-navy-800: #142248;
+  --mb-navy-700: #1c2f5e;
+  --mb-navy-border: rgba(255, 255, 255, 0.08);
+  --mb-navy-text-muted: rgba(255, 255, 255, 0.6);
+  --mb-navy-text-faint: rgba(255, 255, 255, 0.38);
+
+  --mb-blue-50: #eef4ff;
+  --mb-blue-100: #dbe7fe;
+  --mb-blue-500: #2f6fed;
+  --mb-blue-600: #2557d6;
+  --mb-blue-700: #1c46b3;
+
+  /* --- Culori: neutre / fundal / text --- */
+  --mb-bg: #f6f7fb;
+  --mb-surface: #ffffff;
+  --mb-surface-muted: #fafbfd;
+  --mb-border: #e7e9f0;
+  --mb-border-strong: #d8dbe6;
+
+  --mb-text-primary: #12172b;
+  --mb-text-secondary: #5b6172;
+  --mb-text-tertiary: #8a90a1;
+  --mb-text-on-navy: #f5f7fd;
+
+  /* --- Semantic --- */
+  --mb-positive: #16a34a;
+  --mb-positive-bg: #eafaf0;
+  --mb-negative: #dc2626;
+  --mb-negative-bg: #fdeeee;
+  --mb-warning: #d97706;
+  --mb-warning-bg: #fef4e6;
+  --mb-info: var(--mb-blue-500);
+  --mb-info-bg: var(--mb-blue-50);
+
+  /* --- Categorii (badges) — accente discrete, nu saturate --- */
+  --mb-cat-groceries: #16a34a;
+  --mb-cat-shopping: #7c3aed;
+  --mb-cat-transport: #0891b2;
+  --mb-cat-bills: #d97706;
+  --mb-cat-restaurants: #dc2626;
+  --mb-cat-entertainment: #9333ea;
+  --mb-cat-subscriptions: #db2777;
+  --mb-cat-income: #16a34a;
+  --mb-cat-other: #64748b;
+
+  /* --- Typography --- */
+  --mb-font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mb-font-size-xs: 0.75rem;
+  --mb-font-size-sm: 0.8125rem;
+  --mb-font-size-base: 0.9375rem;
+  --mb-font-size-md: 1.0625rem;
+  --mb-font-size-lg: 1.25rem;
+  --mb-font-size-xl: 1.5rem;
+  --mb-font-size-2xl: 1.875rem;
+  --mb-font-weight-regular: 400;
+  --mb-font-weight-medium: 500;
+  --mb-font-weight-semibold: 600;
+  --mb-font-weight-bold: 700;
+  --mb-line-height-tight: 1.25;
+  --mb-line-height-base: 1.5;
+
+  /* --- Spacing scale (4px base) --- */
+  --mb-space-1: 0.25rem;
+  --mb-space-2: 0.5rem;
+  --mb-space-3: 0.75rem;
+  --mb-space-4: 1rem;
+  --mb-space-5: 1.25rem;
+  --mb-space-6: 1.5rem;
+  --mb-space-8: 2rem;
+  --mb-space-10: 2.5rem;
+  --mb-space-12: 3rem;
+
+  /* --- Radius --- */
+  --mb-radius-sm: 8px;
+  --mb-radius-md: 12px;
+  --mb-radius-lg: 16px;
+  --mb-radius-xl: 20px;
+  --mb-radius-pill: 999px;
+
+  /* --- Shadows: discrete, nu dramatice --- */
+  --mb-shadow-xs: 0 1px 2px rgba(16, 24, 48, 0.04);
+  --mb-shadow-sm: 0 1px 3px rgba(16, 24, 48, 0.06), 0 1px 2px rgba(16, 24, 48, 0.04);
+  --mb-shadow-md: 0 4px 12px rgba(16, 24, 48, 0.06), 0 2px 4px rgba(16, 24, 48, 0.04);
+  --mb-shadow-lg: 0 12px 32px rgba(16, 24, 48, 0.10), 0 4px 8px rgba(16, 24, 48, 0.04);
+
+  /* --- Layout --- */
+  --mb-sidebar-width: 264px;
+  --mb-topbar-height: 76px;
+  --mb-content-max-width: 1440px;
+
+  /* --- Motion --- */
+  --mb-transition-fast: 120ms ease;
+  --mb-transition-base: 180ms ease;
+
+  /* --- Breakpoints (documentative — folosite în @media din componente) ---
+     desktop-first: 1440 / 1366 / 1280 / tablet 1024 / mobile 640 */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mb-bg);
+  color: var(--mb-text-primary);
+  font-family: var(--mb-font-sans);
+  font-size: var(--mb-font-size-base);
+  line-height: var(--mb-line-height-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--mb-blue-100);
+}
+
+/* Scrollbar discret (webkit) — nu impune, doar rafinează */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mb-border-strong);
+  border-radius: var(--mb-radius-pill);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -11,8 +11,10 @@ localhost. Vezi `_get_account_by_user` / `_get_account_by_iban` /
 `_apply_transfer` mai jos.
 """
 
+import csv
+import io
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from bson import ObjectId
@@ -22,7 +24,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 from app.database import get_database
 from app.money import format_minor_amount
-from app.models import TransferRequest
+from app.models import ReportTransactionRequest, TransactionFilters, TransferRequest
 
 logger = logging.getLogger("transactions-service")
 
@@ -92,7 +94,10 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "currency": doc["currency"],
         "counterparty_iban": doc["to_iban"] if is_outgoing else doc["from_iban"],
         "description": doc.get("description", ""),
+        "category": doc.get("category", "other"),
         "status": doc["status"],
+        "recognized": doc.get("recognized", False),
+        "reported": doc.get("reported", False),
         "created_at": doc["created_at"],
     }
 
@@ -142,8 +147,11 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
         "amount_minor": payload.amount_minor,
         "currency": source["currency"],
         "description": payload.description,
+        "category": payload.category,
         "type": "transfer",
         "status": "pending",
+        "recognized": False,
+        "reported": False,
         "created_at": now,
     }
     insert_result = await db.transactions.insert_one(transaction_doc)
@@ -167,18 +175,130 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
     return to_transaction_view(completed_doc, viewer_account_id=source["id"])
 
 
-async def list_transactions_for_user(user_id: str, limit: int, skip: int) -> list[dict]:
+def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> dict:
+    """Construiește filtrul Mongo pentru lista/exportul de tranzacții ale
+    userului curent. TOATĂ filtrarea se face aici, în backend — nu doar
+    în frontend — astfel încât paginarea și exportul CSV să rămână
+    corecte indiferent de câte tranzacții are userul.
+
+    NOTĂ despre `account_id`: MVP-ul are un singur cont per user, deci
+    parametrul e validat (trebuie să corespundă contului userului) dar nu
+    schimbă practic rezultatul — pregătit arhitectural pentru userii cu
+    mai multe conturi, fără să inventăm funcționalitate inexistentă acum.
+    """
+    query: dict = {"$or": [{"from_account_id": source_account_id}, {"to_account_id": source_account_id}]}
+
+    if filters.direction == "outgoing":
+        query["from_account_id"] = source_account_id
+    elif filters.direction == "incoming":
+        query["to_account_id"] = source_account_id
+
+    if filters.category:
+        query["category"] = filters.category.strip().lower()
+
+    created_at_range: dict = {}
+    if filters.date_from is not None:
+        created_at_range["$gte"] = filters.date_from
+    if filters.date_to is not None:
+        created_at_range["$lte"] = filters.date_to
+    if created_at_range:
+        query["created_at"] = created_at_range
+
+    amount_range: dict = {}
+    if filters.min_amount_minor is not None:
+        amount_range["$gte"] = filters.min_amount_minor
+    if filters.max_amount_minor is not None:
+        amount_range["$lte"] = filters.max_amount_minor
+    if amount_range:
+        query["amount_minor"] = amount_range
+
+    if filters.search:
+        pattern = {"$regex": filters.search.strip(), "$options": "i"}
+        query["$and"] = [
+            {"$or": [{"description": pattern}, {"from_iban": pattern}, {"to_iban": pattern}]},
+        ]
+
+    return query
+
+
+async def list_transactions_for_user(
+    user_id: str, limit: int, skip: int, filters: TransactionFilters | None = None
+) -> list[dict]:
     db = get_database()
     source = await _get_account_by_user(user_id)
 
-    cursor = (
-        db.transactions.find({"$or": [{"from_account_id": source["id"]}, {"to_account_id": source["id"]}]})
-        .sort("created_at", -1)
-        .skip(skip)
-        .limit(limit)
-    )
+    if filters is not None and filters.account_id and filters.account_id != source["id"]:
+        # Userul nu are acest cont — listă goală, nu eroare (nu dezvăluim
+        # dacă account_id aparține altcuiva).
+        return []
+
+    query = _build_filter_query(source["id"], filters or TransactionFilters())
+    cursor = db.transactions.find(query).sort("created_at", -1).skip(skip).limit(limit)
     docs = await cursor.to_list(length=limit)
     return [to_transaction_view(doc, viewer_account_id=source["id"]) for doc in docs]
+
+
+async def export_transactions_csv(user_id: str, filters: TransactionFilters) -> str:
+    """Generează CSV-ul tranzacțiilor FILTRATE ale userului curent — vezi
+    _build_filter_query. Nu exportă niciodată tranzacțiile altui user
+    (query-ul e mereu legat de contul userului autentificat).
+    """
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+    query = _build_filter_query(source["id"], filters)
+
+    docs = await db.transactions.find(query).sort("created_at", -1).to_list(length=10_000)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Data", "Descriere", "Categorie", "Cont/Card", "Directie", "Suma", "Moneda", "Status"])
+    for doc in docs:
+        view = to_transaction_view(doc, viewer_account_id=source["id"])
+        signed_amount = view["amount"] if view["direction"] == "incoming" else f"-{view['amount']}"
+        writer.writerow(
+            [
+                view["created_at"].isoformat(),
+                view["description"] or view["counterparty_iban"],
+                view["category"],
+                "Cont curent RON",
+                view["direction"],
+                signed_amount,
+                view["currency"],
+                view["status"],
+            ]
+        )
+    return buffer.getvalue()
+
+
+async def recognize_transaction(transaction_id: str, user_id: str) -> dict:
+    return await _set_transaction_flag(transaction_id, user_id, "recognized", True)
+
+
+async def report_transaction(transaction_id: str, user_id: str, payload: ReportTransactionRequest) -> dict:
+    doc = await _set_transaction_flag(transaction_id, user_id, "reported", True)
+    if payload.reason:
+        db = get_database()
+        await db.transactions.update_one({"_id": ObjectId(transaction_id)}, {"$set": {"report_reason": payload.reason}})
+    logger.info("transactions-service: tranzacție raportată (tx_id=%s, user_id=%s)", transaction_id, user_id)
+    return doc
+
+
+async def _set_transaction_flag(transaction_id: str, user_id: str, field: str, value: bool) -> dict:
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+
+    try:
+        object_id = ObjectId(transaction_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de tranzacție invalid.") from exc
+
+    doc = await db.transactions.find_one({"_id": object_id})
+    if doc is None or source["id"] not in (doc["from_account_id"], doc["to_account_id"]):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
+
+    await db.transactions.update_one({"_id": object_id}, {"$set": {field: value}})
+    updated = await db.transactions.find_one({"_id": object_id})
+    return to_transaction_view(updated, viewer_account_id=source["id"])
 
 
 async def get_transaction_for_user(transaction_id: str, user_id: str) -> dict:
@@ -196,3 +316,152 @@ async def get_transaction_for_user(transaction_id: str, user_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
 
     return to_transaction_view(doc, viewer_account_id=source["id"])
+
+
+# --- Analytics (Spending & Forecast) --------------------------------------
+#
+# Determinist, calculat direct din tx_db — NU folosește AI/ML. Vezi task-ul
+# MaestroBank, secțiunea 16: "Spending și Forecast sunt O SINGURĂ PAGINĂ".
+
+
+def _month_start(now: datetime) -> datetime:
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _days_in_month(now: datetime) -> int:
+    import calendar
+
+    return calendar.monthrange(now.year, now.month)[1]
+
+
+async def _get_subscriptions_for_user(user_id: str) -> list[dict]:
+    """Abonamentele active ale userului, prin API-ul budgets-service
+    (NU citim niciodată direct budgets_db din acest serviciu).
+
+    Degradare grațioasă: dacă budgets-service e indisponibil, forecast-ul
+    continuă fără abonamente (mai puțin precis, dar nu blochează pagina).
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.budgets_service_url}/internal/budgets/subscriptions/by-user/{user_id}")
+        if response.status_code == 200:
+            return response.json()
+    except httpx.RequestError:
+        logger.warning("transactions-service: budgets-service indisponibil pentru forecast (user_id=%s)", user_id)
+    return []
+
+
+async def get_spending_analytics(user_id: str) -> dict:
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+    now = datetime.now(timezone.utc)
+    month_start = _month_start(now)
+
+    docs = await db.transactions.find(
+        {
+            "from_account_id": source["id"],
+            "status": "completed",
+            "created_at": {"$gte": month_start, "$lte": now},
+        }
+    ).to_list(length=10_000)
+
+    totals_by_category: dict[str, int] = {}
+    total_spent_minor = 0
+    for doc in docs:
+        amount = doc["amount_minor"]
+        category = doc.get("category", "other")
+        totals_by_category[category] = totals_by_category.get(category, 0) + amount
+        total_spent_minor += amount
+
+    days_elapsed = max((now - month_start).days + 1, 1)
+    average_daily_spending_minor = round(total_spent_minor / days_elapsed)
+
+    by_category = [
+        {
+            "category": category,
+            "amount_minor": amount,
+            "percentage": round((amount / total_spent_minor) * 100, 1) if total_spent_minor > 0 else 0,
+        }
+        for category, amount in sorted(totals_by_category.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    return {
+        "month": month_start.strftime("%Y-%m"),
+        "total_spent_minor": total_spent_minor,
+        "average_daily_spending_minor": average_daily_spending_minor,
+        "by_category": by_category,
+    }
+
+
+async def get_cash_flow_analytics(user_id: str, days: int = 30) -> dict:
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+    now = datetime.now(timezone.utc)
+    range_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    docs = await db.transactions.find(
+        {
+            "$or": [{"from_account_id": source["id"]}, {"to_account_id": source["id"]}],
+            "status": "completed",
+            "created_at": {"$gte": range_start},
+        }
+    ).to_list(length=10_000)
+
+    daily: dict[str, dict[str, int]] = {}
+    for offset in range(days):
+        day_key = (range_start + timedelta(days=offset)).strftime("%Y-%m-%d")
+        daily[day_key] = {"incoming_minor": 0, "outgoing_minor": 0}
+
+    for doc in docs:
+        day_key = doc["created_at"].strftime("%Y-%m-%d")
+        if day_key not in daily:
+            continue
+        if doc["from_account_id"] == source["id"]:
+            daily[day_key]["outgoing_minor"] += doc["amount_minor"]
+        else:
+            daily[day_key]["incoming_minor"] += doc["amount_minor"]
+
+    points = [
+        {
+            "date": day_key,
+            "incoming_minor": values["incoming_minor"],
+            "outgoing_minor": values["outgoing_minor"],
+            "net_minor": values["incoming_minor"] - values["outgoing_minor"],
+        }
+        for day_key, values in sorted(daily.items())
+    ]
+
+    return {"period_days": days, "points": points}
+
+
+async def get_forecast_analytics(user_id: str) -> dict:
+    now = datetime.now(timezone.utc)
+    account = await _get_account_by_user(user_id)
+    spending = await get_spending_analytics(user_id)
+    subscriptions = await _get_subscriptions_for_user(user_id)
+
+    days_total = _days_in_month(now)
+    days_remaining = max(days_total - now.day, 0)
+    projected_variable_spending_minor = spending["average_daily_spending_minor"] * days_remaining
+
+    upcoming_obligations = [
+        {
+            "name": sub["name"],
+            "amount_minor": sub["amount_minor"],
+            "billing_day": sub["billing_day"],
+        }
+        for sub in subscriptions
+        if sub.get("active", True) and sub.get("billing_day", 0) >= now.day
+    ]
+    upcoming_obligations_minor = sum(item["amount_minor"] for item in upcoming_obligations)
+
+    expected_expenses_minor = projected_variable_spending_minor + upcoming_obligations_minor
+    estimated_end_of_month_balance_minor = account["balance_minor"] - expected_expenses_minor
+
+    return {
+        "current_balance_minor": account["balance_minor"],
+        "expected_expenses_minor": expected_expenses_minor,
+        "upcoming_obligations": upcoming_obligations,
+        "estimated_end_of_month_balance_minor": estimated_end_of_month_balance_minor,
+        "days_remaining_in_month": days_remaining,
+    }

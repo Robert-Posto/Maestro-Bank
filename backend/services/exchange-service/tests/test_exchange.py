@@ -1,0 +1,99 @@
+"""
+Teste pentru exchange-service (motor FX DEMO).
+
+Rulare (cu stack-ul pornit prin `docker compose up`, bază de TEST
+separată, ca să nu polueze exchange_db real):
+
+    docker compose exec exchange-service pip install pytest==8.3.3 pytest-asyncio==0.24.0 httpx==0.27.2 -q
+    docker compose exec -e MONGO_URL=mongodb://mongodb:27017/exchange_db_test exchange-service python -m pytest -q
+"""
+
+from datetime import datetime, timedelta, timezone
+
+import jwt
+import pytest
+from bson import ObjectId
+from httpx import ASGITransport, AsyncClient
+
+from app.config import settings
+from app.database import get_database
+from app.main import app
+
+pytestmark = pytest.mark.asyncio
+
+USER_ID = str(ObjectId())
+
+
+def _make_token(user_id: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {"sub": user_id, "email": "test@example.com", "iat": now, "exp": now + timedelta(minutes=5)}
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+AUTH_HEADER = {"Authorization": f"Bearer {_make_token(USER_ID)}"}
+
+
+@pytest.fixture(autouse=True)
+async def clean_collections():
+    await get_database().demo_exchanges.delete_many({})
+    yield
+    await get_database().demo_exchanges.delete_many({})
+
+
+@pytest.fixture
+async def client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+async def test_rates_require_jwt(client: AsyncClient):
+    response = await client.get("/rates")
+    assert response.status_code == 401
+
+
+async def test_get_rates_marked_as_demo(client: AsyncClient):
+    response = await client.get("/rates", headers=AUTH_HEADER)
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) > 0
+    assert all(rate["is_demo"] is True for rate in body)
+
+
+async def test_quote_ron_to_eur(client: AsyncClient):
+    response = await client.get(
+        "/quote", params={"from_currency": "RON", "to_currency": "EUR", "amount_minor": 500_000}, headers=AUTH_HEADER
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_demo"] is True
+    assert body["received_minor"] > 0
+    assert body["received_minor"] < body["amount_minor"]  # curs > 1, deci mai puține unități EUR decât bani RON
+    assert body["total_cost_minor"] > 0
+
+
+async def test_quote_unsupported_pair_rejected(client: AsyncClient):
+    response = await client.get(
+        "/quote", params={"from_currency": "EUR", "to_currency": "USD", "amount_minor": 1_000}, headers=AUTH_HEADER
+    )
+    assert response.status_code == 400
+
+
+async def test_demo_exchange_is_recorded_and_isolated(client: AsyncClient):
+    other_user_token = f"Bearer {_make_token(str(ObjectId()))}"
+
+    response = await client.post(
+        "/demo",
+        json={"from_currency": "RON", "to_currency": "EUR", "amount_minor": 500_000},
+        headers=AUTH_HEADER,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["is_demo"] is True
+    assert "Simulare" in body["note"]
+
+    mine = await client.get("/demo/history", headers=AUTH_HEADER)
+    assert len(mine.json()) == 1
+
+    others = await client.get("/demo/history", headers={"Authorization": other_user_token})
+    assert others.json() == []

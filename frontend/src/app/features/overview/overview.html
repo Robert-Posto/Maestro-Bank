@@ -1,0 +1,95 @@
+<app-page-header title="Overview" [subtitle]="firstName() ? 'Bine ai revenit, ' + firstName() + '.' : undefined" />
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="90" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Ceva nu a mers bine" [description]="error()!">
+    <button type="button" class="overview-retry" (click)="retry()">Reîncearcă</button>
+  </app-empty-state>
+} @else {
+  <div class="overview-stats">
+    <app-stat-card label="Sold total" [value]="(account()?.balance_minor ?? 0 | money: account()?.currency)" icon="wallet" iconTone="blue" />
+    <app-stat-card
+      label="Cheltuieli în această lună"
+      [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')"
+      icon="arrow-up-right"
+      iconTone="red"
+    />
+    <app-stat-card label="Venituri în această lună" [value]="(monthlyIncomeMinor() | money: 'RON')" icon="arrow-down-right" iconTone="green" />
+    <app-stat-card
+      label="Progres bugete"
+      [value]="budgetProgress() ? budgetProgress()!.percent + '%' : '—'"
+      icon="budgets"
+      iconTone="blue"
+    >
+      @if (budgetProgress()) {
+        <p class="overview-budget-note">
+          {{ budgetProgress()!.totalSpent | money: 'RON' }} din {{ budgetProgress()!.totalLimit | money: 'RON' }}
+        </p>
+      } @else {
+        <p class="overview-budget-note"><a routerLink="/app/budgets">Creează un buget →</a></p>
+      }
+    </app-stat-card>
+  </div>
+
+  <div class="overview-grid">
+    <section class="overview-panel">
+      <div class="overview-panel__header">
+        <h2>Conturile mele</h2>
+      </div>
+      @if (account()) {
+        <app-account-card [account]="account()!" (opened)="goTo('/app/accounts')" />
+      }
+      <a class="overview-panel__link" routerLink="/app/accounts">Vezi toate conturile ›</a>
+    </section>
+
+    <section class="overview-panel">
+      <div class="overview-panel__header">
+        <h2>Acțiuni rapide</h2>
+      </div>
+      <div class="overview-actions">
+        @for (action of quickActions; track action.route) {
+          <button type="button" class="overview-action" (click)="goTo(action.route)">
+            <app-icon [name]="action.icon" [size]="18" />
+            <span>{{ action.label }}</span>
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="overview-panel">
+      <div class="overview-panel__header">
+        <h2>Plăți și abonamente următoare</h2>
+      </div>
+      @if (upcomingSubscriptions().length === 0) {
+        <app-empty-state icon="calendar" title="Niciun abonament activ" description="Adaugă unul din pagina Bugete." />
+      } @else {
+        @for (sub of upcomingSubscriptions(); track sub.id) {
+          <div class="overview-subscription">
+            <span class="overview-subscription__avatar">{{ sub.name.charAt(0) }}</span>
+            <span class="overview-subscription__info">
+              <span class="overview-subscription__name">{{ sub.name }}</span>
+              <span class="overview-subscription__day">Ziua {{ sub.billing_day }} a lunii</span>
+            </span>
+            <span class="overview-subscription__amount">{{ sub.amount_minor | money: sub.currency }}</span>
+          </div>
+        }
+      }
+      <a class="overview-panel__link" routerLink="/app/budgets">Vezi toate plățile programate ›</a>
+    </section>
+  </div>
+
+  <section class="overview-panel overview-panel--wide">
+    <div class="overview-panel__header">
+      <h2>Tranzacții recente</h2>
+    </div>
+    @if (recentTransactions().length === 0) {
+      <app-empty-state icon="receipt" title="Nicio tranzacție încă" description="Fă un transfer sau o alimentare demo pentru a vedea istoricul aici." />
+    } @else {
+      @for (tx of recentTransactions(); track tx.id) {
+        <app-transaction-row [transaction]="tx" (opened)="goTo('/app/transactions')" />
+      }
+    }
+    <a class="overview-panel__link" routerLink="/app/transactions">Vezi toate tranzacțiile ›</a>
+  </section>
+}

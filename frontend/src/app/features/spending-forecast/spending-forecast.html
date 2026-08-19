@@ -1,0 +1,94 @@
+<app-page-header title="Spending & Forecast" subtitle="Analiză determinist calculată din tranzacțiile tale — fără AI." />
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="90" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca analiza" [description]="error()!" />
+} @else {
+  <div class="sf-stats">
+    <app-stat-card label="Cheltuieli luna aceasta" [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')" icon="arrow-up-right" iconTone="red" />
+    <app-stat-card label="Medie zilnică cheltuită" [value]="(spending()?.average_daily_spending_minor ?? 0 | money: 'RON')" icon="spending" iconTone="blue" />
+    <app-stat-card label="Cheltuieli estimate rest de lună" [value]="(forecast()?.expected_expenses_minor ?? 0 | money: 'RON')" icon="calendar" iconTone="red" />
+    <app-stat-card
+      label="Sold estimat la final de lună"
+      [value]="(forecast()?.estimated_end_of_month_balance_minor ?? 0 | money: 'RON')"
+      icon="wallet"
+      iconTone="blue"
+    />
+  </div>
+
+  <div class="sf-grid">
+    <section class="sf-panel">
+      <h2>Cheltuieli pe categorie</h2>
+      @if (categoryBars().length === 0) {
+        <app-empty-state icon="budgets" title="Nicio cheltuială luna aceasta" />
+      } @else {
+        <div class="sf-bars">
+          @for (bar of categoryBars(); track bar.category) {
+            <div class="sf-bar-row">
+              <span class="sf-bar-row__label">{{ bar.label }}</span>
+              <div class="sf-bar-row__track">
+                <div class="sf-bar-row__fill" [style.width.%]="bar.percentage" [style.background]="'var(' + bar.colorVar + ')'"></div>
+              </div>
+              <span class="sf-bar-row__value">{{ bar.amountMinor | money: 'RON' }}</span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="sf-panel">
+      <h2>Cash-flow — ultimele {{ cashFlow()?.period_days ?? 30 }} zile</h2>
+      @if (cashFlowPoints().length === 0) {
+        <app-empty-state icon="spending" title="Fără date suficiente" />
+      } @else {
+        <svg class="sf-chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-label="Grafic cash-flow net pe zi">
+          <line x1="0" [attr.y1]="zeroLineY()" x2="600" [attr.y2]="zeroLineY()" class="sf-chart__zero-line" />
+          <path [attr.d]="cashFlowAreaPath()" class="sf-chart__area" />
+          <path [attr.d]="cashFlowPath()" class="sf-chart__line" />
+          @for (p of cashFlowPoints(); track p.date) {
+            <circle [attr.cx]="p.x" [attr.cy]="p.y" r="2.5" class="sf-chart__point">
+              <title>{{ p.date }}: {{ p.netMinor / 100 | number: '1.2-2' }} lei</title>
+            </circle>
+          }
+        </svg>
+        <p class="sf-chart__caption">Flux net zilnic (încasări − plăți). Punctele deasupra liniei punctate = zi pozitivă.</p>
+      }
+    </section>
+  </div>
+
+  <section class="sf-panel sf-forecast">
+    <h2>Forecast lunar</h2>
+    <div class="sf-forecast-grid">
+      <div>
+        <span>Sold curent</span>
+        <strong>{{ forecast()?.current_balance_minor ?? 0 | money: 'RON' }}</strong>
+      </div>
+      <div>
+        <span>Cheltuieli estimate</span>
+        <strong class="sf-forecast-negative">-{{ forecast()?.expected_expenses_minor ?? 0 | money: 'RON' }}</strong>
+      </div>
+      <div>
+        <span>Zile rămase în lună</span>
+        <strong>{{ forecast()?.days_remaining_in_month ?? 0 }}</strong>
+      </div>
+      <div class="sf-forecast-grid__highlight">
+        <span>Sold estimat la final de lună</span>
+        <strong>{{ forecast()?.estimated_end_of_month_balance_minor ?? 0 | money: 'RON' }}</strong>
+      </div>
+    </div>
+
+    @if (forecast()?.upcoming_obligations?.length) {
+      <div class="sf-obligations">
+        <h3>Obligații viitoare</h3>
+        @for (o of forecast()!.upcoming_obligations; track o.name) {
+          <div class="sf-obligation-row">
+            <span>{{ o.name }}</span>
+            <span>Ziua {{ o.billing_day }}</span>
+            <span>{{ o.amount_minor | money: 'RON' }}</span>
+          </div>
+        }
+      </div>
+    }
+  </section>
+}

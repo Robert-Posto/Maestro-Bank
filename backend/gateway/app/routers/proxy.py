@@ -33,6 +33,8 @@ SERVICES: dict[str, dict[str, str]] = {
     "accounts": {"base_url": settings.accounts_service_url, "internal_prefix": ""},
     "transactions": {"base_url": settings.transactions_service_url, "internal_prefix": "/transactions"},
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
+    "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
+    "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
 }
 
 # Headere care nu trebuie retransmise ca atare (sunt specifice conexiunii
@@ -45,17 +47,19 @@ def _is_protected(service: str, path: str) -> bool:
     """Determină dacă o rută necesită JWT valid, ÎNAINTE de forwarding.
 
     Regulă:
-      - auth: doar "me" e protejat (register/login rămân publice);
-      - accounts: TOT e protejat (me, me/cards, dev/fund, {id});
+      - auth: "me" și "change-password" sunt protejate (register/login
+        rămân publice);
+      - accounts: TOT e protejat (me, me/cards, cards/*, beneficiaries,
+        dev/fund, {id});
       - transactions: TOT e protejat (nu există rute publice, inclusiv
         path="" pentru GET /api/transactions);
-      - budgets: nimic protejat încă (nu există rute bancare acolo).
+      - budgets: TOT e protejat (budgets, subscriptions);
+      - support: TOT e protejat (tickets);
+      - exchange: TOT e protejat (rate/quote personalizate per user).
     """
     if service == "auth":
-        return path == "me"
-    if service == "accounts":
-        return True
-    if service == "transactions":
+        return path in ("me", "change-password")
+    if service in ("accounts", "transactions", "budgets", "support", "exchange"):
         return True
     return False
 

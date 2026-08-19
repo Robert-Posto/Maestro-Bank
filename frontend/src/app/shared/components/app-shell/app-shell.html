@@ -1,0 +1,10 @@
+<div class="app-shell">
+  <app-sidebar (logoutRequested)="onLogout()" />
+  <div class="app-shell__main">
+    <app-topbar />
+    <main class="app-shell__content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+<app-toast-container />

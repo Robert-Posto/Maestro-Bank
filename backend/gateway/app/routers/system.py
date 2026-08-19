@@ -23,6 +23,8 @@ _SERVICE_HEALTH_URLS: dict[str, str] = {
     "accounts": f"{settings.accounts_service_url}/health",
     "transactions": f"{settings.transactions_service_url}/health",
     "budgets": f"{settings.budgets_service_url}/health",
+    "support": f"{settings.support_service_url}/health",
+    "exchange": f"{settings.exchange_service_url}/health",
 }
 
 _mongo_client = AsyncIOMotorClient(settings.mongo_url)

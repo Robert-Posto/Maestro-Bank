@@ -1,0 +1,97 @@
+.account-detail-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  box-shadow: var(--mb-shadow-xs);
+  max-width: 620px;
+}
+
+.account-detail-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mb-space-5);
+}
+
+.account-detail-card__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+}
+
+.account-detail-card__avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--mb-navy-900);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--mb-font-weight-semibold);
+  font-size: var(--mb-font-size-xs);
+}
+
+.account-detail-card__name {
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.account-detail-card__iban {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 2px;
+}
+
+.account-detail-card__balance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--mb-space-5) 0;
+  border-top: 1px solid var(--mb-border);
+  border-bottom: 1px solid var(--mb-border);
+  margin-bottom: var(--mb-space-5);
+}
+
+.account-detail-card__balance-label {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.account-detail-card__balance-value {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.account-detail-card__meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mb-space-4);
+  margin: 0 0 var(--mb-space-5);
+}
+
+.account-detail-card__meta dt {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: 2px;
+}
+
+.account-detail-card__meta dd {
+  margin: 0;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.account-detail-card__actions {
+  display: flex;
+  gap: var(--mb-space-3);
+  flex-wrap: wrap;
+}
+
+.accounts-note {
+  margin-top: var(--mb-space-5);
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  max-width: 620px;
+}

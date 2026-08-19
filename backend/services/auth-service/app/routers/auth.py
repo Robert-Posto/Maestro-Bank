@@ -10,7 +10,7 @@ Extern (prin Gateway) acestea devin: /api/auth/register, /api/auth/login,
 from fastapi import APIRouter, Header, status
 
 from app import service
-from app.models import TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
+from app.models import ChangePasswordRequest, TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,3 +34,8 @@ async def login(payload: UserLogin):
 @router.get("/me", response_model=UserMeOut, response_model_by_alias=False)
 async def get_me(authorization: str | None = Header(default=None)):
     return await service.get_current_user(authorization)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(payload: ChangePasswordRequest, authorization: str | None = Header(default=None)):
+    await service.change_password(authorization, payload)

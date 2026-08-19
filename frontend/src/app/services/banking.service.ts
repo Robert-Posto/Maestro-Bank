@@ -11,6 +11,7 @@ export interface AccountView {
   balance_minor: number;
   balance: string;
   status: string;
+  created_at: string;
 }
 
 export interface CardView {
@@ -23,6 +24,26 @@ export interface CardView {
   status: string;
   type: string;
   created_at: string;
+  is_frozen: boolean;
+  online_payments_enabled: boolean;
+  contactless_enabled: boolean;
+  atm_withdrawals_enabled: boolean;
+  international_payments_enabled: boolean;
+  daily_limit_minor: number;
+}
+
+export interface CardSettingsPayload {
+  online_payments_enabled?: boolean;
+  contactless_enabled?: boolean;
+  atm_withdrawals_enabled?: boolean;
+  international_payments_enabled?: boolean;
+}
+
+export interface Beneficiary {
+  id: string;
+  name: string;
+  iban: string;
+  created_at: string;
 }
 
 export interface TransactionView {
@@ -33,7 +54,10 @@ export interface TransactionView {
   currency: string;
   counterparty_iban: string;
   description: string;
+  category: string;
   status: string;
+  recognized: boolean;
+  reported: boolean;
   created_at: string;
 }
 
@@ -41,6 +65,7 @@ export interface TransferPayload {
   to_iban: string;
   amount_minor: number;
   description: string;
+  category?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -66,5 +91,39 @@ export class BankingService {
 
   getTransactions(limit = 20, skip = 0): Observable<TransactionView[]> {
     return this.http.get<TransactionView[]>(`${API_BASE_URL}/transactions?limit=${limit}&skip=${skip}`);
+  }
+
+  // --- Card controls (Cardul meu) — vezi accounts-service /cards/{id}/* ---
+
+  freezeCard(cardId: string): Observable<CardView> {
+    return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/freeze`, {});
+  }
+
+  unfreezeCard(cardId: string): Observable<CardView> {
+    return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/unfreeze`, {});
+  }
+
+  updateCardSettings(cardId: string, payload: CardSettingsPayload): Observable<CardView> {
+    return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/settings`, payload);
+  }
+
+  updateCardLimit(cardId: string, dailyLimitMinor: number): Observable<CardView> {
+    return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/limits`, {
+      daily_limit_minor: dailyLimitMinor,
+    });
+  }
+
+  // --- Beneficiari (transfer rapid) ---------------------------------------
+
+  getBeneficiaries(): Observable<Beneficiary[]> {
+    return this.http.get<Beneficiary[]>(`${API_BASE_URL}/accounts/beneficiaries`);
+  }
+
+  createBeneficiary(name: string, iban: string): Observable<Beneficiary> {
+    return this.http.post<Beneficiary>(`${API_BASE_URL}/accounts/beneficiaries`, { name, iban });
+  }
+
+  deleteBeneficiary(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/accounts/beneficiaries/${id}`);
   }
 }

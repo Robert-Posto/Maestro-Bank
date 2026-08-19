@@ -19,6 +19,9 @@ from app.iban_service import generate_unique_demo_iban
 from app.money import format_minor_amount
 from app.models import (
     AccountPublicOut,
+    BeneficiaryCreate,
+    CardLimitUpdate,
+    CardSettingsUpdate,
     InternalAccountView,
     InternalTransferResponse,
 )
@@ -40,6 +43,7 @@ def to_public_account(account: dict) -> AccountPublicOut:
         balance_minor=account["balance_minor"],
         balance=format_minor_amount(account["balance_minor"]),
         status=account["status"],
+        created_at=account["created_at"],
     )
 
 
@@ -80,6 +84,101 @@ async def get_account_for_user(user_id: str) -> dict:
 async def get_cards_for_user(user_id: str) -> list[dict]:
     db = get_database()
     return await db.cards.find({"user_id": user_id}).to_list(length=20)
+
+
+async def _get_card_for_user(card_id: str, user_id: str) -> dict:
+    """Rezolvă un card DOAR dacă aparține userului autentificat.
+
+    Identitatea vine STRICT din JWT (`user_id`, injectat de router prin
+    `CurrentUserId`) — niciodată dintr-un parametru trimis de frontend.
+    Card inexistent SAU aparținând altui user -> același 404, ca să nu
+    dezvăluim că un card există dar nu-i aparține celui care întreabă.
+    """
+    db = get_database()
+    try:
+        object_id = ObjectId(card_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de card invalid.") from exc
+
+    card = await db.cards.find_one({"_id": object_id})
+    if card is None or card["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cardul nu există.")
+    return card
+
+
+async def _set_card_frozen(card_id: str, user_id: str, is_frozen: bool) -> dict:
+    db = get_database()
+    card = await _get_card_for_user(card_id, user_id)
+    await db.cards.update_one({"_id": card["_id"]}, {"$set": {"is_frozen": is_frozen}})
+    logger.info("accounts-service: card %s (user_id=%s) -> is_frozen=%s", card["_id"], user_id, is_frozen)
+    return await db.cards.find_one({"_id": card["_id"]})
+
+
+async def freeze_card(card_id: str, user_id: str) -> dict:
+    return await _set_card_frozen(card_id, user_id, True)
+
+
+async def unfreeze_card(card_id: str, user_id: str) -> dict:
+    return await _set_card_frozen(card_id, user_id, False)
+
+
+async def update_card_settings(card_id: str, user_id: str, payload: CardSettingsUpdate) -> dict:
+    db = get_database()
+    card = await _get_card_for_user(card_id, user_id)
+
+    updates = {key: value for key, value in payload.model_dump(exclude_unset=True).items() if value is not None}
+    if updates:
+        await db.cards.update_one({"_id": card["_id"]}, {"$set": updates})
+        logger.info("accounts-service: card %s (user_id=%s) settings actualizate: %s", card["_id"], user_id, updates)
+
+    return await db.cards.find_one({"_id": card["_id"]})
+
+
+async def update_card_limit(card_id: str, user_id: str, payload: CardLimitUpdate) -> dict:
+    db = get_database()
+    card = await _get_card_for_user(card_id, user_id)
+
+    await db.cards.update_one({"_id": card["_id"]}, {"$set": {"daily_limit_minor": payload.daily_limit_minor}})
+    logger.info(
+        "accounts-service: card %s (user_id=%s) daily_limit_minor=%s",
+        card["_id"],
+        user_id,
+        payload.daily_limit_minor,
+    )
+    return await db.cards.find_one({"_id": card["_id"]})
+
+
+# --- Beneficiari (transfer către IBAN salvat) -----------------------------
+
+
+async def create_beneficiary(user_id: str, payload: BeneficiaryCreate) -> dict:
+    db = get_database()
+    doc = {
+        "user_id": user_id,
+        "name": payload.name,
+        "iban": payload.iban,
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = await db.beneficiaries.insert_one(doc)
+    return await db.beneficiaries.find_one({"_id": result.inserted_id})
+
+
+async def get_beneficiaries_for_user(user_id: str) -> list[dict]:
+    db = get_database()
+    cursor = db.beneficiaries.find({"user_id": user_id}).sort("created_at", -1)
+    return await cursor.to_list(length=100)
+
+
+async def delete_beneficiary(beneficiary_id: str, user_id: str) -> None:
+    db = get_database()
+    try:
+        object_id = ObjectId(beneficiary_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de beneficiar invalid.") from exc
+
+    result = await db.beneficiaries.delete_one({"_id": object_id, "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Beneficiarul nu există.")
 
 
 async def add_demo_funds(user_id: str, amount_minor: int) -> AccountPublicOut:
@@ -153,6 +252,13 @@ async def provision_account(user_id: str) -> tuple[dict, dict]:
         "status": "active",
         "type": _DEMO_CARD_TYPE,
         "created_at": now,
+        # Card controls (Cardul meu) — valori implicite explicite la creare.
+        "is_frozen": False,
+        "online_payments_enabled": True,
+        "contactless_enabled": True,
+        "atm_withdrawals_enabled": True,
+        "international_payments_enabled": True,
+        "daily_limit_minor": 500_000,
     }
     card_result = await db.cards.insert_one(card_doc)
 

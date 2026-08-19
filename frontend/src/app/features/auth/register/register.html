@@ -1,0 +1,48 @@
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <p class="auth-brand__name">MaestroBank</p>
+      <p class="auth-brand__tagline">maestrul tău în banking</p>
+    </div>
+
+    <h1 class="auth-title">Creează cont</h1>
+    <p class="auth-subtitle">Contul RON, IBAN-ul demo și cardul virtual se creează automat.</p>
+
+    <form class="auth-form" (ngSubmit)="submit()">
+      <div class="auth-form-row">
+        <label class="auth-field">
+          <span>Prenume</span>
+          <input type="text" [ngModel]="firstName()" (ngModelChange)="firstName.set($event)" name="firstName" autocomplete="given-name" />
+        </label>
+        <label class="auth-field">
+          <span>Nume</span>
+          <input type="text" [ngModel]="lastName()" (ngModelChange)="lastName.set($event)" name="lastName" autocomplete="family-name" />
+        </label>
+      </div>
+
+      <label class="auth-field">
+        <span>Email</span>
+        <input type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" autocomplete="email" placeholder="nume@exemplu.com" />
+      </label>
+
+      <label class="auth-field">
+        <span>Parolă</span>
+        <input type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" autocomplete="new-password" placeholder="••••••••" />
+        <span class="auth-hint">Minimum 8 caractere, cel puțin o literă și o cifră.</span>
+      </label>
+
+      @if (error()) {
+        <p class="auth-error">{{ error() }}</p>
+      }
+      @if (success()) {
+        <p class="auth-success">Cont creat. Te autentificăm automat...</p>
+      }
+
+      <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Se creează...' : 'Creează cont' }}
+      </button>
+    </form>
+
+    <p class="auth-switch">Ai deja cont? <a routerLink="/login">Autentifică-te</a></p>
+  </div>
+</div>

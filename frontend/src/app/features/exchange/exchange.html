@@ -1,0 +1,127 @@
+<app-page-header title="Schimb valutar" subtitle="Cursuri, costuri și simulare — motor DEMO." />
+
+<div class="fx-demo-banner">
+  <app-icon name="info" [size]="16" />
+  Demo exchange rate — cursurile, spread-ul și comisioanele sunt simulate pentru acest prototip, NU provin dintr-o piață valutară reală.
+</div>
+
+<div class="fx-layout">
+  <div class="fx-card">
+    <div class="fx-row">
+      <div class="fx-input-group">
+        <span class="fx-label">Schimbi</span>
+        <div class="fx-input-line">
+          <input type="number" min="1" [ngModel]="amount()" (ngModelChange)="amount.set($event); onInputChange()" />
+          <select [ngModel]="fromCurrency()" (ngModelChange)="fromCurrency.set($event); onInputChange()">
+            @for (c of currencyOptions(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+        <span class="fx-hint">Sold disponibil: {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</span>
+      </div>
+
+      <button type="button" class="fx-swap" aria-label="Inversează" (click)="swapCurrencies()">
+        <app-icon name="transfer" [size]="18" />
+      </button>
+
+      <div class="fx-input-group">
+        <span class="fx-label">Vei primi (estimat)</span>
+        <div class="fx-input-line fx-input-line--readonly">
+          <span class="fx-received">{{ quote() ? (quote()!.received_minor | money: toCurrency() : false) : '—' }}</span>
+          <select [ngModel]="toCurrency()" (ngModelChange)="toCurrency.set($event); onInputChange()">
+            @for (c of currencyOptions(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+        <span class="fx-hint">Estimat la cursul demo curent</span>
+      </div>
+    </div>
+
+    @if (quoteError()) {
+      <p class="fx-error">{{ quoteError() }}</p>
+    }
+
+    @if (quote(); as q) {
+      <div class="fx-mini-stats">
+        <div>
+          <span>Curs curent</span>
+          <strong>{{ q.mid_rate }}</strong>
+          <small>{{ q.from_currency }} / {{ q.to_currency }}</small>
+        </div>
+        <div>
+          <span>Spread</span>
+          <strong>{{ q.spread_percent }}%</strong>
+          <small>Inclus în curs</small>
+        </div>
+        <div>
+          <span>Comision</span>
+          <strong>{{ q.commission_minor | money: 'RON' }}</strong>
+          <small>Fix</small>
+        </div>
+        <div class="fx-mini-stats__highlight">
+          <span>Cost total estimat</span>
+          <strong>{{ q.total_cost_minor | money: 'RON' }}</strong>
+          <small>{{ q.total_cost_percent }}% din sumă</small>
+        </div>
+      </div>
+
+      <div class="fx-breakdown">
+        <div class="fx-breakdown__row">
+          <span>Curs curent (mid)</span>
+          <span>{{ q.mid_rate }}</span>
+        </div>
+        <div class="fx-breakdown__row">
+          <span>Curs aplicat (cu spread MaestroBank)</span>
+          <span>{{ q.applied_rate }}</span>
+        </div>
+        <div class="fx-breakdown__row">
+          <span>Comision fix</span>
+          <span>{{ q.commission_minor | money: 'RON' }}</span>
+        </div>
+        <div class="fx-breakdown__row fx-breakdown__row--total">
+          <span>Cost total estimat</span>
+          <span>{{ q.total_cost_minor | money: 'RON' }} ({{ q.total_cost_percent }}%)</span>
+        </div>
+      </div>
+    }
+
+    @if (confirmed()) {
+      <p class="fx-confirmed">
+        <app-icon name="check" [size]="16" /> Simulare înregistrată — fără mutare reală de fonduri.
+      </p>
+    } @else {
+      <app-action-button [fullWidth]="true" [disabled]="!quote()" [loading]="confirming()" (pressed)="confirmExchange()">
+        Confirmă schimbul (Demo)
+      </app-action-button>
+    }
+  </div>
+
+  <aside class="fx-side">
+    <div class="fx-side-card">
+      <div class="fx-side-card__header">
+        <app-icon name="sparkles" [size]="16" />
+        <strong>Cum calculăm costul</strong>
+      </div>
+      <ol class="fx-explain-list">
+        <li>Pornim de la cursul interbancar (mid) — punctul de plecare al pieței valutare demo.</li>
+        <li>Adăugăm spread-ul MaestroBank — diferența noastră, inclusă transparent în curs.</li>
+        <li>Adăugăm comisionul fix, afișat înainte de confirmare.</li>
+        <li>Rezultă costul total estimat — exact cât te costă schimbul, în simulare.</li>
+      </ol>
+    </div>
+
+    <div class="fx-side-card">
+      <div class="fx-side-card__header">
+        <strong>Rate disponibile (demo)</strong>
+      </div>
+      @for (rate of rates(); track rate.currency) {
+        <div class="fx-rate-row">
+          <span>RON / {{ rate.currency }}</span>
+          <span>{{ rate.mid_rate }}</span>
+        </div>
+      }
+    </div>
+  </aside>
+</div>
