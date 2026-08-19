@@ -12,6 +12,11 @@
   </form>
 
   <div class="topbar__right">
+    <button type="button" class="topbar__new-tx" (click)="newTransaction()">
+      <span class="topbar__new-tx-icon"><app-icon name="plus" [size]="16" /></span>
+      <span class="topbar__new-tx-label">Tranzacție nouă</span>
+    </button>
+
     <div class="topbar__notifications">
       <button
         type="button"

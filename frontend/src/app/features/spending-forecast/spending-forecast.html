@@ -84,7 +84,7 @@
         @for (o of forecast()!.upcoming_obligations; track o.name) {
           <div class="sf-obligation-row">
             <span>{{ o.name }}</span>
-            <span>Ziua {{ o.billing_day }}</span>
+            <span>{{ daysUntilBillingLabel(o.billing_day) }}</span>
             <span>{{ o.amount_minor | money: 'RON' }}</span>
           </div>
         }

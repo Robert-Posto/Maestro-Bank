@@ -64,7 +64,7 @@
           <span class="subscription-row__avatar">{{ s.name.charAt(0) }}</span>
           <div class="subscription-row__info">
             <p class="subscription-row__name">{{ s.name }}</p>
-            <p class="subscription-row__meta">Ziua {{ s.billing_day }} a lunii · {{ categoryLabel(s.category) }}</p>
+            <p class="subscription-row__meta">{{ daysUntilBillingLabel(s.billing_day) }} · {{ categoryLabel(s.category) }}</p>
           </div>
           <span class="subscription-row__amount">{{ s.amount_minor | money: s.currency }}</span>
           <div class="budget-card__menu">

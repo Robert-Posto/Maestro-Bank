@@ -1,25 +1,43 @@
 <app-page-header title="Plăți & Transferuri" subtitle="Trimite bani către un IBAN, în câțiva pași." />
 
-<div class="transfer-wrap">
-  @if (step() === 'form') {
+<ol class="transfer-stepper">
+  <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'form'" [class.transfer-stepper__step--done]="step() !== 'form'">
+    <span class="transfer-stepper__dot">@if (step() !== 'form') {<app-icon name="check" [size]="12" />} @else {1}</span>
+    Detalii
+  </li>
+  <li class="transfer-stepper__rule" [class.transfer-stepper__rule--done]="step() !== 'form'"></li>
+  <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'review'" [class.transfer-stepper__step--done]="step() === 'success'">
+    <span class="transfer-stepper__dot">@if (step() === 'success') {<app-icon name="check" [size]="12" />} @else {2}</span>
+    Verificare
+  </li>
+  <li class="transfer-stepper__rule" [class.transfer-stepper__rule--done]="step() === 'success'"></li>
+  <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'success'">
+    <span class="transfer-stepper__dot">3</span>
+    Confirmare
+  </li>
+</ol>
+
+@if (step() === 'form') {
+  <div class="transfer-layout">
     <form class="transfer-card" (ngSubmit)="goToReview()">
-      <div class="transfer-field">
+      <label class="transfer-field">
         <span>Din cont</span>
         <div class="transfer-source">
-          <span class="transfer-source__badge">{{ account()?.currency ?? 'RON' }}</span>
-          <div>
+          <span class="transfer-source__badge"><app-icon name="wallet" [size]="16" /></span>
+          <div class="transfer-source__info">
             <p class="transfer-source__iban">{{ account()?.iban ?? '—' }}</p>
             <p class="transfer-source__balance">Sold disponibil: {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</p>
           </div>
         </div>
-      </div>
+      </label>
 
       @if (beneficiaries().length > 0) {
         <div class="transfer-field">
           <span>Beneficiari recenți</span>
           <div class="transfer-beneficiaries">
             @for (b of beneficiaries(); track b.id) {
-              <button type="button" class="transfer-beneficiary-chip" (click)="selectBeneficiary(b)">
+              <button type="button" class="transfer-beneficiary-chip" [class.transfer-beneficiary-chip--active]="toIban() === b.iban" (click)="selectBeneficiary(b)">
+                <span class="transfer-beneficiary-chip__avatar">{{ initials(b.name) }}</span>
                 {{ b.name }}
               </button>
             }
@@ -29,30 +47,46 @@
 
       <label class="transfer-field">
         <span>IBAN destinație</span>
-        <input type="text" placeholder="RO49 MAES 1234 5678 9012 3456" [ngModel]="toIban()" (ngModelChange)="toIban.set($event)" name="toIban" />
+        <div class="transfer-input-line">
+          <app-icon name="building" [size]="16" />
+          <input
+            type="text"
+            class="transfer-input-line__iban"
+            placeholder="RO49 MAES 1234 5678 9012 3456"
+            [ngModel]="toIban()"
+            (ngModelChange)="toIban.set($event)"
+            name="toIban"
+          />
+        </div>
       </label>
 
-      <label class="transfer-field">
-        <span>Sumă (lei)</span>
-        <input type="number" min="0.01" step="0.01" placeholder="0.00" [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="amount" />
+      <label class="transfer-field transfer-field--amount">
+        <span>Sumă</span>
+        <div class="transfer-input-line transfer-input-line--amount">
+          <input type="number" min="0.01" step="0.01" placeholder="0.00" [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="amount" />
+          <span class="transfer-input-line__currency">{{ account()?.currency ?? 'RON' }}</span>
+        </div>
       </label>
 
-      <label class="transfer-field">
-        <span>Descriere</span>
-        <input type="text" placeholder="Ex: Chirie august" [ngModel]="description()" (ngModelChange)="description.set($event)" name="description" maxlength="140" />
-      </label>
+      <div class="transfer-row">
+        <label class="transfer-field">
+          <span>Descriere</span>
+          <input type="text" placeholder="Ex: Chirie august" [ngModel]="description()" (ngModelChange)="description.set($event)" name="description" maxlength="140" />
+        </label>
 
-      <label class="transfer-field">
-        <span>Categorie</span>
-        <select [ngModel]="category()" (ngModelChange)="category.set($event)" name="category">
-          @for (cat of categories; track cat.value) {
-            <option [value]="cat.value">{{ cat.label }}</option>
-          }
-        </select>
-      </label>
+        <label class="transfer-field">
+          <span>Categorie</span>
+          <select [ngModel]="category()" (ngModelChange)="category.set($event)" name="category">
+            @for (cat of categories; track cat.value) {
+              <option [value]="cat.value">{{ cat.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
 
       <label class="transfer-checkbox">
         <input type="checkbox" [ngModel]="saveAsBeneficiary()" (ngModelChange)="saveAsBeneficiary.set($event)" name="saveBeneficiary" />
+        <span class="transfer-checkbox__box"><app-icon name="check" [size]="11" /></span>
         <span>Salvează ca beneficiar</span>
       </label>
 
@@ -64,36 +98,83 @@
       }
 
       @if (formError()) {
-        <p class="transfer-error">{{ formError() }}</p>
+        <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ formError() }}</p>
       }
 
-      <app-action-button type="submit" [fullWidth]="true">Continuă</app-action-button>
+      <app-action-button type="submit" [fullWidth]="true">Continuă <app-icon name="chevron-right" [size]="16" /></app-action-button>
     </form>
-  } @else if (step() === 'review') {
-    <div class="transfer-card">
+
+    <aside class="transfer-side">
+      <div class="transfer-mini-card">
+        <div class="transfer-mini-card__top">
+          <span class="transfer-mini-card__brand">MaestroBank</span>
+          <span class="transfer-mini-card__type">Cont curent</span>
+        </div>
+        <span class="transfer-mini-card__chip" aria-hidden="true"></span>
+        <p class="transfer-mini-card__iban">{{ account()?.iban ?? '—' }}</p>
+        <div class="transfer-mini-card__bottom">
+          <div>
+            <span class="transfer-mini-card__label">Sold disponibil</span>
+            <span class="transfer-mini-card__value">{{ account()?.balance_minor ?? 0 | money: account()?.currency }}</span>
+          </div>
+          <div>
+            <span class="transfer-mini-card__label">Monedă</span>
+            <span class="transfer-mini-card__value">{{ account()?.currency ?? 'RON' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="transfer-side-card">
+        <div class="transfer-side-card__header">
+          <app-icon name="shield" [size]="16" />
+          <strong>Transfer sigur</strong>
+        </div>
+        <ul class="transfer-explain-list">
+          <li>Verificăm IBAN-ul destinație înainte să confirmi transferul.</li>
+          <li>Poți renunța oricând, până la apăsarea butonului de confirmare.</li>
+          <li>Transferul apare instant în soldul tău și în istoricul tranzacțiilor.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+} @else if (step() === 'review') {
+  <div class="transfer-wrap">
+    <div class="transfer-card transfer-card--review">
       <h2 class="transfer-review-title">Verifică transferul</h2>
 
+      <div class="transfer-review-amount">{{ amountMinor() | money: account()?.currency }}</div>
+
+      <div class="transfer-review-route">
+        <div class="transfer-review-route__party">
+          <span class="transfer-review-route__avatar"><app-icon name="wallet" [size]="16" /></span>
+          <div>
+            <span class="transfer-review-route__label">Din cont</span>
+            <span class="transfer-review-route__value">{{ account()?.iban }}</span>
+          </div>
+        </div>
+        <span class="transfer-review-route__arrow"><app-icon name="chevron-right" [size]="16" /></span>
+        <div class="transfer-review-route__party">
+          <span class="transfer-review-route__avatar transfer-review-route__avatar--dest"><app-icon name="building" [size]="16" /></span>
+          <div>
+            <span class="transfer-review-route__label">Către</span>
+            <span class="transfer-review-route__value">{{ toIban() }}</span>
+          </div>
+        </div>
+      </div>
+
       <dl class="transfer-review-grid">
-        <div>
-          <dt>Din cont</dt>
-          <dd>{{ account()?.iban }}</dd>
-        </div>
-        <div>
-          <dt>Către</dt>
-          <dd>{{ toIban() }}</dd>
-        </div>
-        <div>
-          <dt>Sumă</dt>
-          <dd class="transfer-review-amount">{{ amountMinor() | money: account()?.currency }}</dd>
-        </div>
         <div>
           <dt>Descriere</dt>
           <dd>{{ description() || '—' }}</dd>
         </div>
+        <div>
+          <dt>Categorie</dt>
+          <dd>{{ categoryLabel(category()) }}</dd>
+        </div>
       </dl>
 
       @if (formError()) {
-        <p class="transfer-error">{{ formError() }}</p>
+        <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ formError() }}</p>
       }
 
       <div class="transfer-review-actions">
@@ -101,7 +182,9 @@
         <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">Confirmă transferul</app-action-button>
       </div>
     </div>
-  } @else if (step() === 'success' && completedTransaction(); as tx) {
+  </div>
+} @else if (step() === 'success' && completedTransaction(); as tx) {
+  <div class="transfer-wrap">
     <div class="transfer-card transfer-success">
       <div class="transfer-success__icon">
         <app-icon name="check" [size]="28" />
@@ -114,7 +197,10 @@
           <span class="transfer-success__iban">{{ tx.counterparty_iban }}</span>
         }
       </p>
-      <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">Fă un nou transfer</app-action-button>
+      <div class="transfer-success__actions">
+        <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">Fă un nou transfer</app-action-button>
+        <a routerLink="/app/transactions" class="transfer-success__link">Vezi în tranzacții ›</a>
+      </div>
     </div>
-  }
-</div>
+  </div>
+}

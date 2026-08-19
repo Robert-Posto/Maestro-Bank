@@ -54,6 +54,56 @@
   position: relative;
 }
 
+.topbar__new-tx {
+  flex-shrink: 0;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mb-space-2);
+  padding: 0.4rem 1rem 0.4rem 0.45rem;
+  border: 1px solid var(--mb-navy-700);
+  border-radius: 11px;
+  color: #fff;
+  background: var(--mb-navy-900);
+  box-shadow: 0 6px 14px rgba(10, 18, 38, 0.2);
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--mb-transition-fast),
+    box-shadow var(--mb-transition-fast),
+    background var(--mb-transition-fast);
+}
+
+.topbar__new-tx-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.topbar__new-tx:hover {
+  transform: translateY(-1px);
+  background: var(--mb-navy-800);
+  box-shadow: 0 9px 18px rgba(10, 18, 38, 0.28);
+}
+
+.topbar__new-tx:active {
+  transform: translateY(0);
+  background: var(--mb-navy-950);
+  box-shadow: 0 4px 10px rgba(10, 18, 38, 0.22);
+}
+
+.topbar__new-tx:focus-visible {
+  outline: 3px solid rgba(20, 34, 72, 0.24);
+  outline-offset: 2px;
+}
+
 .topbar__notifications {
   position: relative;
 }
@@ -218,5 +268,15 @@
   }
   .topbar__profile-info {
     display: none;
+  }
+  .topbar__new-tx-label {
+    display: none;
+  }
+  .topbar__new-tx {
+    width: 42px;
+    padding: 0;
+  }
+  .topbar__new-tx-icon {
+    background: transparent;
   }
 }
