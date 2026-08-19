@@ -267,6 +267,128 @@ async def _async_bool(value: bool) -> bool:
     return value
 
 
+async def test_provisioned_account_has_current_type(client: AsyncClient):
+    _, body = await _provision(client)
+    assert body["account"]["account_type"] == "current"
+
+
+async def test_open_additional_account(client: AsyncClient):
+    user_id, token = (await _provision_with_card(client))[:2]
+
+    response = await client.post(
+        "/new",
+        json={"account_type": "savings"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["account_type"] == "savings"
+    assert body["balance_minor"] == 0
+    assert body["iban"].startswith("RO")
+
+    all_accounts = await client.get("/all", headers={"Authorization": f"Bearer {token}"})
+    assert all_accounts.status_code == 200
+    types = {a["account_type"] for a in all_accounts.json()}
+    assert types == {"current", "savings"}
+
+
+async def test_cannot_open_duplicate_account_type(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    first = await client.post("/new", json={"account_type": "deposit"}, headers={"Authorization": f"Bearer {token}"})
+    assert first.status_code == 201
+
+    second = await client.post("/new", json={"account_type": "deposit"}, headers={"Authorization": f"Bearer {token}"})
+    assert second.status_code == 409
+
+
+async def test_cannot_open_current_account_directly(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    response = await client.post("/new", json={"account_type": "current"}, headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 422  # "current" nu e în CreatableAccountType
+
+
+async def test_new_account_does_not_affect_transfer_source(client: AsyncClient):
+    """Contul folosit de transactions-service ca sursă de transfer rămâne
+    STRICT contul curent, chiar și după deschiderea unui cont de economii."""
+    user_id, token, _ = await _provision_with_card(client)
+    await client.post("/new", json={"account_type": "student"}, headers={"Authorization": f"Bearer {token}"})
+
+    from app.service import get_account_by_user
+
+    resolved = await get_account_by_user(user_id)
+    assert resolved.account_type == "current"
+
+
+async def test_student_account_requires_document(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    without_doc = await client.post("/new", json={"account_type": "student"}, headers={"Authorization": f"Bearer {token}"})
+    assert without_doc.status_code == 422
+
+    with_doc = await client.post(
+        "/new",
+        json={"account_type": "student", "document_filename": "adeverinta_student.pdf"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert with_doc.status_code == 201
+    assert with_doc.json()["verification_document_name"] == "adeverinta_student.pdf"
+
+
+async def test_savings_account_does_not_require_document(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    response = await client.post("/new", json={"account_type": "savings"}, headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 201
+    assert response.json()["verification_document_name"] is None
+
+
+async def test_cannot_delete_current_account(client: AsyncClient):
+    user_id, token, _ = await _provision_with_card(client)
+    account = await client.get("/me", headers={"Authorization": f"Bearer {token}"})
+
+    response = await client.delete(f"/{account.json()['id']}", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 400
+
+
+async def test_cannot_delete_account_with_balance(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+    created = await client.post("/new", json={"account_type": "savings"}, headers={"Authorization": f"Bearer {token}"})
+    account_id = created.json()["id"]
+
+    db = get_database()
+    await db.accounts.update_one({"_id": ObjectId(account_id)}, {"$set": {"balance_minor": 5000}})
+
+    response = await client.delete(f"/{account_id}", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 409
+
+
+async def test_delete_empty_additional_account(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+    created = await client.post("/new", json={"account_type": "deposit"}, headers={"Authorization": f"Bearer {token}"})
+    account_id = created.json()["id"]
+
+    response = await client.delete(f"/{account_id}", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 204
+
+    all_accounts = await client.get("/all", headers={"Authorization": f"Bearer {token}"})
+    types = {a["account_type"] for a in all_accounts.json()}
+    assert "deposit" not in types
+
+
+async def test_cannot_delete_another_users_account(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+    created = await client.post("/new", json={"account_type": "savings"}, headers={"Authorization": f"Bearer {token}"})
+    account_id = created.json()["id"]
+
+    other_user_id, _ = await _provision(client)
+    other_token = _make_token(other_user_id)
+
+    response = await client.delete(f"/{account_id}", headers={"Authorization": f"Bearer {other_token}"})
+    assert response.status_code == 404
+
+
 async def test_beneficiary_crud_and_isolation(client: AsyncClient):
     user_id, token = (await _provision_with_card(client))[:2]
     other_user_id, _ = await _provision(client)
