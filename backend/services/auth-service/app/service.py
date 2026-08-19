@@ -139,6 +139,26 @@ async def change_password(authorization: str | None, payload: ChangePasswordRequ
     logger.info("auth-service: parolă schimbată cu succes pentru user_id=%s", user["_id"])
 
 
+async def verify_user_password(user_id: str, password: str) -> bool:
+    """Rută INTERNĂ (service-to-service): confirmă parola userului curent,
+    folosit de accounts-service înainte de a dezvălui PAN/CVV la un card
+    (acțiune sensibilă — vezi accounts-service app/service.py::reveal_card).
+    Nu ridică excepție dacă userul nu există/parola e greșită — întoarce
+    doar `False`, ca accounts-service să decidă mesajul afișat userului.
+    """
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId:
+        return False
+
+    db = get_database()
+    user = await db.users.find_one({"_id": object_id})
+    if user is None:
+        return False
+
+    return verify_password(password, user["password_hash"])
+
+
 async def get_user_name(user_id: str) -> dict:
     """Rută INTERNĂ (service-to-service): rezolvă doar numele unui user,
     după user_id — folosit de transactions-service ca să afișeze numele

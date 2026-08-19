@@ -14,6 +14,9 @@ export interface AccountView {
   created_at: string;
 }
 
+export type CardDesign = 'midnight' | 'aurora' | 'rose-gold' | 'graphite' | 'arctic';
+export type CardType = 'virtual' | 'physical';
+
 export interface CardView {
   id: string;
   user_id: string;
@@ -22,7 +25,7 @@ export interface CardView {
   expiry_month: number;
   expiry_year: number;
   status: string;
-  type: string;
+  type: CardType;
   created_at: string;
   is_frozen: boolean;
   online_payments_enabled: boolean;
@@ -30,6 +33,8 @@ export interface CardView {
   atm_withdrawals_enabled: boolean;
   international_payments_enabled: boolean;
   daily_limit_minor: number;
+  design: CardDesign;
+  is_one_time: boolean;
 }
 
 export interface CardSettingsPayload {
@@ -38,6 +43,22 @@ export interface CardSettingsPayload {
   atm_withdrawals_enabled?: boolean;
   international_payments_enabled?: boolean;
 }
+
+export interface CardCreatePayload {
+  design: CardDesign;
+  type: CardType;
+  is_one_time: boolean;
+}
+
+export interface CardRevealView {
+  pan: string;
+  cvv: string;
+  expiry_month: number;
+  expiry_year: number;
+}
+
+/** Taxă de emitere card fizic — vezi accounts-service::_PHYSICAL_CARD_FEE_MINOR. */
+export const PHYSICAL_CARD_FEE_MINOR = 2_000;
 
 export interface Beneficiary {
   id: string;
@@ -96,6 +117,14 @@ export class BankingService {
   }
 
   // --- Card controls (Cardul meu) — vezi accounts-service /cards/{id}/* ---
+
+  createCard(payload: CardCreatePayload): Observable<CardView> {
+    return this.http.post<CardView>(`${API_BASE_URL}/accounts/cards`, payload);
+  }
+
+  revealCard(cardId: string, password: string): Observable<CardRevealView> {
+    return this.http.post<CardRevealView>(`${API_BASE_URL}/accounts/cards/${cardId}/reveal`, { password });
+  }
 
   freezeCard(cardId: string): Observable<CardView> {
     return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/freeze`, {});
