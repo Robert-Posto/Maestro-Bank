@@ -6,9 +6,60 @@
   }
 </app-page-header>
 
+@if (!loading()) {
+  <div class="budgets-summary">
+    <div class="budgets-summary__card">
+      <span class="budgets-summary__icon budgets-summary__icon--blue"><app-icon name="budgets" [size]="18" /></span>
+      <div>
+        <span class="budgets-summary__label">Bugetat / lună</span>
+        <strong>{{ budgetsSummary().totalLimitMinor | money: 'RON' }}</strong>
+      </div>
+    </div>
+
+    <div class="budgets-summary__card">
+      <span class="budgets-summary__icon budgets-summary__icon--red"><app-icon name="arrow-up-right" [size]="18" /></span>
+      <div>
+        <span class="budgets-summary__label">Cheltuit din bugete</span>
+        <strong>{{ budgetsSummary().totalSpentMinor | money: 'RON' }}</strong>
+      </div>
+    </div>
+
+    <div class="budgets-summary__card">
+      <span class="budgets-summary__icon" [class.budgets-summary__icon--red]="budgetsSummary().percent > 100" [class.budgets-summary__icon--green]="budgetsSummary().percent <= 100">
+        <app-icon name="sparkles" [size]="18" />
+      </span>
+      <div>
+        <span class="budgets-summary__label">Utilizare generală</span>
+        <strong [class.budgets-summary__value--over]="budgetsSummary().percent > 100">{{ budgetsSummary().percent }}%</strong>
+      </div>
+    </div>
+
+    <div class="budgets-summary__card">
+      <span class="budgets-summary__icon budgets-summary__icon--navy"><app-icon name="calendar" [size]="18" /></span>
+      <div>
+        <span class="budgets-summary__label">Abonamente / lună</span>
+        <strong>{{ subscriptionsSummary().totalMonthlyMinor | money: 'RON' }}</strong>
+        @if (subscriptionsSummary().nextName) {
+          <span class="budgets-summary__hint">{{ subscriptionsSummary().nextName }} · {{ daysRemainingLabel(subscriptionsSummary().nextDays!) }}</span>
+        }
+      </div>
+    </div>
+  </div>
+}
+
 <div class="budgets-tabs">
-  <button type="button" [class.budgets-tab--active]="tab() === 'budgets'" (click)="tab.set('budgets')">Bugete</button>
-  <button type="button" [class.budgets-tab--active]="tab() === 'subscriptions'" (click)="tab.set('subscriptions')">Abonamente</button>
+  <button type="button" [class.budgets-tab--active]="tab() === 'budgets'" (click)="tab.set('budgets')">
+    <app-icon name="budgets" [size]="15" /> Bugete
+    @if (budgets().length > 0) {
+      <span class="budgets-tabs__count">{{ budgets().length }}</span>
+    }
+  </button>
+  <button type="button" [class.budgets-tab--active]="tab() === 'subscriptions'" (click)="tab.set('subscriptions')">
+    <app-icon name="calendar" [size]="15" /> Abonamente
+    @if (subscriptions().length > 0) {
+      <span class="budgets-tabs__count">{{ subscriptions().length }}</span>
+    }
+  </button>
 </div>
 
 @if (loading()) {
@@ -20,10 +71,17 @@
     <div class="budgets-grid">
       @for (b of budgetsWithProgress(); track b.id) {
         <div class="budget-card" [class.budget-card--inactive]="!b.active">
+          <span class="budget-card__accent" [style.background]="'var(' + categoryColorVar(b.category) + ')'"></span>
+
           <div class="budget-card__header">
-            <div>
-              <p class="budget-card__name">{{ b.name }}</p>
-              <p class="budget-card__category">{{ categoryLabel(b.category) }} · {{ b.period === 'monthly' ? 'lunar' : b.period === 'weekly' ? 'săptămânal' : 'anual' }}</p>
+            <div class="budget-card__identity">
+              <span class="budget-card__category-icon" [style.color]="'var(' + categoryColorVar(b.category) + ')'" [style.background]="'color-mix(in srgb, var(' + categoryColorVar(b.category) + ') 14%, white)'">
+                <app-icon name="budgets" [size]="19" />
+              </span>
+              <div>
+                <p class="budget-card__name">{{ b.name }}</p>
+                <p class="budget-card__category">{{ categoryLabel(b.category) }} · {{ b.period === 'monthly' ? 'lunar' : b.period === 'weekly' ? 'săptămânal' : 'anual' }}</p>
+              </div>
             </div>
             <div class="budget-card__menu">
               <button type="button" class="budget-card__icon-btn" (click)="toggleBudgetActive(b)" [title]="b.active ? 'Dezactivează' : 'Activează'">
@@ -35,17 +93,22 @@
             </div>
           </div>
 
+          <div class="budget-card__usage">
+            <span>Utilizare buget</span>
+            <strong [class.budget-card__percentage--over]="b.progressPercent > 100">{{ b.progressPercent }}%</strong>
+          </div>
           <div class="budget-card__progress-track">
             <div
               class="budget-card__progress-fill"
               [class.budget-card__progress-fill--over]="b.progressPercent > 100"
+              [style.background]="b.progressPercent > 100 ? null : 'var(' + categoryColorVar(b.category) + ')'"
               [style.width.%]="b.progressPercent > 100 ? 100 : b.progressPercent"
             ></div>
           </div>
 
           <div class="budget-card__numbers">
-            <span>{{ b.spentMinor | money: 'RON' }} cheltuiți</span>
-            <span>{{ b.limit_minor | money: 'RON' }} limită</span>
+            <span><small>Cheltuit</small><strong>{{ b.spentMinor | money: 'RON' }}</strong></span>
+            <span><small>Limită</small><strong>{{ b.limit_minor | money: 'RON' }}</strong></span>
           </div>
           <p class="budget-card__remaining" [class.budget-card__remaining--over]="b.spentMinor > b.limit_minor">
             {{ b.spentMinor > b.limit_minor ? 'Depășit cu ' + (b.spentMinor - b.limit_minor | money: 'RON') : (b.limit_minor - b.spentMinor | money: 'RON') + ' rămași' }}
@@ -58,23 +121,41 @@
   @if (subscriptions().length === 0) {
     <app-empty-state icon="calendar" title="Niciun abonament încă" description="Adaugă abonamentele tale recurente (Netflix, chirie etc.)." />
   } @else {
-    <div class="subscriptions-list">
+    <div class="budgets-grid">
       @for (s of subscriptions(); track s.id) {
-        <div class="subscription-row" [class.subscription-row--inactive]="!s.active">
-          <span class="subscription-row__avatar">{{ s.name.charAt(0) }}</span>
-          <div class="subscription-row__info">
-            <p class="subscription-row__name">{{ s.name }}</p>
-            <p class="subscription-row__meta">{{ daysUntilBillingLabel(s.billing_day) }} · {{ categoryLabel(s.category) }}</p>
+        <div class="budget-card subscription-card" [class.budget-card--inactive]="!s.active">
+          <span class="budget-card__accent" [style.background]="'var(' + categoryColorVar(s.category) + ')'"></span>
+
+          <div class="budget-card__header">
+            <div class="budget-card__identity">
+              <span class="subscription-card__avatar">{{ s.name.charAt(0) }}</span>
+              <div>
+                <p class="budget-card__name">{{ s.name }}</p>
+                <p class="budget-card__category">{{ categoryLabel(s.category) }}</p>
+              </div>
+            </div>
+            <div class="budget-card__menu">
+              <button type="button" class="budget-card__icon-btn" (click)="toggleSubscriptionActive(s)" [title]="s.active ? 'Dezactivează' : 'Activează'">
+                <app-icon [name]="s.active ? 'unlock' : 'lock'" [size]="15" />
+              </button>
+              <button type="button" class="budget-card__icon-btn budget-card__icon-btn--danger" (click)="pendingDeleteSubscription.set(s)" title="Șterge">
+                <app-icon name="trash" [size]="15" />
+              </button>
+            </div>
           </div>
-          <span class="subscription-row__amount">{{ s.amount_minor | money: s.currency }}</span>
-          <div class="budget-card__menu">
-            <button type="button" class="budget-card__icon-btn" (click)="toggleSubscriptionActive(s)" [title]="s.active ? 'Dezactivează' : 'Activează'">
-              <app-icon [name]="s.active ? 'unlock' : 'lock'" [size]="15" />
-            </button>
-            <button type="button" class="budget-card__icon-btn budget-card__icon-btn--danger" (click)="pendingDeleteSubscription.set(s)" title="Șterge">
-              <app-icon name="trash" [size]="15" />
-            </button>
+
+          <div class="subscription-card__amount">
+            {{ s.amount_minor | money: s.currency }}
+            <small>/ lună</small>
           </div>
+
+          <span
+            class="subscription-card__due"
+            [class.subscription-card__due--urgent]="billingUrgency(s.billing_day) === 'urgent'"
+            [class.subscription-card__due--soon]="billingUrgency(s.billing_day) === 'soon'"
+          >
+            <app-icon name="calendar" [size]="13" /> {{ daysUntilBillingLabel(s.billing_day) }}
+          </span>
         </div>
       }
     </div>

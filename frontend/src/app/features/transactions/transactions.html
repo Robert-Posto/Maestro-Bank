@@ -1,9 +1,10 @@
-<app-page-header title="Tranzacții" subtitle="Istoric complet și filtrare avansată." />
+<app-page-header title="Tranzacții" subtitle="Istoric complet și analiză inteligentă." />
 
 <div class="tx-filters">
   <label class="tx-filter">
     <span>Perioadă</span>
     <div class="tx-filter__range">
+      <app-icon name="calendar" [size]="16" />
       <input type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" />
       <span>–</span>
       <input type="date" [ngModel]="dateTo()" (ngModelChange)="dateTo.set($event)" />
@@ -12,26 +13,33 @@
 
   <label class="tx-filter">
     <span>Categorie</span>
-    <select [ngModel]="category()" (ngModelChange)="category.set($event)">
-      <option value="">Toate categoriile</option>
-      @for (cat of categories; track cat.value) {
-        <option [value]="cat.value">{{ cat.label }}</option>
-      }
-    </select>
+    <div class="tx-filter__control">
+      <app-icon name="cards" [size]="16" />
+      <select [ngModel]="category()" (ngModelChange)="category.set($event)">
+        <option value="">Toate categoriile</option>
+        @for (cat of categories; track cat.value) {
+          <option [value]="cat.value">{{ cat.label }}</option>
+        }
+      </select>
+    </div>
   </label>
 
   <label class="tx-filter">
     <span>Direcție</span>
-    <select [ngModel]="direction()" (ngModelChange)="direction.set($event)">
-      <option value="">Toate</option>
-      <option value="incoming">Încasări</option>
-      <option value="outgoing">Plăți</option>
-    </select>
+    <div class="tx-filter__control">
+      <app-icon name="transfer" [size]="16" />
+      <select [ngModel]="direction()" (ngModelChange)="direction.set($event)">
+        <option value="">Toate</option>
+        <option value="incoming">Încasări</option>
+        <option value="outgoing">Plăți</option>
+      </select>
+    </div>
   </label>
 
   <label class="tx-filter">
     <span>Sumă (lei)</span>
     <div class="tx-filter__range">
+      <app-icon name="exchange" [size]="16" />
       <input type="number" min="0" placeholder="Min" [ngModel]="minAmount()" (ngModelChange)="minAmount.set($event)" />
       <span>–</span>
       <input type="number" min="0" placeholder="Max" [ngModel]="maxAmount()" (ngModelChange)="maxAmount.set($event)" />
@@ -51,7 +59,7 @@
     />
   </div>
   <app-action-button variant="secondary" (pressed)="applyFilters()">
-    <app-icon name="filter" [size]="16" /> Aplică filtre
+    <app-icon name="filter" [size]="16" /> Filtre avansate
   </app-action-button>
   <app-action-button variant="ghost" (pressed)="resetFilters()">Resetează</app-action-button>
   <app-action-button variant="secondary" [loading]="exporting()" (pressed)="exportCsv()">
@@ -77,22 +85,24 @@
             <th>Cont / Card</th>
             <th>Sumă</th>
             <th>Status</th>
+            <th aria-label="Acțiuni"></th>
           </tr>
         </thead>
         <tbody>
           @for (tx of transactions(); track tx.id) {
             <tr (click)="openDetails(tx.id)" [class.tx-table__row--active]="selectedId() === tx.id">
-              <td>{{ tx.created_at | date: 'dd MMM yyyy' }}</td>
+              <td class="tx-table__date"><strong>{{ tx.created_at | date: 'dd MMM yyyy' }}</strong><span>{{ tx.created_at | date: 'HH:mm' }}</span></td>
               <td class="tx-table__merchant">
                 <span class="tx-table__avatar">{{ displayName(tx).charAt(0).toUpperCase() }}</span>
                 {{ displayName(tx) }}
               </td>
-              <td>{{ categoryLabel(tx.category) }}</td>
-              <td>Cont curent RON</td>
+              <td><span class="tx-table__category-dot"></span>{{ categoryLabel(tx.category) }}</td>
+              <td class="tx-table__account"><app-icon name="cards" [size]="15" /> Cont curent RON</td>
               <td [class.tx-table__amount--in]="tx.direction === 'incoming'" class="tx-table__amount">
                 {{ tx.direction === 'incoming' ? '+' : '-' }}{{ tx.amount_minor | money: tx.currency : false }} {{ tx.currency === 'RON' ? 'lei' : tx.currency }}
               </td>
               <td><app-status-badge [status]="tx.status" /></td>
+              <td class="tx-table__chevron" aria-hidden="true">›</td>
             </tr>
           }
         </tbody>
