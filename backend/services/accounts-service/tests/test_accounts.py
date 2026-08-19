@@ -15,6 +15,7 @@ import pytest
 from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
 
+import app.service as service_module
 from app.config import settings
 from app.database import get_database
 from app.main import app
@@ -172,6 +173,98 @@ async def test_user_cannot_freeze_another_users_card(client: AsyncClient):
 
     response = await client.patch(f"/cards/{card_id}/freeze", headers={"Authorization": f"Bearer {other_token}"})
     assert response.status_code == 404
+
+
+async def test_create_virtual_card_with_design(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    response = await client.post(
+        "/cards",
+        json={"design": "aurora", "type": "virtual", "is_one_time": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["design"] == "aurora"
+    assert body["type"] == "virtual"
+    assert body["is_one_time"] is False
+    assert len(body["last_four"]) == 4
+
+
+async def test_create_card_invalid_design_rejected(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    response = await client.post(
+        "/cards",
+        json={"design": "does-not-exist", "type": "virtual"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_one_time_card_must_be_virtual(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)
+
+    response = await client.post(
+        "/cards",
+        json={"design": "midnight", "type": "physical", "is_one_time": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_create_physical_card_deducts_fee(client: AsyncClient):
+    user_id, token, _ = await _provision_with_card(client)
+    await client.post("/dev/fund", json={"amount_minor": 100_000}, headers={"Authorization": f"Bearer {token}"})
+
+    response = await client.post(
+        "/cards",
+        json={"design": "graphite", "type": "physical"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+    assert response.json()["type"] == "physical"
+
+    account = await client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert account.json()["balance_minor"] == 100_000 - 2_000
+
+
+async def test_create_physical_card_insufficient_funds(client: AsyncClient):
+    _, token, _ = await _provision_with_card(client)  # sold 0
+
+    response = await client.post(
+        "/cards",
+        json={"design": "graphite", "type": "physical"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 409
+
+
+async def test_reveal_card_requires_correct_password(client: AsyncClient, monkeypatch):
+    _, token, card_id = await _provision_with_card(client)
+
+    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(False))
+    wrong = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={"password": "wrong-password"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert wrong.status_code == 401
+
+    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(True))
+    correct = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={"password": "correct-password"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert correct.status_code == 200
+    body = correct.json()
+    assert len(body["pan"]) == 16
+    assert len(body["cvv"]) == 3
+
+
+async def _async_bool(value: bool) -> bool:
+    return value
 
 
 async def test_beneficiary_crud_and_isolation(client: AsyncClient):

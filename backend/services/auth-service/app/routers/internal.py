@@ -11,11 +11,17 @@ browser/Angular.
 from fastapi import APIRouter
 
 from app import service
-from app.models import InternalUserNameView
+from app.models import InternalPasswordVerifyRequest, InternalPasswordVerifyResponse, InternalUserNameView
 
-router = APIRouter(prefix="/internal/users", tags=["internal"])
+router = APIRouter(prefix="/internal", tags=["internal"])
 
 
-@router.get("/{user_id}", response_model=InternalUserNameView)
+@router.get("/users/{user_id}", response_model=InternalUserNameView)
 async def get_user_name(user_id: str):
     return await service.get_user_name(user_id)
+
+
+@router.post("/auth/verify-password", response_model=InternalPasswordVerifyResponse)
+async def verify_password(payload: InternalPasswordVerifyRequest):
+    valid = await service.verify_user_password(payload.user_id, payload.password)
+    return InternalPasswordVerifyResponse(valid=valid)

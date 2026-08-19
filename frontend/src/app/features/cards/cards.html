@@ -1,55 +1,141 @@
-<app-page-header title="Cardurile mele" subtitle="Detalii, control și securitate pentru cardul tău." />
+<app-page-header title="Cardurile mele" subtitle="Detalii, control și securitate pentru cardurile tale.">
+  <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> Card nou</app-action-button>
+</app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="5" [height]="80" />
 } @else if (error()) {
   <app-empty-state icon="info" title="Nu am putut încărca cardul" [description]="error()!" />
-} @else if (!card()) {
-  <app-empty-state icon="cards" title="Niciun card încă" description="Cardul virtual demo se creează automat la înregistrare." />
+} @else if (cards().length === 0) {
+  <app-empty-state icon="cards" title="Niciun card încă" description="Adaugă primul tău card — virtual, instant, sau fizic.">
+    <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> Card nou</app-action-button>
+  </app-empty-state>
 } @else {
   <div class="cards-layout">
     <div class="cards-main">
-      <div class="card-visual" [class.card-visual--frozen]="card()!.is_frozen">
-        <div class="card-visual__top">
-          <span class="card-visual__brand">MaestroBank</span>
-          <span class="card-visual__type">Virtual Debit</span>
-        </div>
-        <div class="card-visual__chip-row">
-          <span class="card-visual__chip" aria-hidden="true"></span>
-          <app-icon name="contactless" [size]="20" />
-        </div>
-        <p class="card-visual__number">**** **** **** {{ card()!.last_four }}</p>
-        <div class="card-visual__bottom">
-          <div>
-            <span class="card-visual__label">Cardholder</span>
-            <span class="card-visual__value">{{ cardholderName() }}</span>
+      <div class="card-carousel">
+        <button
+          type="button"
+          class="card-carousel__arrow"
+          aria-label="Cardul anterior"
+          [disabled]="cards().length <= 1"
+          (click)="prevCard()"
+        >
+          <app-icon name="chevron-left" [size]="18" />
+        </button>
+
+        <div class="card-carousel__viewport">
+          <div class="card-carousel__track" [style.transform]="'translateX(-' + activeIndex() * 100 + '%)'">
+            @for (c of cards(); track c.id) {
+              <div class="card-carousel__slide">
+                <div
+                  class="card-visual"
+                  [style.background]="designGradient(c.design)"
+                  [class.card-visual--light]="isLightDesign(c.design)"
+                  [class.card-visual--frozen]="c.is_frozen"
+                >
+                  <div class="card-visual__top">
+                    <span class="card-visual__brand">MaestroBank</span>
+                    <span class="card-visual__type">{{ c.type === 'physical' ? 'Fizic' : 'Virtual' }}</span>
+                  </div>
+
+                  <div class="card-visual__chip-row">
+                    <span class="card-visual__chip" aria-hidden="true"></span>
+                    <app-icon name="contactless" [size]="20" />
+                    <button
+                      type="button"
+                      class="card-visual__eye"
+                      [attr.aria-label]="isRevealedCard(c.id) ? 'Ascunde datele cardului' : 'Vezi datele cardului și CVV'"
+                      (click)="onEyeClick(c)"
+                    >
+                      <app-icon [name]="isRevealedCard(c.id) ? 'eye-off' : 'eye'" [size]="16" />
+                    </button>
+                  </div>
+
+                  <p class="card-visual__number">
+                    {{ isRevealedCard(c.id) ? formatPan(revealedData()!.pan) : '•••• •••• •••• ' + c.last_four }}
+                  </p>
+
+                  <div class="card-visual__bottom">
+                    <div>
+                      <span class="card-visual__label">Cardholder</span>
+                      <span class="card-visual__value">{{ cardholderName() }}</span>
+                    </div>
+                    @if (isRevealedCard(c.id)) {
+                      <div>
+                        <span class="card-visual__label">CVV</span>
+                        <span class="card-visual__value">{{ revealedData()!.cvv }}</span>
+                      </div>
+                    }
+                    <div>
+                      <span class="card-visual__label">Expiră</span>
+                      <span class="card-visual__value"
+                        >{{ c.expiry_month.toString().padStart(2, '0') }}/{{ c.expiry_year.toString().slice(-2) }}</span
+                      >
+                    </div>
+                  </div>
+
+                  @if (c.is_frozen) {
+                    <div class="card-visual__frozen-badge">
+                      <app-icon name="lock" [size]="14" /> Blocat temporar
+                    </div>
+                  }
+                  @if (c.is_one_time) {
+                    <div class="card-visual__onetime-badge">
+                      <app-icon name="flash" [size]="13" /> Unică folosință
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           </div>
-          <div>
-            <span class="card-visual__label">Expiră</span>
-            <span class="card-visual__value">{{ card()!.expiry_month.toString().padStart(2, '0') }}/{{ card()!.expiry_year.toString().slice(-2) }}</span>
-          </div>
         </div>
-        @if (card()!.is_frozen) {
-          <div class="card-visual__frozen-badge">
-            <app-icon name="lock" [size]="14" /> Blocat temporar
-          </div>
-        }
+
+        <button
+          type="button"
+          class="card-carousel__arrow"
+          aria-label="Cardul următor"
+          [disabled]="cards().length <= 1"
+          (click)="nextCard()"
+        >
+          <app-icon name="chevron-right" [size]="18" />
+        </button>
       </div>
+
+      @if (cards().length > 1) {
+        <div class="card-carousel__dots">
+          @for (c of cards(); track c.id; let i = $index) {
+            <button
+              type="button"
+              class="card-carousel__dot"
+              [class.card-carousel__dot--active]="i === activeIndex()"
+              [attr.aria-label]="'Cardul ' + (i + 1)"
+              (click)="goToCard(i)"
+            ></button>
+          }
+        </div>
+      }
+
+      @if (isRevealedCard(activeCard()!.id)) {
+        <p class="card-carousel__reveal-hint">
+          <app-icon name="shield" [size]="13" /> Datele cardului se ascund automat în câteva secunde.
+        </p>
+      }
 
       <section class="card-panel">
         <h2>Detalii card</h2>
         <dl class="card-detail-grid">
           <div>
             <dt>Status</dt>
-            <dd><app-status-badge [status]="card()!.is_frozen ? 'frozen' : card()!.status" /></dd>
+            <dd><app-status-badge [status]="activeCard()!.is_frozen ? 'frozen' : activeCard()!.status" /></dd>
           </div>
           <div>
             <dt>Tip card</dt>
-            <dd>Premium Debit (virtual)</dd>
+            <dd>{{ activeCard()!.type === 'physical' ? 'Fizic' : 'Virtual' }} · {{ designLabel(activeCard()!.design) }}</dd>
           </div>
           <div>
             <dt>Ultimele 4 cifre</dt>
-            <dd>{{ card()!.last_four }}</dd>
+            <dd>{{ activeCard()!.last_four }}</dd>
           </div>
           <div>
             <dt>Cont asociat</dt>
@@ -57,7 +143,7 @@
           </div>
           <div>
             <dt>Expirare</dt>
-            <dd>{{ card()!.expiry_month.toString().padStart(2, '0') }}/{{ card()!.expiry_year }}</dd>
+            <dd>{{ activeCard()!.expiry_month.toString().padStart(2, '0') }}/{{ activeCard()!.expiry_year }}</dd>
           </div>
           <div>
             <dt>IBAN asociat</dt>
@@ -75,7 +161,7 @@
             <p class="card-control__title">Blocare temporară card</p>
             <p class="card-control__desc">Blochează cardul pentru o perioadă scurtă.</p>
           </div>
-          <app-toggle-control [checked]="card()!.is_frozen" [disabled]="freezeBusy()" (toggled)="toggleFreeze()" />
+          <app-toggle-control [checked]="activeCard()!.is_frozen" [disabled]="freezeBusy()" (toggled)="toggleFreeze()" />
         </div>
 
         <div class="card-control">
@@ -85,7 +171,7 @@
             <p class="card-control__desc">Permite plățile online cu cardul.</p>
           </div>
           <app-toggle-control
-            [checked]="card()!.online_payments_enabled"
+            [checked]="activeCard()!.online_payments_enabled"
             [disabled]="settingsBusy() === 'online_payments_enabled'"
             (toggled)="toggleSetting('online_payments_enabled', $event)"
           />
@@ -98,7 +184,7 @@
             <p class="card-control__desc">Plăți rapide prin apropierea cardului.</p>
           </div>
           <app-toggle-control
-            [checked]="card()!.contactless_enabled"
+            [checked]="activeCard()!.contactless_enabled"
             [disabled]="settingsBusy() === 'contactless_enabled'"
             (toggled)="toggleSetting('contactless_enabled', $event)"
           />
@@ -111,7 +197,7 @@
             <p class="card-control__desc">Permite retragerile de numerar de la ATM.</p>
           </div>
           <app-toggle-control
-            [checked]="card()!.atm_withdrawals_enabled"
+            [checked]="activeCard()!.atm_withdrawals_enabled"
             [disabled]="settingsBusy() === 'atm_withdrawals_enabled'"
             (toggled)="toggleSetting('atm_withdrawals_enabled', $event)"
           />
@@ -124,7 +210,7 @@
             <p class="card-control__desc">Permite utilizarea cardului în străinătate.</p>
           </div>
           <app-toggle-control
-            [checked]="card()!.international_payments_enabled"
+            [checked]="activeCard()!.international_payments_enabled"
             [disabled]="settingsBusy() === 'international_payments_enabled'"
             (toggled)="toggleSetting('international_payments_enabled', $event)"
           />
@@ -142,8 +228,8 @@
               <button type="button" class="card-control__limit-save" [disabled]="limitBusy()" (click)="saveLimit()">Salvează</button>
             </div>
           } @else {
-            <button type="button" class="card-control__limit-value" (click)="editingLimit.set(true)">
-              {{ card()!.daily_limit_minor | money: account()?.currency }}
+            <button type="button" class="card-control__limit-value" (click)="openLimitEditor()">
+              {{ activeCard()!.daily_limit_minor | money: account()?.currency }}
               <app-icon name="chevron-right" [size]="14" />
             </button>
           }
@@ -192,7 +278,7 @@
       </div>
 
       <div class="card-panel">
-        <h2>Tranzacții recente cu acest card</h2>
+        <h2>Tranzacții recente</h2>
         @if (recentTransactions().length === 0) {
           <app-empty-state icon="receipt" title="Nicio tranzacție încă" />
         } @else {
@@ -212,4 +298,96 @@
       </div>
     </aside>
   </div>
+}
+
+@if (addCardModalOpen()) {
+  <app-modal title="Card nou" [maxWidth]="540" (closed)="addCardModalOpen.set(false)">
+    <div class="add-card-form">
+      <div class="add-card-section">
+        <p class="add-card-section__label">Alege un design</p>
+        <div class="design-picker">
+          @for (d of cardDesignOptions; track d.value) {
+            <button
+              type="button"
+              class="design-swatch"
+              [style.background]="d.gradient"
+              [class.design-swatch--light]="d.light"
+              [class.design-swatch--active]="addCardDesign() === d.value"
+              [attr.aria-label]="d.label"
+              (click)="addCardDesign.set(d.value)"
+            >
+              @if (addCardDesign() === d.value) {
+                <app-icon name="check" [size]="14" />
+              }
+            </button>
+          }
+        </div>
+        <p class="add-card-section__hint">{{ designLabel(addCardDesign()) }}</p>
+      </div>
+
+      <div class="add-card-section">
+        <p class="add-card-section__label">Tip card</p>
+        <div class="card-type-picker">
+          <button
+            type="button"
+            class="card-type-option"
+            [class.card-type-option--active]="addCardType() === 'virtual'"
+            (click)="selectCardType('virtual')"
+          >
+            <app-icon name="cards" [size]="18" />
+            <span class="card-control__title">Virtual</span>
+            <small class="card-control__desc">Emis instant</small>
+          </button>
+          <button
+            type="button"
+            class="card-type-option"
+            [class.card-type-option--active]="addCardType() === 'physical'"
+            (click)="selectCardType('physical')"
+          >
+            <app-icon name="wallet" [size]="18" />
+            <span class="card-control__title">Fizic</span>
+            <small class="card-control__desc">Taxă {{ physicalCardFeeMinor | money: 'RON' }}</small>
+          </button>
+        </div>
+        @if (physicalFeeShortfall()) {
+          <p class="add-card-section__warning">Sold insuficient pentru taxa de emitere a cardului fizic.</p>
+        }
+      </div>
+
+      <div class="card-control add-card-toggle-row" [class.card-control--muted]="addCardType() === 'physical'">
+        <app-icon name="flash" [size]="18" />
+        <div class="card-control__info">
+          <p class="card-control__title">Card de unică folosință</p>
+          <p class="card-control__desc">Ca la Revolut — folosește-l o singură dată, apoi îl poți dezactiva din Control card.</p>
+        </div>
+        <app-toggle-control [checked]="addCardOneTime()" [disabled]="addCardType() === 'physical'" (toggled)="toggleOneTime($event)" />
+      </div>
+
+      <app-action-button [fullWidth]="true" [loading]="addCardSaving()" [disabled]="physicalFeeShortfall()" (pressed)="saveNewCard()">
+        {{ addCardType() === 'physical' ? 'Comandă card fizic' : 'Emite card virtual' }}
+      </app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (revealModalOpen()) {
+  <app-modal title="Confirmă parola" [maxWidth]="400" (closed)="closeRevealModal()">
+    <form class="reveal-form" (ngSubmit)="submitReveal()">
+      <p class="reveal-form__desc">
+        Pentru a vedea numărul complet și CVV-ul cardului **** {{ revealTarget()?.last_four }}, confirmă parola contului tău.
+      </p>
+      <label>
+        <span>Parolă</span>
+        <input
+          type="password"
+          autocomplete="current-password"
+          placeholder="Parola contului"
+          [ngModel]="revealPassword()"
+          (ngModelChange)="revealPassword.set($event)"
+          name="revealPassword"
+        />
+      </label>
+      <app-action-button type="submit" [fullWidth]="true" [loading]="revealBusy()">Confirmă și afișează</app-action-button>
+    </form>
+  </app-modal>
 }

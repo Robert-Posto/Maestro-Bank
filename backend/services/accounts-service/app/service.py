@@ -10,16 +10,19 @@ import logging
 import random
 from datetime import datetime, timezone
 
+import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app.config import settings
 from app.database import get_database
 from app.iban_service import generate_unique_demo_iban
 from app.money import format_minor_amount
 from app.models import (
     AccountPublicOut,
     BeneficiaryCreate,
+    CardCreateRequest,
     CardLimitUpdate,
     CardSettingsUpdate,
     InternalAccountView,
@@ -30,6 +33,11 @@ logger = logging.getLogger("accounts-service")
 
 _DEMO_CARD_TYPE = "virtual"
 _DEMO_CARD_VALID_YEARS = 3
+_DEMO_PAN_BIN = "4111"  # prefix demo (Visa test BIN) — NU e un card real, doar plauzibil vizual
+
+# Emitere card nou (Cardul meu) ---------------------------------------------
+_PHYSICAL_CARD_FEE_MINOR = 2_000  # 20,00 RON, dedusă din cont la emiterea unui card fizic
+_MAX_CARDS_PER_USER = 6  # cap defensiv demo — evită creare nelimitată de carduri
 
 
 # --- helpers de conversie (DB -> DTO) -------------------------------------
@@ -58,13 +66,36 @@ def _to_internal_view(account: dict) -> InternalAccountView:
     )
 
 
-def _generate_demo_last_four() -> str:
-    return f"{random.randint(0, 9999):04d}"
+def _generate_demo_pan() -> str:
+    """PAN demo, 16 cifre, cu prefix plauzibil vizual (BIN de test) — NU e
+    un card real, nu trece prin niciun procesator de plăți."""
+    remaining = "".join(str(random.randint(0, 9)) for _ in range(16 - len(_DEMO_PAN_BIN)))
+    return f"{_DEMO_PAN_BIN}{remaining}"
+
+
+def _generate_demo_cvv() -> str:
+    return f"{random.randint(0, 999):03d}"
 
 
 def _demo_expiry() -> tuple[int, int]:
     now = datetime.now(timezone.utc)
     return now.month, now.year + _DEMO_CARD_VALID_YEARS
+
+
+async def _ensure_card_secrets(card: dict) -> dict:
+    """Backfill lazy pentru `pan`/`cvv` la carduri create ÎNAINTE de introducerea
+    reveal-ului (Cardul meu) — la fel ca la celelalte controale de card, lipsa
+    câmpurilor în Mongo nu cere o migrare de date explicită, doar se completează
+    la prima accesare și se persistă, ca reveal-urile ulterioare să fie stabile."""
+    if "pan" in card and "cvv" in card:
+        return card
+
+    pan = card.get("pan") or f"{_DEMO_PAN_BIN}{'0' * (12 - len(card['last_four']))}{card['last_four']}"
+    cvv = card.get("cvv") or _generate_demo_cvv()
+
+    db = get_database()
+    await db.cards.update_one({"_id": card["_id"]}, {"$set": {"pan": pan, "cvv": cvv}})
+    return {**card, "pan": pan, "cvv": cvv}
 
 
 # --- rute protejate JWT (app/routers/accounts.py) -------------------------
@@ -146,6 +177,104 @@ async def update_card_limit(card_id: str, user_id: str, payload: CardLimitUpdate
         payload.daily_limit_minor,
     )
     return await db.cards.find_one({"_id": card["_id"]})
+
+
+async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
+    """Emite un card nou pentru contul userului curent (design + virtual/fizic
+    + opțional unică folosință, ca la Revolut). Cardurile fizice presupun o
+    taxă de emitere dedusă atomic din cont — vezi _PHYSICAL_CARD_FEE_MINOR."""
+    db = get_database()
+    account = await get_account_for_user(user_id)
+
+    existing_count = await db.cards.count_documents({"user_id": user_id})
+    if existing_count >= _MAX_CARDS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ai atins numărul maxim de carduri ({_MAX_CARDS_PER_USER}).",
+        )
+
+    if payload.type == "physical":
+        debit_result = await db.accounts.update_one(
+            {"_id": account["_id"], "balance_minor": {"$gte": _PHYSICAL_CARD_FEE_MINOR}},
+            {"$inc": {"balance_minor": -_PHYSICAL_CARD_FEE_MINOR}},
+        )
+        if debit_result.modified_count != 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Sold insuficient pentru taxa de emitere a cardului fizic "
+                f"({format_minor_amount(_PHYSICAL_CARD_FEE_MINOR)} RON).",
+            )
+
+    expiry_month, expiry_year = _demo_expiry()
+    pan = _generate_demo_pan()
+    now = datetime.now(timezone.utc)
+    card_doc = {
+        "user_id": user_id,
+        "account_id": account["_id"],
+        "pan": pan,
+        "last_four": pan[-4:],
+        "cvv": _generate_demo_cvv(),
+        "expiry_month": expiry_month,
+        "expiry_year": expiry_year,
+        "status": "active",
+        "type": payload.type,
+        "design": payload.design,
+        "is_one_time": payload.is_one_time,
+        "created_at": now,
+        "is_frozen": False,
+        "online_payments_enabled": True,
+        "contactless_enabled": True,
+        "atm_withdrawals_enabled": True,
+        "international_payments_enabled": True,
+        "daily_limit_minor": 500_000,
+    }
+    card_result = await db.cards.insert_one(card_doc)
+    logger.info(
+        "accounts-service: card nou emis (user_id=%s, card_id=%s, type=%s, design=%s, is_one_time=%s)",
+        user_id,
+        card_result.inserted_id,
+        payload.type,
+        payload.design,
+        payload.is_one_time,
+    )
+    return await db.cards.find_one({"_id": card_result.inserted_id})
+
+
+async def _verify_password_with_auth_service(user_id: str, password: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.auth_service_url}/internal/auth/verify-password",
+                json={"user_id": user_id, "password": password},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.error("accounts-service: verificarea parolei a eșuat (user_id=%s): %s", user_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nu am putut verifica parola — serviciul de autentificare este indisponibil.",
+        ) from exc
+
+    return bool(response.json().get("valid", False))
+
+
+async def reveal_card(card_id: str, user_id: str, password: str) -> dict:
+    """Dezvăluie PAN + CVV pentru un card — DOAR după ce parola curentă a
+    userului a fost confirmată de auth-service. Acțiune sensibilă: nu se
+    bazează doar pe JWT (care poate rămâne valid ore întregi), la fel ca la
+    orice bancă reală care cere reautentificare pentru date de card."""
+    card = await _get_card_for_user(card_id, user_id)
+
+    if not await _verify_password_with_auth_service(user_id, password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Parolă incorectă.")
+
+    card = await _ensure_card_secrets(card)
+    return {
+        "pan": card["pan"],
+        "cvv": card["cvv"],
+        "expiry_month": card["expiry_month"],
+        "expiry_year": card["expiry_year"],
+    }
 
 
 # --- Beneficiari (transfer către IBAN salvat) -----------------------------
@@ -243,14 +372,19 @@ async def provision_account(user_id: str) -> tuple[dict, dict]:
     account_result = await db.accounts.insert_one(account_doc)
 
     expiry_month, expiry_year = _demo_expiry()
+    pan = _generate_demo_pan()
     card_doc = {
         "user_id": user_id,
         "account_id": account_result.inserted_id,
-        "last_four": _generate_demo_last_four(),
+        "pan": pan,
+        "last_four": pan[-4:],
+        "cvv": _generate_demo_cvv(),
         "expiry_month": expiry_month,
         "expiry_year": expiry_year,
         "status": "active",
         "type": _DEMO_CARD_TYPE,
+        "design": "midnight",
+        "is_one_time": False,
         "created_at": now,
         # Card controls (Cardul meu) — valori implicite explicite la creare.
         "is_frozen": False,
