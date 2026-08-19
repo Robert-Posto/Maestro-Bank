@@ -53,7 +53,7 @@
 
   <div class="details-panel__actions">
     <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
-      🚩 Nu recunosc această tranzacție
+      <app-icon name="shield" [size]="17" /> Nu recunosc această tranzacție
     </app-action-button>
     <app-action-button
       variant="secondary"
@@ -62,7 +62,8 @@
       [loading]="recognizing()"
       (pressed)="recognize.emit()"
     >
-      {{ transaction().recognized ? '✓ Marcată ca recunoscută' : '✓ Marchează ca recunoscută' }}
+      <app-icon name="check" [size]="17" />
+      {{ transaction().recognized ? 'Marcată ca recunoscută' : 'Marchează ca recunoscută' }}
     </app-action-button>
   </div>
 
@@ -72,7 +73,7 @@
 
   <div class="details-panel__guardian">
     <div class="details-panel__guardian-header">
-      <span aria-hidden="true">🛡️</span>
+      <span class="details-panel__guardian-icon"><app-icon name="shield" [size]="18" /></span>
       <strong>Financial Guardian</strong>
       <span class="details-panel__coming-soon">Coming in AI phase</span>
     </div>

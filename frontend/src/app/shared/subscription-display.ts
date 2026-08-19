@@ -23,10 +23,14 @@ export function daysUntilBilling(billingDay: number, from: Date = new Date()): n
   return Math.round((nextBilling.getTime() - today.getTime()) / msPerDay);
 }
 
-/** Etichetă gata de afișat: "Astăzi", "Mâine" sau "În N zile". */
-export function daysUntilBillingLabel(billingDay: number, from: Date = new Date()): string {
-  const days = daysUntilBilling(billingDay, from);
+/** Etichetă gata de afișat pentru un număr de zile rămase: "Astăzi", "Mâine" sau "În N zile". */
+export function daysRemainingLabel(days: number): string {
   if (days === 0) return 'Astăzi';
   if (days === 1) return 'Mâine';
   return `În ${days} zile`;
+}
+
+/** Etichetă gata de afișat pentru un abonament: "Astăzi", "Mâine" sau "În N zile". */
+export function daysUntilBillingLabel(billingDay: number, from: Date = new Date()): string {
+  return daysRemainingLabel(daysUntilBilling(billingDay, from));
 }

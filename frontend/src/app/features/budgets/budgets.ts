@@ -12,16 +12,30 @@ import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { Modal } from '../../shared/components/modal/modal';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
-import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
+import { TRANSACTION_CATEGORIES, categoryColorVar, categoryLabel } from '../../shared/categories';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
-import { daysUntilBillingLabel } from '../../shared/subscription-display';
+import { daysRemainingLabel, daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
 
 type Tab = 'budgets' | 'subscriptions';
 
 interface BudgetWithProgress extends Budget {
   spentMinor: number;
   progressPercent: number;
+}
+
+interface BudgetsSummary {
+  totalLimitMinor: number;
+  totalSpentMinor: number;
+  percent: number;
+  activeCount: number;
+}
+
+interface SubscriptionsSummary {
+  totalMonthlyMinor: number;
+  activeCount: number;
+  nextDays: number | null;
+  nextName: string | null;
 }
 
 /** Bugete + abonamente — vezi task-ul MaestroBank, secțiunile 18 și 19. */
@@ -39,7 +53,10 @@ export class Budgets implements OnInit {
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
+  protected readonly categoryColorVar = categoryColorVar;
+  protected readonly daysUntilBilling = daysUntilBilling;
   protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
+  protected readonly daysRemainingLabel = daysRemainingLabel;
   protected readonly tab = signal<Tab>('budgets');
 
   protected readonly loading = signal(true);
@@ -54,6 +71,29 @@ export class Budgets implements OnInit {
       const progressPercent = b.limit_minor > 0 ? Math.min(Math.round((spentMinor / b.limit_minor) * 100), 999) : 0;
       return { ...b, spentMinor, progressPercent };
     });
+  });
+
+  protected readonly budgetsSummary = computed<BudgetsSummary>(() => {
+    const active = this.budgetsWithProgress().filter((b) => b.active);
+    const totalLimitMinor = active.reduce((sum, b) => sum + b.limit_minor, 0);
+    const totalSpentMinor = active.reduce((sum, b) => sum + b.spentMinor, 0);
+    const percent = totalLimitMinor > 0 ? Math.min(Math.round((totalSpentMinor / totalLimitMinor) * 100), 999) : 0;
+    return { totalLimitMinor, totalSpentMinor, percent, activeCount: active.length };
+  });
+
+  protected readonly subscriptionsSummary = computed<SubscriptionsSummary>(() => {
+    const active = this.subscriptions().filter((s) => s.active);
+    const totalMonthlyMinor = active.reduce((sum, s) => sum + s.amount_minor, 0);
+    let nextDays: number | null = null;
+    let nextName: string | null = null;
+    for (const s of active) {
+      const days = daysUntilBilling(s.billing_day);
+      if (nextDays === null || days < nextDays) {
+        nextDays = days;
+        nextName = s.name;
+      }
+    }
+    return { totalMonthlyMinor, activeCount: active.length, nextDays, nextName };
   });
 
   // --- Budget form ---
@@ -92,6 +132,14 @@ export class Budgets implements OnInit {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** "urgent" (≤3 zile), "soon" (≤7 zile) sau "" — pentru accentul vizual al badge-ului de scadență. */
+  protected billingUrgency(billingDay: number): 'urgent' | 'soon' | '' {
+    const days = daysUntilBilling(billingDay);
+    if (days <= 3) return 'urgent';
+    if (days <= 7) return 'soon';
+    return '';
   }
 
   // --- Budgets CRUD ---
