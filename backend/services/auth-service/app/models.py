@@ -107,3 +107,17 @@ class InternalUserNameView(BaseModel):
 
     first_name: str
     last_name: str
+
+
+class InternalPasswordVerifyRequest(BaseModel):
+    """Folosit de accounts-service pentru a confirma parola userului curent
+    înainte de a dezvălui datele complete ale unui card (PAN + CVV) —
+    vezi routers/internal.py::verify_password. Parola circulă DOAR pe rețeaua
+    internă Docker, niciodată logată."""
+
+    user_id: str
+    password: str = Field(min_length=1)
+
+
+class InternalPasswordVerifyResponse(BaseModel):
+    valid: bool

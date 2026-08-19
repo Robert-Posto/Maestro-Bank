@@ -96,8 +96,24 @@ import { Component, input } from '@angular/core';
         @case ('chevron-right') {
           <path d="M9 6l6 6-6 6" />
         }
+        @case ('chevron-left') {
+          <path d="M15 6l-6 6 6 6" />
+        }
         @case ('chevron-down') {
           <path d="M6 9l6 6 6-6" />
+        }
+        @case ('eye') {
+          <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+          <circle cx="12" cy="12" r="3" />
+        }
+        @case ('eye-off') {
+          <path d="M3 3l18 18" />
+          <path d="M10.6 5.7A10.6 10.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.6 15.6 0 0 1-3.4 4.2" />
+          <path d="M6.2 6.9C3.7 8.6 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.3 0 2.5-.3 3.6-.8" />
+          <path d="M9.9 10a3 3 0 0 0 4.1 4.1" />
+        }
+        @case ('flash') {
+          <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
         }
         @case ('close') {
           <path d="M6 6l12 12" />

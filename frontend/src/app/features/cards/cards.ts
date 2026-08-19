@@ -1,8 +1,17 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
-import { AccountView, BankingService, CardView } from '../../services/banking.service';
+import {
+  AccountView,
+  BankingService,
+  CardCreatePayload,
+  CardDesign,
+  CardRevealView,
+  CardType,
+  CardView,
+  PHYSICAL_CARD_FEE_MINOR,
+} from '../../services/banking.service';
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
 import { AuthService } from '../../services/auth.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
@@ -11,6 +20,8 @@ import { ToggleControl } from '../../shared/components/toggle-control/toggle-con
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
+import { ActionButton } from '../../shared/components/action-button/action-button';
+import { Modal } from '../../shared/components/modal/modal';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Icon } from '../../shared/components/icon/icon';
 import { ToastService } from '../../shared/components/toast/toast.service';
@@ -18,20 +29,51 @@ import { extractErrorMessage } from '../../shared/error-utils';
 
 type ToggleKey = 'online_payments_enabled' | 'contactless_enabled' | 'atm_withdrawals_enabled' | 'international_payments_enabled';
 
+const REVEAL_AUTO_HIDE_MS = 20_000;
+
+interface CardDesignOption {
+  value: CardDesign;
+  label: string;
+  gradient: string;
+  /** Design cu fundal deschis — cere text/overlay-uri închise (vezi .card-visual--light în CSS). */
+  light: boolean;
+}
+
+const CARD_DESIGN_OPTIONS: CardDesignOption[] = [
+  { value: 'midnight', label: 'Midnight', gradient: 'linear-gradient(135deg, var(--mb-navy-800) 0%, var(--mb-navy-950) 100%)', light: false },
+  { value: 'aurora', label: 'Aurora', gradient: 'linear-gradient(135deg, #17264a 0%, #2f6fed 55%, #7c3aed 100%)', light: false },
+  { value: 'rose-gold', label: 'Rose Gold', gradient: 'linear-gradient(135deg, #3a2030 0%, #a85f72 55%, #e8c39c 100%)', light: false },
+  { value: 'graphite', label: 'Graphite', gradient: 'linear-gradient(135deg, #232428 0%, #46484f 100%)', light: false },
+  { value: 'arctic', label: 'Arctic', gradient: 'linear-gradient(135deg, #eef4ff 0%, #d3e2fb 60%, #a9c3ef 100%)', light: true },
+];
+
 /**
- * Cardul meu — vezi UI reference/Cards.png și task-ul MaestroBank,
- * secțiunea 9. NU generăm PAN/CVV reale — doar ultimele 4 cifre demo.
- * Card controls sunt reale (accounts-service), userul poate modifica
- * DOAR propriile carduri (identitate din JWT — vezi backend).
+ * Cardurile mele — vezi UI reference/Cards.png și task-ul MaestroBank,
+ * secțiunea 9. NU generăm PAN/CVV reale — sunt generate demo, doar pentru
+ * acest prototip (vezi accounts-service::_generate_demo_pan). Card controls
+ * sunt reale (accounts-service), userul poate modifica DOAR propriile
+ * carduri (identitate din JWT — vezi backend).
  */
 @Component({
   selector: 'app-cards',
   standalone: true,
-  imports: [PageHeader, StatusBadge, ToggleControl, LoadingSkeleton, EmptyState, TransactionRow, MoneyPipe, Icon, FormsModule],
+  imports: [
+    PageHeader,
+    StatusBadge,
+    ToggleControl,
+    LoadingSkeleton,
+    EmptyState,
+    TransactionRow,
+    ActionButton,
+    Modal,
+    MoneyPipe,
+    Icon,
+    FormsModule,
+  ],
   templateUrl: './cards.html',
   styleUrl: './cards.css',
 })
-export class Cards implements OnInit {
+export class Cards implements OnInit, OnDestroy {
   private readonly banking = inject(BankingService);
   private readonly transactionsApi = inject(TransactionsService);
   private readonly auth = inject(AuthService);
@@ -41,7 +83,10 @@ export class Cards implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   protected readonly account = signal<AccountView | null>(null);
-  protected readonly card = signal<CardView | null>(null);
+  protected readonly cards = signal<CardView[]>([]);
+  protected readonly activeIndex = signal(0);
+  protected readonly activeCard = computed<CardView | null>(() => this.cards()[this.activeIndex()] ?? null);
+
   protected readonly spending = signal<SpendingAnalytics | null>(null);
   protected readonly recentTransactions = signal<TransactionRowData[]>([]);
 
@@ -56,8 +101,35 @@ export class Cards implements OnInit {
     return user ? `${user.first_name} ${user.last_name}`.toUpperCase() : '';
   });
 
+  // --- Emitere card nou -----------------------------------------------
+  protected readonly cardDesignOptions = CARD_DESIGN_OPTIONS;
+  protected readonly physicalCardFeeMinor = PHYSICAL_CARD_FEE_MINOR;
+
+  protected readonly addCardModalOpen = signal(false);
+  protected readonly addCardSaving = signal(false);
+  protected readonly addCardDesign = signal<CardDesign>('midnight');
+  protected readonly addCardType = signal<CardType>('virtual');
+  protected readonly addCardOneTime = signal(false);
+
+  protected readonly physicalFeeShortfall = computed(
+    () => this.addCardType() === 'physical' && (this.account()?.balance_minor ?? 0) < PHYSICAL_CARD_FEE_MINOR,
+  );
+
+  // --- Vezi date card + CVV (necesită parolă) --------------------------
+  protected readonly revealModalOpen = signal(false);
+  protected readonly revealPassword = signal('');
+  protected readonly revealBusy = signal(false);
+  protected readonly revealTarget = signal<CardView | null>(null);
+  protected readonly revealedCardId = signal<string | null>(null);
+  protected readonly revealedData = signal<CardRevealView | null>(null);
+  private autoHideTimer?: ReturnType<typeof setTimeout>;
+
   ngOnInit(): void {
     this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.clearAutoHideTimer();
   }
 
   private load(): void {
@@ -72,11 +144,8 @@ export class Cards implements OnInit {
     }).subscribe({
       next: ({ account, cards, spending, transactions }) => {
         this.account.set(account);
-        const primaryCard = cards[0] ?? null;
-        this.card.set(primaryCard);
-        if (primaryCard) {
-          this.limitInput.set(primaryCard.daily_limit_minor / 100);
-        }
+        this.cards.set(cards);
+        this.activeIndex.set(0);
         this.spending.set(spending);
         this.recentTransactions.set(transactions);
         this.loading.set(false);
@@ -88,15 +157,48 @@ export class Cards implements OnInit {
     });
   }
 
+  private replaceCard(updated: CardView): void {
+    this.cards.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
+  private onActiveCardChanged(): void {
+    this.editingLimit.set(false);
+    this.hideReveal();
+  }
+
+  // --- Carusel carduri --------------------------------------------------
+
+  protected prevCard(): void {
+    const total = this.cards().length;
+    if (total <= 1) return;
+    this.activeIndex.update((i) => (i - 1 + total) % total);
+    this.onActiveCardChanged();
+  }
+
+  protected nextCard(): void {
+    const total = this.cards().length;
+    if (total <= 1) return;
+    this.activeIndex.update((i) => (i + 1) % total);
+    this.onActiveCardChanged();
+  }
+
+  protected goToCard(index: number): void {
+    if (index === this.activeIndex()) return;
+    this.activeIndex.set(index);
+    this.onActiveCardChanged();
+  }
+
+  // --- Control card (freeze/settings/limit) -----------------------------
+
   protected toggleFreeze(): void {
-    const current = this.card();
+    const current = this.activeCard();
     if (!current) return;
 
     this.freezeBusy.set(true);
     const request = current.is_frozen ? this.banking.unfreezeCard(current.id) : this.banking.freezeCard(current.id);
     request.subscribe({
       next: (updated) => {
-        this.card.set(updated);
+        this.replaceCard(updated);
         this.freezeBusy.set(false);
         this.toast.success(updated.is_frozen ? 'Card blocat temporar.' : 'Card deblocat.');
       },
@@ -108,13 +210,13 @@ export class Cards implements OnInit {
   }
 
   protected toggleSetting(key: ToggleKey, value: boolean): void {
-    const current = this.card();
+    const current = this.activeCard();
     if (!current) return;
 
     this.settingsBusy.set(key);
     this.banking.updateCardSettings(current.id, { [key]: value }).subscribe({
       next: (updated) => {
-        this.card.set(updated);
+        this.replaceCard(updated);
         this.settingsBusy.set(null);
         this.toast.success('Setările cardului au fost actualizate.');
       },
@@ -125,8 +227,15 @@ export class Cards implements OnInit {
     });
   }
 
+  protected openLimitEditor(): void {
+    const current = this.activeCard();
+    if (!current) return;
+    this.limitInput.set(current.daily_limit_minor / 100);
+    this.editingLimit.set(true);
+  }
+
   protected saveLimit(): void {
-    const current = this.card();
+    const current = this.activeCard();
     if (!current) return;
     const minor = Math.round(this.limitInput() * 100);
     if (minor <= 0) {
@@ -137,7 +246,7 @@ export class Cards implements OnInit {
     this.limitBusy.set(true);
     this.banking.updateCardLimit(current.id, minor).subscribe({
       next: (updated) => {
-        this.card.set(updated);
+        this.replaceCard(updated);
         this.limitBusy.set(false);
         this.editingLimit.set(false);
         this.toast.success('Limita zilnică a fost actualizată.');
@@ -147,5 +256,147 @@ export class Cards implements OnInit {
         this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza limita.'));
       },
     });
+  }
+
+  // --- Emitere card nou ---------------------------------------------------
+
+  protected openAddCardModal(): void {
+    this.addCardDesign.set('midnight');
+    this.addCardType.set('virtual');
+    this.addCardOneTime.set(false);
+    this.addCardModalOpen.set(true);
+  }
+
+  protected selectCardType(type: CardType): void {
+    this.addCardType.set(type);
+    if (type === 'physical') {
+      this.addCardOneTime.set(false);
+    }
+  }
+
+  protected toggleOneTime(value: boolean): void {
+    this.addCardOneTime.set(value);
+    if (value) {
+      this.addCardType.set('virtual');
+    }
+  }
+
+  protected saveNewCard(): void {
+    if (this.physicalFeeShortfall()) {
+      this.toast.error('Sold insuficient pentru taxa de emitere a cardului fizic.');
+      return;
+    }
+
+    const payload: CardCreatePayload = {
+      design: this.addCardDesign(),
+      type: this.addCardType(),
+      is_one_time: this.addCardOneTime(),
+    };
+
+    this.addCardSaving.set(true);
+    this.banking.createCard(payload).subscribe({
+      next: (card) => {
+        this.cards.update((list) => [...list, card]);
+        this.activeIndex.set(this.cards().length - 1);
+        this.onActiveCardChanged();
+        this.addCardSaving.set(false);
+        this.addCardModalOpen.set(false);
+        this.toast.success(payload.type === 'physical' ? 'Card fizic comandat.' : 'Card virtual emis.');
+
+        if (payload.type === 'physical') {
+          this.banking.getMyAccount().subscribe((account) => this.account.set(account));
+        }
+      },
+      error: (err) => {
+        this.addCardSaving.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut emite cardul.'));
+      },
+    });
+  }
+
+  // --- Vezi date card + CVV (necesită parolă) -----------------------------
+
+  protected isRevealedCard(cardId: string): boolean {
+    return this.revealedCardId() === cardId && this.revealedData() !== null;
+  }
+
+  protected onEyeClick(card: CardView): void {
+    if (this.isRevealedCard(card.id)) {
+      this.hideReveal();
+      return;
+    }
+    this.revealTarget.set(card);
+    this.revealPassword.set('');
+    this.revealModalOpen.set(true);
+  }
+
+  protected closeRevealModal(): void {
+    this.revealModalOpen.set(false);
+    this.revealPassword.set('');
+    this.revealTarget.set(null);
+  }
+
+  protected submitReveal(): void {
+    const target = this.revealTarget();
+    if (!target) return;
+    if (!this.revealPassword().trim()) {
+      this.toast.error('Introdu parola contului.');
+      return;
+    }
+
+    this.revealBusy.set(true);
+    this.banking.revealCard(target.id, this.revealPassword()).subscribe({
+      next: (data) => {
+        this.revealedData.set(data);
+        this.revealedCardId.set(target.id);
+        this.revealBusy.set(false);
+        this.revealModalOpen.set(false);
+        this.revealPassword.set('');
+        this.revealTarget.set(null);
+        this.scheduleAutoHide();
+      },
+      error: (err) => {
+        this.revealBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'Parolă incorectă.'));
+      },
+    });
+  }
+
+  protected hideReveal(): void {
+    this.clearAutoHideTimer();
+    this.revealedData.set(null);
+    this.revealedCardId.set(null);
+  }
+
+  private scheduleAutoHide(): void {
+    this.clearAutoHideTimer();
+    this.autoHideTimer = setTimeout(() => this.hideReveal(), REVEAL_AUTO_HIDE_MS);
+  }
+
+  private clearAutoHideTimer(): void {
+    if (this.autoHideTimer) {
+      clearTimeout(this.autoHideTimer);
+      this.autoHideTimer = undefined;
+    }
+  }
+
+  protected formatPan(pan: string): string {
+    return pan.match(/.{1,4}/g)?.join(' ') ?? pan;
+  }
+
+  private designOption(design: CardDesign): CardDesignOption | undefined {
+    return this.cardDesignOptions.find((d) => d.value === design);
+  }
+
+  protected designLabel(design: CardDesign): string {
+    return this.designOption(design)?.label ?? design;
+  }
+
+  protected designGradient(design: CardDesign): string {
+    return this.designOption(design)?.gradient ?? '';
+  }
+
+  protected isLightDesign(design: CardDesign): boolean {
+    return this.designOption(design)?.light ?? false;
   }
 }
