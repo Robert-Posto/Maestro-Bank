@@ -7,6 +7,7 @@ import { transactionDisplayName } from '../../transaction-display';
 import { StatusBadge } from '../status-badge/status-badge';
 import { ActionButton } from '../action-button/action-button';
 import { Icon } from '../icon/icon';
+import { MerchantAvatar } from '../merchant-avatar/merchant-avatar';
 
 export interface TransactionDetail {
   id: string;
@@ -32,7 +33,7 @@ export interface TransactionDetail {
 @Component({
   selector: 'app-transaction-details-panel',
   standalone: true,
-  imports: [MoneyPipe, DatePipe, StatusBadge, ActionButton, Icon],
+  imports: [MoneyPipe, DatePipe, StatusBadge, ActionButton, Icon, MerchantAvatar],
   templateUrl: './transaction-details-panel.html',
   styleUrl: './transaction-details-panel.css',
 })

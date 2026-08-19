@@ -93,7 +93,13 @@
             <tr (click)="openDetails(tx.id)" [class.tx-table__row--active]="selectedId() === tx.id">
               <td class="tx-table__date"><strong>{{ tx.created_at | date: 'dd MMM yyyy' }}</strong><span>{{ tx.created_at | date: 'HH:mm' }}</span></td>
               <td class="tx-table__merchant">
-                <span class="tx-table__avatar">{{ displayName(tx).charAt(0).toUpperCase() }}</span>
+                <app-merchant-avatar
+                  size="sm"
+                  [name]="displayName(tx)"
+                  [description]="tx.description"
+                  [isPerson]="!!tx.counterparty_name"
+                  [category]="tx.category"
+                />
                 {{ displayName(tx) }}
               </td>
               <td><span class="tx-table__category-dot"></span>{{ categoryLabel(tx.category) }}</td>

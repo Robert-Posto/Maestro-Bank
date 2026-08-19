@@ -6,7 +6,13 @@
 
   <div class="details-panel__hero">
     <div class="details-panel__merchant">
-      <span class="details-panel__avatar">{{ displayName().charAt(0).toUpperCase() }}</span>
+      <app-merchant-avatar
+        size="lg"
+        [name]="displayName()"
+        [description]="transaction().description"
+        [isPerson]="!!transaction().counterparty_name"
+        [category]="transaction().category"
+      />
       <div>
         <p class="details-panel__name">{{ displayName() }}</p>
         <p class="details-panel__date">{{ transaction().created_at | date: 'dd MMM yyyy, HH:mm' }}</p>

@@ -178,20 +178,6 @@
   white-space: normal;
 }
 
-.tx-table__avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--mb-radius-sm);
-  background: var(--mb-navy-900);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--mb-font-size-xs);
-  font-weight: var(--mb-font-weight-semibold);
-  flex-shrink: 0;
-}
-
 .tx-table__date strong,
 .tx-table__date span {
   display: block;
