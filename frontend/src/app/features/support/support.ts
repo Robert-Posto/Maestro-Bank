@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
@@ -33,6 +33,11 @@ interface ChatMessage {
   id: number;
   role: 'support' | 'user';
   text: string;
+  time: string;
+}
+
+function formatChatTime(date: Date): string {
+  return date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Support — vezi task-ul MaestroBank, secțiunea 20. Fără AI. */
@@ -47,6 +52,7 @@ export class Support implements OnInit {
   private readonly supportApi = inject(SupportService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
   protected readonly categoryLabels = CATEGORY_LABELS;
   protected readonly faqItems = FAQ_ITEMS;
@@ -60,13 +66,24 @@ export class Support implements OnInit {
   protected readonly category = signal<TicketCategory>('other');
   protected readonly message = signal('');
   protected readonly chatInput = signal('');
+  protected readonly supportTyping = signal(false);
   protected readonly chatMessages = signal<ChatMessage[]>([
     {
       id: 1,
       role: 'support',
-      text: 'Bună! Scrie-ne cu ce te putem ajuta.',
+      text: 'Bună! Scrie-ne cu ce te putem ajuta — sau alege o întrebare rapidă mai jos.',
+      time: formatChatTime(new Date()),
     },
   ]);
+
+  constructor() {
+    effect(() => {
+      this.chatMessages();
+      this.supportTyping();
+      const el = this.messagesEl()?.nativeElement;
+      if (el) queueMicrotask(() => (el.scrollTop = el.scrollHeight));
+    });
+  }
 
   ngOnInit(): void {
     this.load();
@@ -98,8 +115,24 @@ export class Support implements OnInit {
     if (!text) return;
 
     const id = Date.now();
-    this.chatMessages.update((messages) => [...messages, { id, role: 'user', text }]);
+    this.chatMessages.update((messages) => [...messages, { id, role: 'user', text, time: formatChatTime(new Date()) }]);
     this.chatInput.set('');
+  }
+
+  /** Întrebare rapidă aleasă din lista de sugestii — reutilizează exact perechea Q&A din FAQ. */
+  protected askSuggested(item: { q: string; a: string }): void {
+    this.chatMessages.update((messages) => [
+      ...messages,
+      { id: Date.now(), role: 'user', text: item.q, time: formatChatTime(new Date()) },
+    ]);
+    this.supportTyping.set(true);
+    setTimeout(() => {
+      this.supportTyping.set(false);
+      this.chatMessages.update((messages) => [
+        ...messages,
+        { id: Date.now(), role: 'support', text: item.a, time: formatChatTime(new Date()) },
+      ]);
+    }, 650);
   }
 
   protected submitTicket(): void {
