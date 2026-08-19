@@ -15,6 +15,7 @@ import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-di
 import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { daysUntilBillingLabel } from '../../shared/subscription-display';
 
 type Tab = 'budgets' | 'subscriptions';
 
@@ -38,6 +39,7 @@ export class Budgets implements OnInit {
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
+  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
   protected readonly tab = signal<Tab>('budgets');
 
   protected readonly loading = signal(true);

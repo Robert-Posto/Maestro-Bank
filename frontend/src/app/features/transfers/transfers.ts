@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { AccountView, BankingService, Beneficiary, TransactionView } from '../../services/banking.service';
@@ -7,7 +8,7 @@ import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
-import { TRANSACTION_CATEGORIES } from '../../shared/categories';
+import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
 type TransferStep = 'form' | 'review' | 'success';
@@ -22,7 +23,7 @@ type TransferStep = 'form' | 'review' | 'success';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe],
+  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, MoneyPipe],
   templateUrl: './transfers.html',
   styleUrl: './transfers.css',
 })
@@ -31,6 +32,7 @@ export class Transfers implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
+  protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
 
   protected readonly account = signal<AccountView | null>(null);
@@ -64,6 +66,12 @@ export class Transfers implements OnInit {
 
   protected selectBeneficiary(beneficiary: Beneficiary): void {
     this.toIban.set(beneficiary.iban);
+  }
+
+  protected initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    return (parts[0].charAt(0) + (parts[1]?.charAt(0) ?? '')).toUpperCase();
   }
 
   protected goToReview(): void {

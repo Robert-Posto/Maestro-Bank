@@ -14,6 +14,7 @@ import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loadin
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { categoryColorVar, categoryLabel } from '../../shared/categories';
+import { daysUntilBillingLabel } from '../../shared/subscription-display';
 
 interface CategoryBar {
   category: string;
@@ -48,6 +49,7 @@ export class SpendingForecast implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
 
   protected readonly spending = signal<SpendingAnalytics | null>(null);
   protected readonly cashFlow = signal<CashFlowAnalytics | null>(null);

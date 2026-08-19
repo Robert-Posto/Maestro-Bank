@@ -2,18 +2,16 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
-import { AuthService } from '../../services/auth.service';
 import { BankingService } from '../../services/banking.service';
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
 import { BudgetsService, Budget, Subscription } from '../../services/budgets.service';
-import { PageHeader } from '../../shared/components/page-header/page-header';
-import { StatCard } from '../../shared/components/stat-card/stat-card';
 import { AccountCard, AccountRowData } from '../../shared/components/account-card/account-card';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Icon } from '../../shared/components/icon/icon';
+import { daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
 
 interface QuickAction {
   label: string;
@@ -23,9 +21,9 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Transfer', icon: 'transfer', route: '/app/transfers' },
-  { label: 'Card controls', icon: 'cards', route: '/app/cards' },
   { label: 'Schimb valutar', icon: 'exchange', route: '/app/exchange' },
-  { label: 'Vezi tranzacții', icon: 'transactions', route: '/app/transactions' },
+  { label: 'Plată factură', icon: 'receipt', route: '/app/transfers' },
+  { label: 'Control card', icon: 'cards', route: '/app/cards' },
 ];
 
 function startOfMonthIso(): string {
@@ -42,12 +40,12 @@ function startOfMonthIso(): string {
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [RouterLink, PageHeader, StatCard, AccountCard, TransactionRow, LoadingSkeleton, EmptyState, MoneyPipe, Icon],
+  imports: [RouterLink, AccountCard, TransactionRow, LoadingSkeleton, EmptyState, MoneyPipe, Icon],
   templateUrl: './overview.html',
   styleUrl: './overview.css',
 })
 export class Overview implements OnInit {
-  private readonly auth = inject(AuthService);
+  protected readonly Math = Math;
   private readonly banking = inject(BankingService);
   private readonly transactionsApi = inject(TransactionsService);
   private readonly budgetsApi = inject(BudgetsService);
@@ -64,7 +62,7 @@ export class Overview implements OnInit {
   protected readonly budgets = signal<Budget[]>([]);
   protected readonly upcomingSubscriptions = signal<Subscription[]>([]);
 
-  protected readonly firstName = computed(() => this.auth.currentUser()?.first_name ?? '');
+  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
 
   protected readonly budgetProgress = computed(() => {
     const budgetList = this.budgets().filter((b) => b.active);
@@ -106,7 +104,14 @@ export class Overview implements OnInit {
         this.monthlyIncomeMinor.set(incomeThisMonth.reduce((sum, t) => sum + t.amount_minor, 0));
         this.spending.set(spending);
         this.budgets.set(budgets);
-        this.upcomingSubscriptions.set(subscriptions.filter((s) => s.active).slice(0, 3));
+        // Sortăm după cât de aproape e următoarea facturare, ca secțiunea
+        // "Abonamente apropiate" să arate chiar cele mai urgente, nu primele 3 din listă.
+        this.upcomingSubscriptions.set(
+          subscriptions
+            .filter((s) => s.active)
+            .sort((a, b) => daysUntilBilling(a.billing_day) - daysUntilBilling(b.billing_day))
+            .slice(0, 3),
+        );
         this.loading.set(false);
       },
       error: () => {

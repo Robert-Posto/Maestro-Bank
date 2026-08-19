@@ -8,8 +8,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { Icon } from '../icon/icon';
 
 /**
- * Bara de sus — search, notificări, avatar + nume (din backend, NU
- * hardcodat) + tip de cont demo. Vezi UI reference/*.png.
+ * Bara de sus — search, buton rapid "Tranzacție nouă" (duce la formularul
+ * real de transfer, /app/transfers — nu duplicăm logica de transfer aici),
+ * notificări, avatar + nume (din backend, NU hardcodat) + tip de cont demo.
+ * Vezi UI reference/*.png.
  */
 @Component({
   selector: 'app-topbar',
@@ -44,6 +46,12 @@ export class Topbar {
   protected onSearch(): void {
     const term = this.searchTerm().trim();
     this.router.navigate(['/app/transactions'], term ? { queryParams: { search: term } } : {});
+  }
+
+  protected newTransaction(): void {
+    this.notificationsOpen.set(false);
+    this.profileMenuOpen.set(false);
+    this.router.navigate(['/app/transfers']);
   }
 
   protected toggleNotifications(): void {
