@@ -1,14 +1,53 @@
-<app-page-header title="Support" subtitle="How can we help?">
-  <app-action-button (pressed)="openModal()"><app-icon name="plus" [size]="16" /> New support request</app-action-button>
+<app-page-header title="Suport" subtitle="Suntem aici să te ajutăm.">
+  <app-action-button (pressed)="openModal()"><app-icon name="plus" [size]="16" /> Solicitare nouă</app-action-button>
 </app-page-header>
+
+<section class="support-chat" aria-label="Chat suport MaestroBank">
+  <header class="support-chat__header">
+    <div class="support-chat__identity">
+      <div class="support-chat__avatar"><app-icon name="support" [size]="22" /></div>
+      <div>
+        <h2>Chat suport</h2>
+        <p>Echipa de suport MaestroBank</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="support-chat__messages" aria-live="polite">
+    @for (chatMessage of chatMessages(); track chatMessage.id) {
+      <div class="support-chat__message-row" [class.support-chat__message-row--user]="chatMessage.role === 'user'">
+        @if (chatMessage.role === 'support') {
+          <div class="support-chat__message-avatar">M</div>
+        }
+        <div class="support-chat__bubble" [class.support-chat__bubble--user]="chatMessage.role === 'user'">
+          {{ chatMessage.text }}
+        </div>
+      </div>
+    }
+  </div>
+
+  <form class="support-chat__composer" (ngSubmit)="sendChatMessage()">
+    <input
+      type="text"
+      name="chatMessage"
+      autocomplete="off"
+      aria-label="Mesaj pentru echipa de suport"
+      placeholder="Scrie mesajul tău..."
+      [ngModel]="chatInput()"
+      (ngModelChange)="chatInput.set($event)"
+    />
+    <button type="submit" [disabled]="!chatInput().trim()" aria-label="Trimite mesajul">Trimite</button>
+  </form>
+  <p class="support-chat__notice">Chat demonstrativ — mesajele nu sunt trimise încă unei echipe de suport. Nu include parole, PIN-uri sau date complete ale cardului.</p>
+</section>
 
 <div class="support-grid">
   <section class="support-panel">
-    <h2>My requests</h2>
+    <h2>Solicitările mele</h2>
     @if (loading()) {
       <app-loading-skeleton [rows]="3" [height]="60" />
     } @else if (tickets().length === 0) {
-      <app-empty-state icon="support" title="No support requests" description="Trimite prima ta solicitare — răspundem cât mai curând." />
+      <app-empty-state icon="support" title="Nu ai solicitări" description="Trimite prima ta solicitare — răspundem cât mai curând." />
     } @else {
       <div class="support-tickets">
         @for (t of tickets(); track t.id) {
@@ -38,7 +77,7 @@
 </div>
 
 @if (modalOpen()) {
-  <app-modal title="New support request" (closed)="modalOpen.set(false)">
+  <app-modal title="Solicitare nouă" (closed)="modalOpen.set(false)">
     <div class="support-form">
       <label>
         <span>Categorie</span>

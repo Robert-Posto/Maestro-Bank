@@ -1,9 +1,25 @@
 <div class="auth-screen">
-  <div class="auth-card">
-    <div class="auth-brand">
-      <p class="auth-brand__name">MaestroBank</p>
-      <p class="auth-brand__tagline">maestrul tău în banking</p>
-    </div>
+  <main class="auth-layout">
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-brand">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="auth-visual__content">
+        <p class="auth-visual__eyebrow">Banking simplificat</p>
+        <h2 class="auth-visual__title">Finanțele tale, într-un singur loc.</h2>
+        <p class="auth-visual__text">Conturi, plăți și informații utile, într-o experiență sigură și ușor de folosit.</p>
+      </div>
+
+      <p class="auth-visual__security">Conexiune securizată și date protejate</p>
+    </aside>
+
+    <section class="auth-card">
+      <div class="auth-brand auth-brand--mobile">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
 
     <h1 class="auth-title">Autentificare</h1>
     <p class="auth-subtitle">Accesează contul tău MaestroBank.</p>
@@ -47,5 +63,6 @@
     </form>
 
     <p class="auth-switch">Nu ai cont? <a routerLink="/register">Creează unul</a></p>
-  </div>
+    </section>
+  </main>
 </div>

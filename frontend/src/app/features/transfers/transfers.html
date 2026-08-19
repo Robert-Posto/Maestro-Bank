@@ -108,7 +108,12 @@
       </div>
       <h2>Transfer reușit</h2>
       <p class="transfer-success__amount">{{ tx.amount_minor | money: tx.currency }}</p>
-      <p class="transfer-success__meta">către {{ tx.counterparty_iban }}</p>
+      <p class="transfer-success__meta">
+        către {{ tx.counterparty_name || tx.counterparty_iban }}
+        @if (tx.counterparty_name) {
+          <span class="transfer-success__iban">{{ tx.counterparty_iban }}</span>
+        }
+      </p>
       <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">Fă un nou transfer</app-action-button>
     </div>
   }

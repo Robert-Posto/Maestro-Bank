@@ -19,7 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Bugete', route: '/app/budgets', icon: 'budgets' },
   { label: 'Spending & Forecast', route: '/app/spending-forecast', icon: 'spending' },
   { label: 'Support', route: '/app/support', icon: 'support' },
-  { label: 'AI Copilot', route: '/app/copilot', icon: 'copilot' },
+  { label: 'MaestroAssistent', route: '/app/copilot', icon: 'copilot' },
   { label: 'Profil & Securitate', route: '/app/profile', icon: 'profile' },
 ];
 

@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { categoryLabel } from '../../categories';
+import { transactionDisplayName } from '../../transaction-display';
 
 export interface TransactionRowData {
   id: string;
@@ -10,6 +11,7 @@ export interface TransactionRowData {
   amount_minor: number;
   currency: string;
   counterparty_iban: string;
+  counterparty_name?: string | null;
   description: string;
   category: string;
   status: string;
@@ -105,9 +107,7 @@ export class TransactionRow {
   readonly transaction = input.required<TransactionRowData>();
   readonly opened = output<void>();
 
-  protected readonly displayName = computed(
-    () => this.transaction().description?.trim() || this.transaction().counterparty_iban,
-  );
+  protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
   protected readonly initial = computed(() => this.displayName().charAt(0).toUpperCase());
   protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));
 }

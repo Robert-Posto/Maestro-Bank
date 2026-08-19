@@ -98,3 +98,12 @@ class ChangePasswordRequest(BaseModel):
         if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
             raise ValueError("Parola trebuie să conțină cel puțin o literă și o cifră.")
         return value
+
+
+class InternalUserNameView(BaseModel):
+    """Vedere MINIMALĂ, doar-nume, pentru alte servicii (ex. transactions-service
+    afișează numele contrapărții la un transfer). NU expune email/password_hash —
+    intenționat mai restrictivă decât UserOut. Rută internă, blocată la Gateway."""
+
+    first_name: str
+    last_name: str

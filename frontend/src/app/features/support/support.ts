@@ -29,6 +29,12 @@ const FAQ_ITEMS = [
   { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
 ];
 
+interface ChatMessage {
+  id: number;
+  role: 'support' | 'user';
+  text: string;
+}
+
 /** Support — vezi task-ul MaestroBank, secțiunea 20. Fără AI. */
 @Component({
   selector: 'app-support',
@@ -53,6 +59,14 @@ export class Support implements OnInit {
   protected readonly subject = signal('');
   protected readonly category = signal<TicketCategory>('other');
   protected readonly message = signal('');
+  protected readonly chatInput = signal('');
+  protected readonly chatMessages = signal<ChatMessage[]>([
+    {
+      id: 1,
+      role: 'support',
+      text: 'Bună! Scrie-ne cu ce te putem ajuta.',
+    },
+  ]);
 
   ngOnInit(): void {
     this.load();
@@ -77,6 +91,15 @@ export class Support implements OnInit {
     this.subject.set('');
     this.message.set('');
     this.modalOpen.set(true);
+  }
+
+  protected sendChatMessage(): void {
+    const text = this.chatInput().trim();
+    if (!text) return;
+
+    const id = Date.now();
+    this.chatMessages.update((messages) => [...messages, { id, role: 'user', text }]);
+    this.chatInput.set('');
   }
 
   protected submitTicket(): void {

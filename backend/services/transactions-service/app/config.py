@@ -11,6 +11,7 @@ class Settings:
     # vine prin API-ul serviciului responsabil.
     accounts_service_url: str = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-service:8000")
     budgets_service_url: str = os.getenv("BUDGETS_SERVICE_URL", "http://budgets-service:8000")
+    auth_service_url: str = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
 
 
 settings = Settings()

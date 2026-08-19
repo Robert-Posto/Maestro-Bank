@@ -137,3 +137,21 @@ async def change_password(authorization: str | None, payload: ChangePasswordRequ
         {"$set": {"password_hash": hash_password(payload.new_password)}},
     )
     logger.info("auth-service: parolă schimbată cu succes pentru user_id=%s", user["_id"])
+
+
+async def get_user_name(user_id: str) -> dict:
+    """Rută INTERNĂ (service-to-service): rezolvă doar numele unui user,
+    după user_id — folosit de transactions-service ca să afișeze numele
+    contrapărții la un transfer, nu doar IBAN-ul. NU expune email/hash.
+    """
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+
+    db = get_database()
+    user = await db.users.find_one({"_id": object_id})
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+
+    return {"first_name": user["first_name"], "last_name": user["last_name"]}

@@ -32,7 +32,14 @@
     </div>
     <div class="details-panel__field">
       <dt>Contrapartidă</dt>
-      <dd class="details-panel__mono">{{ transaction().counterparty_iban }}</dd>
+      @if (transaction().counterparty_name) {
+        <dd>
+          {{ transaction().counterparty_name }}
+          <span class="details-panel__mono details-panel__iban-secondary">{{ transaction().counterparty_iban }}</span>
+        </dd>
+      } @else {
+        <dd class="details-panel__mono">{{ transaction().counterparty_iban }}</dd>
+      }
     </div>
     <div class="details-panel__field">
       <dt>Status</dt>

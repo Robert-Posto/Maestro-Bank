@@ -1,9 +1,25 @@
 <div class="auth-screen">
-  <div class="auth-card">
-    <div class="auth-brand">
-      <p class="auth-brand__name">MaestroBank</p>
-      <p class="auth-brand__tagline">maestrul tău în banking</p>
-    </div>
+  <main class="auth-layout">
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-brand">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="auth-visual__content">
+        <p class="auth-visual__eyebrow">Începe simplu</p>
+        <h2 class="auth-visual__title">Un cont construit în jurul tău.</h2>
+        <p class="auth-visual__text">Ai acces rapid la sold, card virtual și instrumentele de care ai nevoie zi de zi.</p>
+      </div>
+
+      <p class="auth-visual__security">Înregistrare rapidă și protejată</p>
+    </aside>
+
+    <section class="auth-card">
+      <div class="auth-brand auth-brand--mobile">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
 
     <h1 class="auth-title">Creează cont</h1>
     <p class="auth-subtitle">Contul RON, IBAN-ul demo și cardul virtual se creează automat.</p>
@@ -44,5 +60,6 @@
     </form>
 
     <p class="auth-switch">Ai deja cont? <a routerLink="/login">Autentifică-te</a></p>
-  </div>
+    </section>
+  </main>
 </div>

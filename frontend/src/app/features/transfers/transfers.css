@@ -181,3 +181,9 @@
   color: var(--mb-text-tertiary);
   margin-bottom: var(--mb-space-2);
 }
+
+.transfer-success__iban {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--mb-font-size-xs);
+}

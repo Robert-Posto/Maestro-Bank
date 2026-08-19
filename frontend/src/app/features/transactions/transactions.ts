@@ -13,6 +13,7 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
+import { transactionDisplayName } from '../../shared/transaction-display';
 import {
   TransactionDetailsPanel,
   TransactionDetail,
@@ -48,6 +49,7 @@ export class Transactions implements OnInit {
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
+  protected readonly displayName = transactionDisplayName;
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
