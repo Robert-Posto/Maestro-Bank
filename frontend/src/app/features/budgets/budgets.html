@@ -128,7 +128,7 @@
 
           <div class="budget-card__header">
             <div class="budget-card__identity">
-              <span class="subscription-card__avatar">{{ s.name.charAt(0) }}</span>
+              <app-merchant-avatar [name]="s.name" [description]="s.name" [category]="s.category" />
               <div>
                 <p class="budget-card__name">{{ s.name }}</p>
                 <p class="budget-card__category">{{ categoryLabel(s.category) }}</p>

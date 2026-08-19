@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { categoryLabel } from '../../categories';
 import { transactionDisplayName } from '../../transaction-display';
+import { MerchantAvatar } from '../merchant-avatar/merchant-avatar';
 
 export interface TransactionRowData {
   id: string;
@@ -22,12 +23,15 @@ export interface TransactionRowData {
 @Component({
   selector: 'app-transaction-row',
   standalone: true,
-  imports: [MoneyPipe, DatePipe],
+  imports: [MoneyPipe, DatePipe, MerchantAvatar],
   template: `
     <button type="button" class="tx-row" (click)="opened.emit()">
-      <span class="tx-row__avatar" [class.tx-row__avatar--in]="transaction().direction === 'incoming'">
-        {{ initial() }}
-      </span>
+      <app-merchant-avatar
+        [name]="displayName()"
+        [description]="transaction().description"
+        [isPerson]="!!transaction().counterparty_name"
+        [category]="transaction().category"
+      />
       <span class="tx-row__info">
         <span class="tx-row__title">{{ displayName() }}</span>
         <span class="tx-row__meta">{{ categoryLabel() }} · {{ transaction().created_at | date: 'dd MMM yyyy' }}</span>
@@ -55,23 +59,6 @@ export interface TransactionRowData {
       }
       .tx-row:hover {
         background: var(--mb-surface-muted);
-      }
-      .tx-row__avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: var(--mb-radius-sm);
-        background: var(--mb-negative-bg);
-        color: var(--mb-negative);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: var(--mb-font-size-sm);
-        font-weight: var(--mb-font-weight-semibold);
-        flex-shrink: 0;
-      }
-      .tx-row__avatar--in {
-        background: var(--mb-positive-bg);
-        color: var(--mb-positive);
       }
       .tx-row__info {
         display: flex;
@@ -108,6 +95,5 @@ export class TransactionRow {
   readonly opened = output<void>();
 
   protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
-  protected readonly initial = computed(() => this.displayName().charAt(0).toUpperCase());
   protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));
 }

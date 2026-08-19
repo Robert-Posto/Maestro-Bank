@@ -14,6 +14,7 @@ import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
 import { transactionDisplayName } from '../../shared/transaction-display';
+import { MerchantAvatar } from '../../shared/components/merchant-avatar/merchant-avatar';
 import {
   TransactionDetailsPanel,
   TransactionDetail,
@@ -36,6 +37,7 @@ const PAGE_SIZE = 8;
     ActionButton,
     Icon,
     MoneyPipe,
+    MerchantAvatar,
     TransactionDetailsPanel,
   ],
   templateUrl: './transactions.html',

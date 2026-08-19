@@ -16,6 +16,7 @@ import { TRANSACTION_CATEGORIES, categoryColorVar, categoryLabel } from '../../s
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { daysRemainingLabel, daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
+import { MerchantAvatar } from '../../shared/components/merchant-avatar/merchant-avatar';
 
 type Tab = 'budgets' | 'subscriptions';
 
@@ -42,7 +43,7 @@ interface SubscriptionsSummary {
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog],
+  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog, MerchantAvatar],
   templateUrl: './budgets.html',
   styleUrl: './budgets.css',
 })
