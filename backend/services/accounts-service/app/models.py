@@ -169,6 +169,45 @@ class BeneficiaryOut(BaseModel):
         return str(value)
 
 
+class PocketCreateRequest(BaseModel):
+    """POST /pockets — creează un obiectiv nou de economisire ("Vacanță",
+    "Fond urgențe"). Banii alocați rămân în contul RON al userului (NU se
+    mută pe alt IBAN) — un "pocket" e doar o rezervare/etichetare a unei
+    părți din sold, ca la Revolut Vaults / N26 Spaces."""
+
+    name: str = Field(min_length=1, max_length=60)
+    target_minor: int = Field(gt=0, le=1_000_000_000)  # cap defensiv: max 10.000.000,00 RON
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Numele obiectivului nu poate fi gol.")
+        return stripped
+
+
+class PocketOut(BaseModel):
+    id: str = Field(alias="_id")
+    name: str
+    target_minor: int
+    saved_minor: int
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)
+
+
+class PocketAmountRequest(BaseModel):
+    """POST /pockets/{id}/deposit sau /withdraw."""
+
+    amount_minor: int = Field(gt=0, le=100_000_000)  # cap defensiv: max 1.000.000,00 RON/operație
+
+
 class DevFundRequest(BaseModel):
     """STRICT development-only — vezi routers/accounts.py::dev_fund_account."""
 

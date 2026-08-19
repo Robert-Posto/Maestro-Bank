@@ -1,9 +1,10 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 
 import { AuthService } from '../../../services/auth.service';
+import { ThemeService } from '../../../services/theme.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Icon } from '../icon/icon';
 
@@ -13,6 +14,8 @@ import { Icon } from '../icon/icon';
  * notificări, avatar + nume (din backend, NU hardcodat) + tip de cont demo.
  * Vezi UI reference/*.png.
  */
+const NOTIFICATIONS_POLL_INTERVAL_MS = 30_000;
+
 @Component({
   selector: 'app-topbar',
   standalone: true,
@@ -20,10 +23,11 @@ import { Icon } from '../icon/icon';
   templateUrl: './topbar.html',
   styleUrl: './topbar.css',
 })
-export class Topbar {
+export class Topbar implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly notificationsService = inject(NotificationsService);
+  protected readonly themeService = inject(ThemeService);
 
   readonly accountType = input('Client Premium');
 
@@ -43,6 +47,17 @@ export class Topbar {
   protected readonly profileMenuOpen = signal(false);
   protected readonly notifications = this.notificationsService.notifications;
 
+  private pollHandle: ReturnType<typeof setInterval> | undefined;
+
+  ngOnInit(): void {
+    this.notificationsService.refresh();
+    this.pollHandle = setInterval(() => this.notificationsService.refresh(), NOTIFICATIONS_POLL_INTERVAL_MS);
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.pollHandle);
+  }
+
   protected onSearch(): void {
     const term = this.searchTerm().trim();
     this.router.navigate(['/app/transactions'], term ? { queryParams: { search: term } } : {});
@@ -58,6 +73,7 @@ export class Topbar {
     this.notificationsOpen.update((open) => !open);
     this.profileMenuOpen.set(false);
     if (this.notificationsOpen()) {
+      this.notificationsService.refresh();
       this.notificationsService.markAllRead();
     }
   }

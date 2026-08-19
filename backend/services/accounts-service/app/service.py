@@ -27,6 +27,7 @@ from app.models import (
     CardSettingsUpdate,
     InternalAccountView,
     InternalTransferResponse,
+    PocketOut,
 )
 
 logger = logging.getLogger("accounts-service")
@@ -146,7 +147,9 @@ async def _set_card_frozen(card_id: str, user_id: str, is_frozen: bool) -> dict:
 
 
 async def freeze_card(card_id: str, user_id: str) -> dict:
-    return await _set_card_frozen(card_id, user_id, True)
+    card = await _set_card_frozen(card_id, user_id, True)
+    await _notify_user(user_id, "card", f"Cardul terminat în {card['last_four']} a fost blocat.")
+    return card
 
 
 async def unfreeze_card(card_id: str, user_id: str) -> dict:
@@ -240,6 +243,19 @@ async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
     return await db.cards.find_one({"_id": card_result.inserted_id})
 
 
+async def _notify_user(user_id: str, kind: str, text: str) -> None:
+    """Trimite o notificare persistentă către support-service. NU blochează
+    și NU eșuează operația principală dacă support-service e indisponibil."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{settings.support_service_url}/internal/notifications",
+                json={"user_id": user_id, "kind": kind, "text": text},
+            )
+    except httpx.HTTPError:
+        logger.warning("accounts-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
+
+
 async def _verify_password_with_auth_service(user_id: str, password: str) -> bool:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -275,6 +291,106 @@ async def reveal_card(card_id: str, user_id: str, password: str) -> dict:
         "expiry_month": card["expiry_month"],
         "expiry_year": card["expiry_year"],
     }
+
+
+# --- Pockets (obiective de economisire) -----------------------------------
+#
+# Un pocket NU mută bani pe alt cont/IBAN — e doar o rezervare/etichetare
+# a unei părți din soldul contului RON existent (ca la Revolut Vaults).
+# Regula de integritate: suma `saved_minor` a TUTUROR pocket-urilor unui
+# user nu poate depăși niciodată `balance_minor` al contului lui — verificat
+# la fiecare depunere, nu doar la creare (soldul se poate schimba între timp
+# prin transferuri).
+
+
+def to_pocket_out(pocket: dict) -> PocketOut:
+    return PocketOut(
+        id=str(pocket["_id"]),
+        name=pocket["name"],
+        target_minor=pocket["target_minor"],
+        saved_minor=pocket["saved_minor"],
+        created_at=pocket["created_at"],
+    )
+
+
+async def get_pockets_for_user(user_id: str) -> list[dict]:
+    db = get_database()
+    return await db.pockets.find({"user_id": user_id}).sort("created_at", 1).to_list(length=50)
+
+
+async def _get_pocket_for_user(pocket_id: str, user_id: str) -> dict:
+    db = get_database()
+    try:
+        object_id = ObjectId(pocket_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de obiectiv invalid.") from exc
+
+    pocket = await db.pockets.find_one({"_id": object_id})
+    if pocket is None or pocket["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obiectivul nu există.")
+    return pocket
+
+
+async def create_pocket(user_id: str, name: str, target_minor: int) -> dict:
+    db = get_database()
+    account = await get_account_for_user(user_id)
+
+    pocket_doc = {
+        "user_id": user_id,
+        "account_id": account["_id"],
+        "name": name,
+        "target_minor": target_minor,
+        "saved_minor": 0,
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = await db.pockets.insert_one(pocket_doc)
+    return await db.pockets.find_one({"_id": result.inserted_id})
+
+
+async def deposit_to_pocket(pocket_id: str, user_id: str, amount_minor: int) -> dict:
+    db = get_database()
+    pocket = await _get_pocket_for_user(pocket_id, user_id)
+    account = await get_account_for_user(user_id)
+
+    already_allocated = await _total_allocated_for_user(user_id)
+    if already_allocated + amount_minor > account["balance_minor"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Suma depășește soldul disponibil (neluat deja de alte obiective).",
+        )
+
+    await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": amount_minor}})
+    return await db.pockets.find_one({"_id": pocket["_id"]})
+
+
+async def withdraw_from_pocket(pocket_id: str, user_id: str, amount_minor: int) -> dict:
+    db = get_database()
+    pocket = await _get_pocket_for_user(pocket_id, user_id)
+
+    if amount_minor > pocket["saved_minor"]:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nu poți retrage mai mult decât ai economisit.")
+
+    await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": -amount_minor}})
+    return await db.pockets.find_one({"_id": pocket["_id"]})
+
+
+async def delete_pocket(pocket_id: str, user_id: str) -> None:
+    db = get_database()
+    pocket = await _get_pocket_for_user(pocket_id, user_id)
+    if pocket["saved_minor"] > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Retrage banii economisiți înainte să ștergi obiectivul.",
+        )
+    await db.pockets.delete_one({"_id": pocket["_id"]})
+
+
+async def _total_allocated_for_user(user_id: str) -> int:
+    db = get_database()
+    total = 0
+    async for doc in db.pockets.find({"user_id": user_id}, {"saved_minor": 1}):
+        total += doc["saved_minor"]
+    return total
 
 
 # --- Beneficiari (transfer către IBAN salvat) -----------------------------

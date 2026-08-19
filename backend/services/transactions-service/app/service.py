@@ -12,6 +12,7 @@ localhost. Vezi `_get_account_by_user` / `_get_account_by_iban` /
 """
 
 import asyncio
+import calendar
 import csv
 import io
 import logging
@@ -25,7 +26,12 @@ from fastapi import HTTPException, status
 from app.config import settings
 from app.database import get_database
 from app.money import format_minor_amount
-from app.models import ReportTransactionRequest, TransactionFilters, TransferRequest
+from app.models import (
+    ReportTransactionRequest,
+    ScheduledTransferCreate,
+    TransactionFilters,
+    TransferRequest,
+)
 
 logger = logging.getLogger("transactions-service")
 
@@ -207,8 +213,117 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
     await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "completed"}})
     logger.info("transactions-service: transfer reușit (tx_id=%s)", insert_result.inserted_id)
 
+    await _notify_user(
+        user_id,
+        "transfer",
+        f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+    )
+
     completed_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
     return to_transaction_view(completed_doc, viewer_account_id=source["id"])
+
+
+async def _notify_user(user_id: str, kind: str, text: str) -> None:
+    """Trimite o notificare persistentă către support-service. NU blochează
+    și NU eșuează operația principală dacă support-service e indisponibil —
+    la fel ca provisioning-ul de cont din auth-service, o notificare
+    pierdută nu trebuie să strice fluxul de bani."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{settings.support_service_url}/internal/notifications",
+                json={"user_id": user_id, "kind": kind, "text": text},
+            )
+    except httpx.HTTPError:
+        logger.warning("transactions-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
+
+
+# --- Transferuri programate/recurente ---------------------------------------
+
+
+def _advance_schedule(current: datetime, frequency: str) -> datetime:
+    if frequency == "weekly":
+        return current + timedelta(days=7)
+
+    # monthly — păstrează ziua din lună, cu clamp la ultima zi validă (ex.
+    # 31 ianuarie -> 28/29 februarie), nu explodează cu ValueError.
+    month = current.month + 1
+    year = current.year + (month - 1) // 12
+    month = ((month - 1) % 12) + 1
+    day = min(current.day, calendar.monthrange(year, month)[1])
+    return current.replace(year=year, month=month, day=day)
+
+
+async def create_scheduled_transfer(user_id: str, payload: ScheduledTransferCreate) -> dict:
+    db = get_database()
+    now = datetime.now(timezone.utc)
+    doc = {
+        "user_id": user_id,
+        "to_iban": payload.to_iban,
+        "amount_minor": payload.amount_minor,
+        "description": payload.description,
+        "frequency": payload.frequency,
+        "next_run_at": _advance_schedule(now, payload.frequency),
+        "active": True,
+        "created_at": now,
+    }
+    result = await db.scheduled_transfers.insert_one(doc)
+    return await db.scheduled_transfers.find_one({"_id": result.inserted_id})
+
+
+async def list_scheduled_transfers_for_user(user_id: str) -> list[dict]:
+    db = get_database()
+    cursor = db.scheduled_transfers.find({"user_id": user_id, "active": True}).sort("next_run_at", 1)
+    return await cursor.to_list(length=50)
+
+
+async def cancel_scheduled_transfer(schedule_id: str, user_id: str) -> None:
+    db = get_database()
+    try:
+        object_id = ObjectId(schedule_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de transfer programat invalid.") from exc
+
+    result = await db.scheduled_transfers.update_one(
+        {"_id": object_id, "user_id": user_id, "active": True},
+        {"$set": {"active": False}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transferul programat nu există.")
+
+
+async def run_due_scheduled_transfers() -> None:
+    """Apelat periodic dintr-un loop intern (vezi app/scheduler.py, pornit
+    din app/main.py::lifespan) — execută orice transfer programat cu
+    `next_run_at` scadent, REFOLOSIND `create_transfer` (aceeași validare,
+    exact același flux ca un transfer manual — inclusiv notificarea).
+
+    Un eșec la UN schedule (ex. sold insuficient în acel moment) nu oprește
+    restul — se loghează și se reîncearcă la următoarea rulare programată,
+    nu imediat (evită retry-storm dacă userul rămâne fără fonduri).
+    """
+    db = get_database()
+    now = datetime.now(timezone.utc)
+    due = await db.scheduled_transfers.find({"active": True, "next_run_at": {"$lte": now}}).to_list(length=200)
+
+    for schedule in due:
+        transfer_payload = TransferRequest(
+            to_iban=schedule["to_iban"],
+            amount_minor=schedule["amount_minor"],
+            description=schedule["description"] or "Transfer programat",
+        )
+        try:
+            await create_transfer(transfer_payload, schedule["user_id"])
+            logger.info("transactions-service: transfer programat executat (id=%s)", schedule["_id"])
+        except HTTPException as exc:
+            logger.warning(
+                "transactions-service: transfer programat eșuat (id=%s, motiv=%s) — reîncerc la următoarea rulare",
+                schedule["_id"],
+                exc.detail,
+            )
+
+        next_run = _advance_schedule(schedule["next_run_at"], schedule["frequency"])
+        await db.scheduled_transfers.update_one({"_id": schedule["_id"]}, {"$set": {"next_run_at": next_run}})
 
 
 def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> dict:

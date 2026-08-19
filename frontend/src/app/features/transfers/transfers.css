@@ -614,3 +614,143 @@
     padding: var(--mb-space-5);
   }
 }
+
+/* --- Transferuri programate ------------------------------------------------ */
+
+.scheduled-section {
+  margin-top: var(--mb-space-8);
+  max-width: 900px;
+}
+
+.scheduled-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  margin-bottom: var(--mb-space-5);
+}
+
+.scheduled-section__header h2 {
+  font-size: var(--mb-font-size-md);
+}
+
+.scheduled-section__subtitle {
+  margin: 4px 0 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  max-width: 480px;
+}
+
+.scheduled-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.scheduled-row {
+  display: grid;
+  grid-template-columns: 1.5fr auto auto 1fr auto;
+  align-items: center;
+  gap: var(--mb-space-4);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-xs);
+  padding: var(--mb-space-4) var(--mb-space-5);
+}
+
+.scheduled-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scheduled-row__iban {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scheduled-row__desc {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.scheduled-row__amount {
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.scheduled-row__frequency {
+  font-size: var(--mb-font-size-xs);
+  background: var(--mb-info-bg);
+  color: var(--mb-info);
+  padding: 4px 10px;
+  border-radius: var(--mb-radius-pill);
+  white-space: nowrap;
+}
+
+.scheduled-row__next {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  white-space: nowrap;
+}
+
+.scheduled-row__cancel {
+  border: none;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  padding: var(--mb-space-2);
+  border-radius: var(--mb-radius-sm);
+}
+
+.scheduled-row__cancel:hover {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+@media (max-width: 900px) {
+  .scheduled-row {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+    gap: var(--mb-space-2);
+  }
+}
+
+/* --- Formular modal (transfer programat) ---------------------------------- */
+
+.schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.schedule-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.schedule-form input,
+.schedule-form select {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  min-height: 44px;
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.schedule-form input:focus,
+.schedule-form select:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}

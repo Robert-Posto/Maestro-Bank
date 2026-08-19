@@ -89,9 +89,144 @@
   flex-wrap: wrap;
 }
 
-.accounts-note {
-  margin-top: var(--mb-space-5);
+/* --- Pockets (obiective de economisire) ---------------------------------- */
+
+.pockets-section {
+  margin-top: var(--mb-space-8);
+  max-width: 900px;
+}
+
+.pockets-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  margin-bottom: var(--mb-space-5);
+}
+
+.pockets-section__header h2 {
+  font-size: var(--mb-font-size-md);
+}
+
+.pockets-section__subtitle {
+  margin: 4px 0 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  max-width: 480px;
+}
+
+.pockets-section__total {
+  margin: var(--mb-space-4) 0 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.pockets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--mb-space-4);
+}
+
+.pocket-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-xs);
+  padding: var(--mb-space-5);
+}
+
+.pocket-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mb-space-3);
+}
+
+.pocket-card__name {
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.pocket-card__delete {
+  border: none;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  padding: var(--mb-space-1);
+  border-radius: var(--mb-radius-sm);
+}
+
+.pocket-card__delete:hover {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+.pocket-card__amounts {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: var(--mb-space-2);
+}
+
+.pocket-card__saved {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.pocket-card__target {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
-  max-width: 620px;
+}
+
+.pocket-card__bar {
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-border);
+  overflow: hidden;
+  margin-bottom: var(--mb-space-4);
+}
+
+.pocket-card__bar-fill {
+  height: 100%;
+  background: var(--mb-blue-500);
+  border-radius: var(--mb-radius-pill);
+  transition: width var(--mb-transition-base);
+}
+
+.pocket-card__actions {
+  display: flex;
+  gap: var(--mb-space-2);
+  flex-wrap: wrap;
+}
+
+/* --- Formulare modale (creare/depunere pocket) --------------------------- */
+
+.pocket-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.pocket-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.pocket-form input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  min-height: 44px;
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.pocket-form input:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
 }

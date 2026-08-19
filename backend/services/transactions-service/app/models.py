@@ -90,3 +90,43 @@ class TransactionFilters(BaseModel):
 
 class ReportTransactionRequest(BaseModel):
     reason: str = Field(default="", max_length=280)
+
+
+# --- Transferuri programate/recurente --------------------------------------
+#
+# Diferit de detecția PASIVĂ de abonamente (budgets-service) — aici userul
+# INIȚIAZĂ explicit o automatizare ("trimite 500 RON lunar către IBAN X").
+# Execuția se face de un loop intern (vezi app/scheduler.py), care
+# reutilizează EXACT create_transfer — nu duplică validarea/logica.
+
+ScheduleFrequency = Literal["weekly", "monthly"]
+
+
+class ScheduledTransferCreate(BaseModel):
+    to_iban: str = Field(min_length=10, max_length=34)
+    amount_minor: int = Field(gt=0, le=100_000_000)
+    description: str = Field(default="", max_length=140)
+    frequency: ScheduleFrequency
+
+    @field_validator("to_iban")
+    @classmethod
+    def normalize_iban(cls, value: str) -> str:
+        return value.strip().upper().replace(" ", "")
+
+
+class ScheduledTransferOut(BaseModel):
+    id: str = Field(alias="_id")
+    to_iban: str
+    amount_minor: int
+    description: str
+    frequency: ScheduleFrequency
+    next_run_at: datetime
+    active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)

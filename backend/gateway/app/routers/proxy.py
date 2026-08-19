@@ -50,7 +50,7 @@ def _is_protected(service: str, path: str) -> bool:
       - auth: "me" și "change-password" sunt protejate (register/login
         rămân publice);
       - accounts: TOT e protejat (me, me/cards, cards/*, beneficiaries,
-        dev/fund, {id});
+        pockets/*, dev/fund, {id});
       - transactions: TOT e protejat (nu există rute publice, inclusiv
         path="" pentru GET /api/transactions);
       - budgets: TOT e protejat (budgets, subscriptions);

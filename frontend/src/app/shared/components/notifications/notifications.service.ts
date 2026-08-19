@@ -1,42 +1,74 @@
-import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+
+import { API_BASE_URL } from '../../../core/api-config';
+
+export type NotificationKind = 'budget' | 'card' | 'transfer' | 'system';
 
 export interface AppNotification {
-  id: number;
+  id: string;
+  kind: NotificationKind;
   text: string;
-  createdAt: Date;
   read: boolean;
+  createdAt: Date;
+}
+
+interface NotificationApiView {
+  id: string;
+  kind: NotificationKind;
+  text: string;
+  read: boolean;
+  created_at: string;
 }
 
 /**
- * Notificări — versiune MVP, DOAR frontend (in-memory, per sesiune).
+ * Notificări — istoric PERSISTENT, alimentat de backend (support-service).
  *
- * Task-ul MaestroBank (secțiunea 22) permite explicit ca, dacă un sistem
- * complet de notificări (persistat, backend dedicat) e prea mult pentru
- * această etapă, să pregătim structura fără să blocăm implementarea
- * principală. Acest serviciu se alimentează din aceleași evenimente care
- * declanșează toast-uri (transfer reușit, card blocat, buget aproape
- * atins, tichet de suport creat) — vezi ToastService pentru feedback-ul
- * imediat, acesta e istoricul persistent-în-sesiune, afișat în clopoțel.
+ * Evenimente reale care creează o notificare acum: transfer reușit
+ * (transactions-service), card blocat (accounts-service) — vezi
+ * app/service.py::_notify_user în fiecare. Alte servicii pot adăuga
+ * propriile evenimente apelând POST /internal/notifications, fără nicio
+ * schimbare aici.
  *
- * NU e conectat la un microserviciu — "Coming soon" pentru persistare
- * reală (vezi raportul final).
+ * Polling simplu (nu WebSocket/SSE — overkill pentru un demo), pornit din
+ * Topbar (singurul loc unde clopoțelul e afișat) cât timp userul e
+ * autentificat.
  */
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
+  private readonly http = inject(HttpClient);
   private readonly _notifications = signal<AppNotification[]>([]);
   readonly notifications = this._notifications.asReadonly();
-  private nextId = 1;
 
   get unreadCount(): number {
     return this._notifications().filter((n) => !n.read).length;
   }
 
-  push(text: string): void {
-    const notification: AppNotification = { id: this.nextId++, text, createdAt: new Date(), read: false };
-    this._notifications.update((list) => [notification, ...list].slice(0, 20));
+  refresh(): void {
+    this.http.get<NotificationApiView[]>(`${API_BASE_URL}/support/notifications`).subscribe({
+      next: (list) => this._notifications.set(list.map(toAppNotification)),
+      error: () => {
+        // Eșec silențios — notificările nu sunt critice, nu merită un toast
+        // care întrerupe userul la fiecare 30s dacă backend-ul are o problemă.
+      },
+    });
   }
 
   markAllRead(): void {
-    this._notifications.update((list) => list.map((n) => ({ ...n, read: true })));
+    if (this.unreadCount === 0) return;
+    this.http.patch<void>(`${API_BASE_URL}/support/notifications/read-all`, {}).subscribe({
+      next: () => this._notifications.update((list) => list.map((n) => ({ ...n, read: true }))),
+      error: () => {},
+    });
   }
+}
+
+function toAppNotification(view: NotificationApiView): AppNotification {
+  return {
+    id: view.id,
+    kind: view.kind,
+    text: view.text,
+    read: view.read,
+    createdAt: new Date(view.created_at),
+  };
 }
