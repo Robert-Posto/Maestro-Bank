@@ -6,10 +6,11 @@ class Settings:
     jwt_secret: str = os.getenv("JWT_SECRET", "change-me-in-development")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
 
-    # Adresă INTERNĂ Docker — transactions-service NU citește niciodată
-    # direct accounts_db; orice info despre conturi vine prin API-ul
-    # accounts-service (endpoint-urile /internal/accounts/*).
+    # Adrese INTERNE Docker — transactions-service NU citește niciodată
+    # direct accounts_db/budgets_db; orice info despre conturi/abonamente
+    # vine prin API-ul serviciului responsabil.
     accounts_service_url: str = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-service:8000")
+    budgets_service_url: str = os.getenv("BUDGETS_SERVICE_URL", "http://budgets-service:8000")
 
 
 settings = Settings()

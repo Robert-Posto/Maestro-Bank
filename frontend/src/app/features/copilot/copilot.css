@@ -1,0 +1,89 @@
+.copilot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  margin: var(--mb-space-10) auto var(--mb-space-8);
+  padding: var(--mb-space-8);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.copilot-empty__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--mb-blue-50);
+  color: var(--mb-blue-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--mb-space-4);
+}
+
+.copilot-empty h2 {
+  font-size: var(--mb-font-size-lg);
+  margin-bottom: var(--mb-space-3);
+}
+
+.copilot-empty p {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  line-height: var(--mb-line-height-base);
+  margin-bottom: var(--mb-space-4);
+}
+
+.copilot-empty__badge {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-tertiary);
+  background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--mb-radius-pill);
+}
+
+.copilot-input-bar {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  opacity: 0.6;
+}
+
+.copilot-input-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  background: transparent;
+}
+
+.copilot-input-bar button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--mb-blue-500);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: not-allowed;
+}
+
+.copilot-input-note {
+  text-align: center;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: var(--mb-space-3);
+}

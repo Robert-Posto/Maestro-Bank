@@ -86,3 +86,15 @@ class UserMeOut(UserOut):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Parola trebuie să conțină cel puțin o literă și o cifră.")
+        return value

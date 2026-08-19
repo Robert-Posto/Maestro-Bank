@@ -100,6 +100,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
+      - BUDGETS_SERVICE_URL=http://budgets-service:8000
     volumes:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
@@ -115,6 +116,8 @@ services:
         condition: service_healthy
       accounts-service:
         condition: service_healthy
+      budgets-service:
+        condition: service_healthy
     networks:
       - maestrobank-network
 
@@ -128,8 +131,68 @@ services:
       - "8004:8000"
     environment:
       - MONGO_URL=mongodb://mongodb:27017/budgets_db
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
     volumes:
       - ./backend/services/budgets-service/app:/app/app
+      - ./backend/services/budgets-service/tests:/app/tests
+      - ./backend/services/budgets-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
+  support-service:
+    build:
+      context: ./backend/services/support-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-support-service
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/support_db
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+    volumes:
+      - ./backend/services/support-service/app:/app/app
+      - ./backend/services/support-service/tests:/app/tests
+      - ./backend/services/support-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
+  exchange-service:
+    build:
+      context: ./backend/services/exchange-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-exchange-service
+    restart: unless-stopped
+    ports:
+      - "8006:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/exchange_db
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+    volumes:
+      - ./backend/services/exchange-service/app:/app/app
+      - ./backend/services/exchange-service/tests:/app/tests
+      - ./backend/services/exchange-service/pytest.ini:/app/pytest.ini
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 5s
@@ -162,6 +225,8 @@ services:
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8000
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
+      - SUPPORT_SERVICE_URL=http://support-service:8000
+      - EXCHANGE_SERVICE_URL=http://exchange-service:8000
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8080}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-300}
       - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
@@ -183,6 +248,10 @@ services:
       transactions-service:
         condition: service_healthy
       budgets-service:
+        condition: service_healthy
+      support-service:
+        condition: service_healthy
+      exchange-service:
         condition: service_healthy
     networks:
       - maestrobank-network

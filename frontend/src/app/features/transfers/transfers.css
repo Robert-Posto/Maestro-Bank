@@ -1,0 +1,183 @@
+.transfer-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.transfer-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  box-shadow: var(--mb-shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.transfer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.transfer-field input,
+.transfer-field select {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  padding: 0.65rem var(--mb-space-4);
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.transfer-field input:focus,
+.transfer-field select:focus {
+  border-color: var(--mb-blue-500);
+}
+
+.transfer-source {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  background: var(--mb-surface-muted);
+  border-radius: var(--mb-radius-sm);
+  padding: var(--mb-space-3);
+}
+
+.transfer-source__badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mb-navy-900);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.transfer-source__iban {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.transfer-source__balance {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: 2px;
+}
+
+.transfer-beneficiaries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-2);
+}
+
+.transfer-beneficiary-chip {
+  font-family: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--mb-radius-pill);
+  border: 1px solid var(--mb-border-strong);
+  background: var(--mb-surface);
+  color: var(--mb-text-primary);
+  cursor: pointer;
+}
+
+.transfer-beneficiary-chip:hover {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.transfer-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.transfer-error {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+  font-size: var(--mb-font-size-xs);
+  padding: var(--mb-space-2) var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+}
+
+.transfer-review-title {
+  font-size: var(--mb-font-size-md);
+}
+
+.transfer-review-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+  margin: 0;
+  padding: var(--mb-space-4) 0;
+  border-top: 1px solid var(--mb-border);
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.transfer-review-grid dt {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.transfer-review-grid dd {
+  margin: 2px 0 0;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.transfer-review-amount {
+  font-size: var(--mb-font-size-lg) !important;
+  font-weight: var(--mb-font-weight-semibold) !important;
+}
+
+.transfer-review-actions {
+  display: flex;
+  gap: var(--mb-space-3);
+}
+
+.transfer-review-actions app-action-button {
+  flex: 1;
+}
+
+.transfer-success {
+  align-items: center;
+  text-align: center;
+}
+
+.transfer-success__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transfer-success__amount {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.transfer-success__meta {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+}

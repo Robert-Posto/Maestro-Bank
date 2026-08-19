@@ -1,0 +1,33 @@
+<aside class="sidebar">
+  <div class="sidebar__brand">
+    <p class="sidebar__brand-name">MaestroBank</p>
+    <p class="sidebar__brand-tagline">maestrul tău în banking</p>
+  </div>
+
+  <nav class="sidebar__nav">
+    @for (item of navItems; track item.route) {
+      <a
+        class="sidebar__link"
+        [routerLink]="item.route"
+        routerLinkActive="sidebar__link--active"
+      >
+        <app-icon [name]="item.icon" [size]="19" />
+        <span>{{ item.label }}</span>
+      </a>
+    }
+  </nav>
+
+  <div class="sidebar__footer">
+    <div class="sidebar__copilot-promo">
+      <app-icon name="copilot" [size]="18" />
+      <p class="sidebar__copilot-title">AI Copilot</p>
+      <p class="sidebar__copilot-text">Vine în etapa următoare a MaestroBank.</p>
+      <a class="sidebar__copilot-cta" routerLink="/app/copilot">Vezi detalii</a>
+    </div>
+
+    <button type="button" class="sidebar__logout" (click)="logoutRequested.emit()">
+      <app-icon name="logout" [size]="18" />
+      <span>Ieși din cont</span>
+    </button>
+  </div>
+</aside>

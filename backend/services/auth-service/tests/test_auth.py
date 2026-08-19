@@ -107,3 +107,65 @@ async def test_me_with_valid_jwt(client: AsyncClient):
     response = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json()["email"] == VALID_PAYLOAD["email"]
+
+
+async def _register_and_login(client: AsyncClient) -> str:
+    await client.post("/auth/register", json=VALID_PAYLOAD)
+    login_response = await client.post(
+        "/auth/login",
+        json={"email": VALID_PAYLOAD["email"], "password": VALID_PAYLOAD["password"]},
+    )
+    return login_response.json()["access_token"]
+
+
+async def test_change_password_without_jwt_rejected(client: AsyncClient):
+    response = await client.post(
+        "/auth/change-password",
+        json={"current_password": VALID_PAYLOAD["password"], "new_password": "NewPass1234"},
+    )
+    assert response.status_code == 401
+
+
+async def test_change_password_wrong_current_password_rejected(client: AsyncClient):
+    token = await _register_and_login(client)
+
+    response = await client.post(
+        "/auth/change-password",
+        json={"current_password": "NotTheRealPassword1", "new_password": "NewPass1234"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 401
+
+
+async def test_change_password_weak_new_password_rejected(client: AsyncClient):
+    token = await _register_and_login(client)
+
+    response = await client.post(
+        "/auth/change-password",
+        json={"current_password": VALID_PAYLOAD["password"], "new_password": "onlyletters"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_change_password_success_allows_login_with_new_password(client: AsyncClient):
+    token = await _register_and_login(client)
+
+    response = await client.post(
+        "/auth/change-password",
+        json={"current_password": VALID_PAYLOAD["password"], "new_password": "NewPass1234"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 204
+
+    old_login = await client.post(
+        "/auth/login",
+        json={"email": VALID_PAYLOAD["email"], "password": VALID_PAYLOAD["password"]},
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/auth/login",
+        json={"email": VALID_PAYLOAD["email"], "password": "NewPass1234"},
+    )
+    assert new_login.status_code == 200

@@ -1,0 +1,61 @@
+<app-page-header title="Profil & Securitate" subtitle="Datele contului tău și opțiunile de securitate." />
+
+<div class="profile-grid">
+  <section class="profile-panel">
+    <h2>Profil</h2>
+    <div class="profile-field">
+      <span>Prenume</span>
+      <p>{{ currentUser()?.first_name ?? '—' }}</p>
+    </div>
+    <div class="profile-field">
+      <span>Nume</span>
+      <p>{{ currentUser()?.last_name ?? '—' }}</p>
+    </div>
+    <div class="profile-field">
+      <span>Email</span>
+      <p>{{ currentUser()?.email ?? '—' }}</p>
+    </div>
+  </section>
+
+  <section class="profile-panel">
+    <h2>Sesiune</h2>
+    <div class="profile-field">
+      <span>Status</span>
+      <p>Autentificat</p>
+    </div>
+    @if (sessionExpiry()) {
+      <div class="profile-field">
+        <span>Sesiunea expiră la</span>
+        <p>{{ sessionExpiry() | date: 'dd MMM yyyy, HH:mm' }}</p>
+      </div>
+    }
+    <app-action-button variant="danger" (pressed)="logout()">Ieși din cont</app-action-button>
+  </section>
+
+  <section class="profile-panel profile-panel--wide">
+    <h2>Schimbă parola</h2>
+    <form class="profile-password-form" (ngSubmit)="changePassword()">
+      <label>
+        <span>Parola curentă</span>
+        <input type="password" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" name="currentPassword" />
+      </label>
+      <label>
+        <span>Parolă nouă</span>
+        <input type="password" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" name="newPassword" />
+      </label>
+      <label>
+        <span>Confirmă parola nouă</span>
+        <input type="password" autocomplete="new-password" [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" name="confirmPassword" />
+      </label>
+
+      @if (passwordError()) {
+        <p class="profile-password-error">{{ passwordError() }}</p>
+      }
+      @if (passwordSuccess()) {
+        <p class="profile-password-success">Parola a fost actualizată.</p>
+      }
+
+      <app-action-button type="submit" [loading]="changingPassword()">Actualizează parola</app-action-button>
+    </form>
+  </section>
+</div>

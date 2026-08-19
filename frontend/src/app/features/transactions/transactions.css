@@ -1,0 +1,208 @@
+.tx-filters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-3);
+}
+
+.tx-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-3) var(--mb-space-4);
+}
+
+.tx-filter span {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.tx-filter select,
+.tx-filter input {
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-primary);
+  background: transparent;
+  padding: 0;
+}
+
+.tx-filter__range {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tx-filter__range input {
+  min-width: 0;
+  flex: 1;
+}
+
+.tx-filter__range span {
+  color: var(--mb-text-tertiary);
+}
+
+.tx-searchbar {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-5);
+  flex-wrap: wrap;
+}
+
+.tx-search {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: 0.6rem var(--mb-space-4);
+  color: var(--mb-text-tertiary);
+}
+
+.tx-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  background: transparent;
+  color: var(--mb-text-primary);
+}
+
+.tx-layout {
+  display: block;
+}
+
+.tx-layout--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--mb-space-5);
+  align-items: start;
+}
+
+.tx-table-wrap {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-xs);
+  padding: var(--mb-space-2);
+  overflow-x: auto;
+}
+
+.tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--mb-font-size-sm);
+}
+
+.tx-table th {
+  text-align: left;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  font-weight: var(--mb-font-weight-medium);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.tx-table td {
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+  color: var(--mb-text-primary);
+  white-space: nowrap;
+}
+
+.tx-table tbody tr {
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.tx-table tbody tr:hover {
+  background: var(--mb-surface-muted);
+}
+
+.tx-table__row--active {
+  background: var(--mb-blue-50);
+}
+
+.tx-table__merchant {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  font-weight: var(--mb-font-weight-medium);
+  white-space: normal;
+}
+
+.tx-table__avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-navy-900);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.tx-table__amount {
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-negative);
+}
+
+.tx-table__amount--in {
+  color: var(--mb-positive);
+}
+
+.tx-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mb-space-4);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.tx-pagination__controls {
+  display: flex;
+  gap: var(--mb-space-2);
+}
+
+.tx-pagination__controls button {
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  background: var(--mb-surface);
+  cursor: pointer;
+}
+
+.tx-pagination__controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .tx-filters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tx-layout--split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tx-filters {
+    grid-template-columns: 1fr;
+  }
+}

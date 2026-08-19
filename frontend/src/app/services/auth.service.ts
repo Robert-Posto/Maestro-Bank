@@ -30,6 +30,11 @@ export interface TokenResponse {
   token_type: string;
 }
 
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+}
+
 /**
  * ⚠️ NOTĂ IMPORTANT — implementare de DEVELOPMENT, NU arhitectură de
  * securitate pentru producție: tokenul JWT e ținut în `sessionStorage`,
@@ -57,6 +62,10 @@ export class AuthService {
 
   fetchCurrentUser(): Observable<AuthUser> {
     return this.http.get<AuthUser>(`${API_BASE_URL}/auth/me`).pipe(tap((user) => this.currentUser.set(user)));
+  }
+
+  changePassword(payload: ChangePasswordPayload): Observable<void> {
+    return this.http.post<void>(`${API_BASE_URL}/auth/change-password`, payload);
   }
 
   logout(): void {

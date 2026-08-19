@@ -1,0 +1,65 @@
+<header class="topbar">
+  <form class="topbar__search" (ngSubmit)="onSearch()">
+    <app-icon name="search" [size]="18" />
+    <input
+      type="search"
+      placeholder="Caută tranzacții, comercianți, categorii..."
+      [ngModel]="searchTerm()"
+      (ngModelChange)="searchTerm.set($event)"
+      name="topbarSearch"
+    />
+    <kbd class="topbar__search-kbd">⌘K</kbd>
+  </form>
+
+  <div class="topbar__right">
+    <div class="topbar__notifications">
+      <button
+        type="button"
+        class="topbar__icon-btn"
+        aria-label="Notificări"
+        (click)="toggleNotifications()"
+      >
+        <app-icon name="bell" [size]="20" />
+        @if (notificationsService.unreadCount > 0) {
+          <span class="topbar__badge">{{ notificationsService.unreadCount }}</span>
+        }
+      </button>
+
+      @if (notificationsOpen()) {
+        <div class="topbar__dropdown topbar__dropdown--wide">
+          <p class="topbar__dropdown-title">Notificări</p>
+          @if (notifications().length === 0) {
+            <p class="topbar__dropdown-empty">Nicio notificare încă.</p>
+          } @else {
+            @for (n of notifications(); track n.id) {
+              <div class="topbar__notification">
+                <p>{{ n.text }}</p>
+                <span>{{ n.createdAt | date: 'short' }}</span>
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+
+    <button type="button" class="topbar__profile" (click)="toggleProfileMenu()">
+      <span class="topbar__avatar">{{ initials() }}</span>
+      <span class="topbar__profile-info">
+        <span class="topbar__profile-name">{{ fullName() }}</span>
+        <span class="topbar__profile-type">{{ accountType() }}</span>
+      </span>
+      <app-icon name="chevron-down" [size]="16" />
+    </button>
+
+    @if (profileMenuOpen()) {
+      <div class="topbar__dropdown topbar__dropdown--profile">
+        <a routerLink="/app/profile" class="topbar__dropdown-link" (click)="profileMenuOpen.set(false)">
+          Profil &amp; Securitate
+        </a>
+        <button type="button" class="topbar__dropdown-link topbar__dropdown-link--danger" (click)="logout()">
+          Ieși din cont
+        </button>
+      </div>
+    }
+  </div>
+</header>

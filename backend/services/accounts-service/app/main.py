@@ -12,6 +12,8 @@ from fastapi import FastAPI
 
 from app.database import close_database_connection, ping_database
 from app.routers.accounts import router as accounts_router
+from app.routers.beneficiaries import router as beneficiaries_router
+from app.routers.cards import router as cards_router
 from app.routers.internal import router as internal_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [accounts-service] %(levelname)s %(message)s")
@@ -36,9 +38,15 @@ async def health_check():
     }
 
 
-# Ordine importantă: /health (mai sus) și rutele literale (/me, /me/cards,
-# în routers/accounts.py) trebuie înregistrate ÎNAINTE de wildcard-ul
-# /{account_id}, altfel acesta le-ar "înghiți" pe toate (orice segment
-# unic, inclusiv "health", ar fi interpretat ca account_id).
+# Ordine importantă: /health (mai sus), /cards/* și /beneficiaries*
+# trebuie înregistrate ÎNAINTE de accounts_router (care conține
+# GET /{account_id} la rădăcină, UN SINGUR segment) — altfel acesta le-ar
+# "înghiți" pe cele cu un singur segment (ex. GET /beneficiaries ar fi
+# interpretat ca account_id="beneficiaries", FastAPI potrivind rutele în
+# ordinea înregistrării). /cards/{id}/freeze etc. au 3+ segmente, deci nu
+# sunt de fapt ambigue cu /{account_id} — dar păstrăm ordinea oricum,
+# pentru claritate și siguranță pe termen lung.
+app.include_router(cards_router)
+app.include_router(beneficiaries_router)
 app.include_router(accounts_router)
 app.include_router(internal_router)

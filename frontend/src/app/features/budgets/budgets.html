@@ -1,0 +1,156 @@
+<app-page-header title="Bugete" subtitle="Limite de cheltuieli și abonamente — informativ, nu blochează transferuri.">
+  @if (tab() === 'budgets') {
+    <app-action-button (pressed)="openBudgetModal()"><app-icon name="plus" [size]="16" /> Buget nou</app-action-button>
+  } @else {
+    <app-action-button (pressed)="openSubscriptionModal()"><app-icon name="plus" [size]="16" /> Abonament nou</app-action-button>
+  }
+</app-page-header>
+
+<div class="budgets-tabs">
+  <button type="button" [class.budgets-tab--active]="tab() === 'budgets'" (click)="tab.set('budgets')">Bugete</button>
+  <button type="button" [class.budgets-tab--active]="tab() === 'subscriptions'" (click)="tab.set('subscriptions')">Abonamente</button>
+</div>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="3" [height]="90" />
+} @else if (tab() === 'budgets') {
+  @if (budgetsWithProgress().length === 0) {
+    <app-empty-state icon="budgets" title="Niciun buget încă" description="Creează primul buget pentru a-ți urmări cheltuielile pe categorie." />
+  } @else {
+    <div class="budgets-grid">
+      @for (b of budgetsWithProgress(); track b.id) {
+        <div class="budget-card" [class.budget-card--inactive]="!b.active">
+          <div class="budget-card__header">
+            <div>
+              <p class="budget-card__name">{{ b.name }}</p>
+              <p class="budget-card__category">{{ categoryLabel(b.category) }} · {{ b.period === 'monthly' ? 'lunar' : b.period === 'weekly' ? 'săptămânal' : 'anual' }}</p>
+            </div>
+            <div class="budget-card__menu">
+              <button type="button" class="budget-card__icon-btn" (click)="toggleBudgetActive(b)" [title]="b.active ? 'Dezactivează' : 'Activează'">
+                <app-icon [name]="b.active ? 'unlock' : 'lock'" [size]="15" />
+              </button>
+              <button type="button" class="budget-card__icon-btn budget-card__icon-btn--danger" (click)="pendingDeleteBudget.set(b)" title="Șterge">
+                <app-icon name="trash" [size]="15" />
+              </button>
+            </div>
+          </div>
+
+          <div class="budget-card__progress-track">
+            <div
+              class="budget-card__progress-fill"
+              [class.budget-card__progress-fill--over]="b.progressPercent > 100"
+              [style.width.%]="b.progressPercent > 100 ? 100 : b.progressPercent"
+            ></div>
+          </div>
+
+          <div class="budget-card__numbers">
+            <span>{{ b.spentMinor | money: 'RON' }} cheltuiți</span>
+            <span>{{ b.limit_minor | money: 'RON' }} limită</span>
+          </div>
+          <p class="budget-card__remaining" [class.budget-card__remaining--over]="b.spentMinor > b.limit_minor">
+            {{ b.spentMinor > b.limit_minor ? 'Depășit cu ' + (b.spentMinor - b.limit_minor | money: 'RON') : (b.limit_minor - b.spentMinor | money: 'RON') + ' rămași' }}
+          </p>
+        </div>
+      }
+    </div>
+  }
+} @else {
+  @if (subscriptions().length === 0) {
+    <app-empty-state icon="calendar" title="Niciun abonament încă" description="Adaugă abonamentele tale recurente (Netflix, chirie etc.)." />
+  } @else {
+    <div class="subscriptions-list">
+      @for (s of subscriptions(); track s.id) {
+        <div class="subscription-row" [class.subscription-row--inactive]="!s.active">
+          <span class="subscription-row__avatar">{{ s.name.charAt(0) }}</span>
+          <div class="subscription-row__info">
+            <p class="subscription-row__name">{{ s.name }}</p>
+            <p class="subscription-row__meta">Ziua {{ s.billing_day }} a lunii · {{ categoryLabel(s.category) }}</p>
+          </div>
+          <span class="subscription-row__amount">{{ s.amount_minor | money: s.currency }}</span>
+          <div class="budget-card__menu">
+            <button type="button" class="budget-card__icon-btn" (click)="toggleSubscriptionActive(s)" [title]="s.active ? 'Dezactivează' : 'Activează'">
+              <app-icon [name]="s.active ? 'unlock' : 'lock'" [size]="15" />
+            </button>
+            <button type="button" class="budget-card__icon-btn budget-card__icon-btn--danger" (click)="pendingDeleteSubscription.set(s)" title="Șterge">
+              <app-icon name="trash" [size]="15" />
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (budgetModalOpen()) {
+  <app-modal title="Buget nou" (closed)="budgetModalOpen.set(false)">
+    <div class="budget-form">
+      <label>
+        <span>Nume</span>
+        <input type="text" placeholder="Ex: Shopping lunar" [ngModel]="budgetName()" (ngModelChange)="budgetName.set($event)" />
+      </label>
+      <label>
+        <span>Categorie</span>
+        <select [ngModel]="budgetCategory()" (ngModelChange)="budgetCategory.set($event)">
+          @for (cat of categories; track cat.value) {
+            <option [value]="cat.value">{{ cat.label }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Limită (lei)</span>
+        <input type="number" min="1" step="1" [ngModel]="budgetLimit()" (ngModelChange)="budgetLimit.set($event)" />
+      </label>
+      <label>
+        <span>Perioadă</span>
+        <select [ngModel]="budgetPeriod()" (ngModelChange)="budgetPeriod.set($event)">
+          <option value="weekly">Săptămânal</option>
+          <option value="monthly">Lunar</option>
+          <option value="yearly">Anual</option>
+        </select>
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="budgetSaving()" (pressed)="saveBudget()">Creează buget</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (subscriptionModalOpen()) {
+  <app-modal title="Abonament nou" (closed)="subscriptionModalOpen.set(false)">
+    <div class="budget-form">
+      <label>
+        <span>Nume</span>
+        <input type="text" placeholder="Ex: Netflix" [ngModel]="subscriptionName()" (ngModelChange)="subscriptionName.set($event)" />
+      </label>
+      <label>
+        <span>Sumă (lei)</span>
+        <input type="number" min="0.01" step="0.01" [ngModel]="subscriptionAmount()" (ngModelChange)="subscriptionAmount.set($event)" />
+      </label>
+      <label>
+        <span>Ziua facturării</span>
+        <input type="number" min="1" max="31" [ngModel]="subscriptionDay()" (ngModelChange)="subscriptionDay.set($event)" />
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="subscriptionSaving()" (pressed)="saveSubscription()">Creează abonament</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (pendingDeleteBudget(); as b) {
+  <app-confirm-dialog
+    title="Șterge bugetul?"
+    [message]="'Sigur vrei să ștergi bugetul ' + b.name + '? Această acțiune nu poate fi anulată.'"
+    confirmLabel="Șterge"
+    [danger]="true"
+    (confirmed)="confirmDeleteBudget()"
+    (cancelled)="pendingDeleteBudget.set(null)"
+  />
+}
+
+@if (pendingDeleteSubscription(); as s) {
+  <app-confirm-dialog
+    title="Șterge abonamentul?"
+    [message]="'Sigur vrei să ștergi abonamentul ' + s.name + '?'"
+    confirmLabel="Șterge"
+    [danger]="true"
+    (confirmed)="confirmDeleteSubscription()"
+    (cancelled)="pendingDeleteSubscription.set(null)"
+  />
+}

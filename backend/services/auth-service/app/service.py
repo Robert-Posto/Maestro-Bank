@@ -16,7 +16,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.database import get_database
-from app.models import UserLogin, UserRegister
+from app.models import ChangePasswordRequest, UserLogin, UserRegister
 from app.security import create_access_token, decode_access_token, hash_password, verify_password
 
 logger = logging.getLogger("auth-service")
@@ -116,3 +116,24 @@ async def get_current_user(authorization: str | None) -> dict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu mai există.")
 
     return user
+
+
+async def change_password(authorization: str | None, payload: ChangePasswordRequest) -> None:
+    """Verifică parola curentă, apoi o înlocuiește cu hash-ul noii parole.
+
+    Reutilizează `get_current_user` (aceeași validare JWT ca /auth/me) —
+    identitatea vine STRICT din token, nu dintr-un user_id trimis de UI.
+    NU logăm niciodată parola în clar (nici cea curentă, nici cea nouă).
+    """
+    user = await get_current_user(authorization)
+
+    if not verify_password(payload.current_password, user["password_hash"]):
+        logger.info("auth-service: schimbare parolă eșuată (parolă curentă incorectă) pentru user_id=%s", user["_id"])
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Parola curentă este incorectă.")
+
+    db = get_database()
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password)}},
+    )
+    logger.info("auth-service: parolă schimbată cu succes pentru user_id=%s", user["_id"])

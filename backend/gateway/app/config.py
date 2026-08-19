@@ -15,6 +15,8 @@ class Settings:
     accounts_service_url: str = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-service:8000")
     transactions_service_url: str = os.getenv("TRANSACTIONS_SERVICE_URL", "http://transactions-service:8000")
     budgets_service_url: str = os.getenv("BUDGETS_SERVICE_URL", "http://budgets-service:8000")
+    support_service_url: str = os.getenv("SUPPORT_SERVICE_URL", "http://support-service:8000")
+    exchange_service_url: str = os.getenv("EXCHANGE_SERVICE_URL", "http://exchange-service:8000")
 
     cors_allowed_origins: list[str] = [
         origin.strip()
