@@ -5,7 +5,11 @@
   gap: var(--mb-space-6);
   height: var(--mb-topbar-height);
   padding: 0 var(--mb-space-8);
-  background: var(--mb-bg);
+  /* Bară distinctă de pagina din spate (înainte era aceeași culoare —
+     de-asta căutarea "se pierdea", oricât de puternică i-am fi făcut
+     bordura, fiindcă tot fundalul era aproape identic). */
+  background: var(--mb-surface);
+  border-bottom: 1px solid var(--mb-border);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -17,11 +21,28 @@
   display: flex;
   align-items: center;
   gap: var(--mb-space-2);
-  background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
+  /* "Adâncită" în bara albă (fundal mat, fără bordură) — contrast garantat
+     indiferent de nuanțele exacte de token, nu doar o bordură subtilă pe
+     un fundal aproape identic. */
+  background: var(--mb-surface-muted);
+  border: 1px solid transparent;
   border-radius: var(--mb-radius-md);
   padding: 0.65rem var(--mb-space-4);
   color: var(--mb-text-tertiary);
+  transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast),
+    box-shadow var(--mb-transition-fast), transform var(--mb-transition-fast);
+}
+
+.topbar__search:hover {
+  background: var(--mb-border);
+}
+
+.topbar__search:focus-within {
+  background: var(--mb-surface);
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 4px rgba(47, 111, 237, 0.14), var(--mb-shadow-sm);
+  color: var(--mb-blue-600);
+  transform: translateY(-1px);
 }
 
 .topbar__search input {
@@ -41,10 +62,24 @@
 .topbar__search-kbd {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
-  border: 1px solid var(--mb-border);
+  border: 1px solid var(--mb-border-strong);
   border-radius: 4px;
   padding: 0.1rem 0.4rem;
   font-family: inherit;
+  transition: opacity var(--mb-transition-fast);
+}
+
+.topbar__search:focus-within .topbar__search-kbd {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar__search {
+    transition: none;
+  }
+  .topbar__search:focus-within {
+    transform: none;
+  }
 }
 
 .topbar__right {

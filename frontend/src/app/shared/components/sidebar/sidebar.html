@@ -1,22 +1,29 @@
 <aside class="sidebar">
   <div class="sidebar__brand">
     <p class="sidebar__brand-name">MaestroBank</p>
-    <p class="sidebar__brand-tagline">maestrul tău în banking</p>
   </div>
 
   <nav class="sidebar__nav">
-    @for (item of navItems; track item.route) {
-      <a
-        class="sidebar__link"
-        [routerLink]="item.route"
-        routerLinkActive="sidebar__link--active"
-      >
-        <app-icon [name]="item.icon" [size]="19" />
-        <span>{{ item.label }}</span>
-        @if (item.badge) {
-          <span class="sidebar__link-badge">{{ item.badge }}</span>
+    @for (group of navGroups; track $index) {
+      <div class="sidebar__group">
+        @if (group.label) {
+          <p class="sidebar__group-label">{{ group.label }}</p>
         }
-      </a>
+        @for (item of group.items; track item.route) {
+          <a
+            class="sidebar__link"
+            [class.sidebar__link--accent]="item.accent"
+            [routerLink]="item.route"
+            routerLinkActive="sidebar__link--active"
+          >
+            <app-icon [name]="item.icon" [size]="19" />
+            <span class="sidebar__link-label">{{ item.label }}</span>
+            @if (item.badge) {
+              <span class="sidebar__link-badge">{{ item.badge }}</span>
+            }
+          </a>
+        }
+      </div>
     }
   </nav>
 </aside>

@@ -8,7 +8,8 @@
   height: 100vh;
   position: sticky;
   top: 0;
-  padding: var(--mb-space-6) var(--mb-space-4);
+  padding: var(--mb-space-5) var(--mb-space-4);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -23,21 +24,35 @@
   letter-spacing: -0.01em;
 }
 
-.sidebar__brand-tagline {
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-navy-text-faint);
-  margin-top: 2px;
-}
-
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-1);
+  gap: var(--mb-space-4);
   flex: 1;
+  min-width: 0;
+}
+
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-1);
+}
+
+.sidebar__group + .sidebar__group {
+  padding-top: var(--mb-space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar__group-label {
+  padding: 0 var(--mb-space-3) var(--mb-space-1);
+  color: var(--mb-navy-text-faint);
+  font-size: 0.68rem;
+  font-weight: var(--mb-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .sidebar__link {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--mb-space-3);
@@ -47,7 +62,15 @@
   text-decoration: none;
   font-size: var(--mb-font-size-sm);
   font-weight: var(--mb-font-weight-medium);
-  transition: background var(--mb-transition-fast), color var(--mb-transition-fast);
+  min-width: 0;
+  /* Bara de accent e un border transparent, mereu prezent în layout —
+     doar culoarea i se schimbă la activ. Așa nu "sare" lățimea link-ului
+     când devine activ (border invizibil ocupă deja spațiul), și nu mai
+     depinde de poziționare absolută care putea fi tăiată de overflow. */
+  border-left: 3px solid transparent;
+  transition: background var(--mb-transition-fast), color var(--mb-transition-fast), border-color var(--mb-transition-fast);
+  /* Intrare animată, în cascadă — vezi @keyframes mai jos. */
+  animation: sidebar-link-in 320ms ease backwards;
 }
 
 .sidebar__link:hover {
@@ -58,24 +81,21 @@
 .sidebar__link--active {
   background: var(--mb-blue-600);
   color: #fff;
+  border-left-color: #fff;
   box-shadow: 0 4px 14px rgba(47, 111, 237, 0.35);
 }
 
-/* Bară de accent discretă în stânga, doar pe link-ul activ — un reper
-   vizual în plus, pe lângă fundalul albastru (util și pe ecrane mici, unde
-   fundalul poate fi mai puțin vizibil dacă textul e lung). */
-.sidebar__link--active::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: 20%;
-  bottom: 20%;
-  width: 3px;
-  border-radius: var(--mb-radius-pill);
-  background: #fff;
+.sidebar__link app-icon {
+  flex: 0 0 auto;
+  display: flex;
 }
 
-.sidebar__link span {
+/* Clasă dedicată (NU un selector generic "span") — un badge e și el un
+   <span>, iar o regulă generică ar câștiga în fața lui .sidebar__link-badge
+   (specificitate egală, dar declarată mai devreme) și i-ar fura din spațiul
+   flex, comprimând eticheta AI ca să încapă un badge care oricum nu are
+   nevoie de el. Exact bug-ul care făcea "MaestroAgent" ilizibil. */
+.sidebar__link-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -85,7 +105,7 @@
 
 .sidebar__link-badge {
   flex: 0 0 auto;
-  padding: 0.1rem 0.4rem;
+  padding: 0.15rem 0.45rem;
   border-radius: var(--mb-radius-pill);
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
@@ -96,6 +116,67 @@
 
 .sidebar__link--active .sidebar__link-badge {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* Intrare cu tratament vizual distinct (MaestroAgent) — altfel se pierde
+   într-o listă de 9 link-uri identice utilitare, deși e singura bazată pe
+   AI. Gradient discret + iconiță/etichetă în nuanțe albastru-violet, ca
+   să se recunoască dintr-o privire, fără să pară un buton spart sau un
+   element care nu se potrivește cu restul. */
+.sidebar__link--accent:not(.sidebar__link--active) {
+  background: linear-gradient(100deg, rgba(94, 124, 255, 0.16), rgba(168, 116, 255, 0.1));
+}
+
+.sidebar__link--accent:not(.sidebar__link--active):hover {
+  background: linear-gradient(100deg, rgba(94, 124, 255, 0.24), rgba(168, 116, 255, 0.16));
+  color: #fff;
+}
+
+.sidebar__link--accent:not(.sidebar__link--active) app-icon {
+  color: #b3c2ff;
+}
+
+.sidebar__link--accent .sidebar__link-badge {
+  background: linear-gradient(120deg, #5e7cff, #a874ff, #5e7cff);
+  background-size: 200% 100%;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+  /* Un "shimmer" lent — semnal discret, dar recognoscibil, de "e o
+     funcționalitate AI", fără să distragă atenția de la restul navigării. */
+  animation: sidebar-badge-shimmer 3.5s ease-in-out infinite;
+}
+
+@keyframes sidebar-badge-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Cascadă la încărcarea sidebar-ului — fiecare link intră puțin decalat
+   față de precedentul (pe poziția lui în propriul grup). */
+@keyframes sidebar-link-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* nth-of-type, NU nth-child — grupurile cu etichetă au un <p> ca prim
+   copil, care ar decala greșit numărătoarea dacă am conta orice copil. */
+.sidebar__link:nth-of-type(1) { animation-delay: 40ms; }
+.sidebar__link:nth-of-type(2) { animation-delay: 90ms; }
+.sidebar__link:nth-of-type(3) { animation-delay: 140ms; }
+.sidebar__link:nth-of-type(4) { animation-delay: 190ms; }
+.sidebar__link:nth-of-type(5) { animation-delay: 240ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__link,
+  .sidebar__link-badge {
+    animation: none;
+  }
 }
 
 @media (max-width: 1024px) {

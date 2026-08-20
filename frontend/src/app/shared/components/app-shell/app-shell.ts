@@ -1,7 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
+import { IdleService } from '../../../services/idle.service';
 import { Sidebar } from '../sidebar/sidebar';
 import { Topbar } from '../topbar/topbar';
 import { ToastContainer } from '../toast/toast-container';
@@ -22,12 +23,20 @@ import { ToastContainer } from '../toast/toast-container';
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.css',
 })
-export class AppShell implements OnInit {
+export class AppShell implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly idle = inject(IdleService);
 
   ngOnInit(): void {
     if (!this.auth.currentUser()) {
       this.auth.fetchCurrentUser().subscribe();
     }
+    // Deconectare automată la inactivitate — DOAR cât timp userul e efectiv
+    // în /app/*, nu pe login/register/onboarding (vezi IdleService).
+    this.idle.start();
+  }
+
+  ngOnDestroy(): void {
+    this.idle.stop();
   }
 }
