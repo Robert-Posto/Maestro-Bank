@@ -2,38 +2,46 @@
 
 <div class="fx-demo-banner">
   <app-icon name="info" [size]="16" />
-  Cursul de bază e cel oficial, publicat zilnic de Banca Națională a României. Spread-ul, comisionul și execuția schimbului sunt o simulare MaestroBank pentru acest prototip — NU se mută fonduri reale.
+  <span>Cursul de bază e cel oficial, publicat zilnic de Banca Națională a României. Spread-ul, comisionul și execuția schimbului sunt o simulare MaestroBank pentru acest prototip — NU se mută fonduri reale.</span>
 </div>
 
 <div class="fx-layout">
   <div class="fx-card">
-    <div class="fx-row">
-      <div class="fx-input-group">
+    <div class="fx-converter">
+      <div class="fx-field">
         <span class="fx-label">Schimbi</span>
-        <div class="fx-input-line">
-          <input type="number" min="1" [ngModel]="amount()" (ngModelChange)="amount.set($event); onInputChange()" />
-          <select [ngModel]="fromCurrency()" (ngModelChange)="fromCurrency.set($event); onInputChange()">
-            @for (c of currencyOptions(); track c) {
-              <option [value]="c">{{ c }}</option>
-            }
-          </select>
+        <div class="fx-field__row">
+          <input class="fx-amount" type="number" min="1" [ngModel]="amount()" (ngModelChange)="amount.set($event); onInputChange()" />
+          <label class="fx-currency-select">
+            <span class="fx-currency-badge" [style.background]="'var(' + currencyColor(fromCurrency()) + ')'">{{ fromCurrency() }}</span>
+            <select [ngModel]="fromCurrency()" (ngModelChange)="fromCurrency.set($event); onInputChange()">
+              @for (c of fromOptions(); track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+            <app-icon name="chevron-down" [size]="14" />
+          </label>
         </div>
         <span class="fx-hint">Sold disponibil: {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</span>
       </div>
 
-      <button type="button" class="fx-swap" aria-label="Inversează" (click)="swapCurrencies()">
+      <button type="button" class="fx-swap" aria-label="Inversează monedele" (click)="swapCurrencies()">
         <app-icon name="transfer" [size]="18" />
       </button>
 
-      <div class="fx-input-group">
+      <div class="fx-field">
         <span class="fx-label">Vei primi (estimat)</span>
-        <div class="fx-input-line fx-input-line--readonly">
-          <span class="fx-received">{{ quote() ? (quote()!.received_minor | money: toCurrency() : false) : '—' }}</span>
-          <select [ngModel]="toCurrency()" (ngModelChange)="toCurrency.set($event); onInputChange()">
-            @for (c of currencyOptions(); track c) {
-              <option [value]="c">{{ c }}</option>
-            }
-          </select>
+        <div class="fx-field__row fx-field__row--readonly">
+          <span class="fx-amount fx-amount--result">{{ quote() ? (quote()!.received_minor | money: toCurrency() : false) : '—' }}</span>
+          <label class="fx-currency-select">
+            <span class="fx-currency-badge" [style.background]="'var(' + currencyColor(toCurrency()) + ')'">{{ toCurrency() }}</span>
+            <select [ngModel]="toCurrency()" (ngModelChange)="toCurrency.set($event); onInputChange()">
+              @for (c of toOptions(); track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+            <app-icon name="chevron-down" [size]="14" />
+          </label>
         </div>
         <span class="fx-hint">Estimat la cursul BNR al zilei</span>
       </div>
@@ -44,38 +52,38 @@
     }
 
     @if (quote(); as q) {
-      <div class="fx-mini-stats">
-        <div>
-          <span>Spread</span>
-          <strong>{{ q.spread_percent }}%</strong>
-          <small>Inclus în curs</small>
+      <div class="fx-stats">
+        <div class="fx-stat">
+          <span class="fx-stat__icon"><app-icon name="globe" [size]="16" /></span>
+          <div class="fx-stat__body">
+            <span class="fx-stat__label">Curs curent (mid)</span>
+            <strong>{{ q.mid_rate }}</strong>
+            <small>Curs aplicat: {{ q.applied_rate }}</small>
+          </div>
         </div>
-        <div class="fx-mini-stats__highlight">
-          <span>Cost total estimat</span>
-          <strong>{{ q.total_cost_minor | money: 'RON' }}</strong>
-          <small>{{ q.total_cost_percent }}% din sumă</small>
+        <div class="fx-stat">
+          <span class="fx-stat__icon"><app-icon name="flash" [size]="16" /></span>
+          <div class="fx-stat__body">
+            <span class="fx-stat__label">Spread MaestroBank</span>
+            <strong>{{ q.spread_percent }}%</strong>
+            <small>Inclus transparent în curs</small>
+          </div>
         </div>
-      </div>
-
-      <!-- Curs curent, comision și costul total apar detaliat mai jos, în
-           fx-breakdown — nu le mai repetăm și aici, ca să nu arate aceeași
-           cifră de 2 ori pe pagină. -->
-      <div class="fx-breakdown">
-        <div class="fx-breakdown__row">
-          <span>Curs curent (mid)</span>
-          <span>{{ q.mid_rate }}</span>
+        <div class="fx-stat">
+          <span class="fx-stat__icon"><app-icon name="receipt" [size]="16" /></span>
+          <div class="fx-stat__body">
+            <span class="fx-stat__label">Comision fix</span>
+            <strong>{{ q.commission_minor | money: 'RON' }}</strong>
+            <small>Afișat înainte de confirmare</small>
+          </div>
         </div>
-        <div class="fx-breakdown__row">
-          <span>Curs aplicat (cu spread MaestroBank)</span>
-          <span>{{ q.applied_rate }}</span>
-        </div>
-        <div class="fx-breakdown__row">
-          <span>Comision fix</span>
-          <span>{{ q.commission_minor | money: 'RON' }}</span>
-        </div>
-        <div class="fx-breakdown__row fx-breakdown__row--total">
-          <span>Cost total estimat</span>
-          <span>{{ q.total_cost_minor | money: 'RON' }} ({{ q.total_cost_percent }}%)</span>
+        <div class="fx-stat fx-stat--highlight">
+          <span class="fx-stat__icon"><app-icon name="check" [size]="16" /></span>
+          <div class="fx-stat__body">
+            <span class="fx-stat__label">Cost total estimat</span>
+            <strong>{{ q.total_cost_minor | money: 'RON' }}</strong>
+            <small>{{ q.total_cost_percent }}% din sumă</small>
+          </div>
         </div>
       </div>
     }
@@ -97,11 +105,23 @@
         <app-icon name="sparkles" [size]="16" />
         <strong>Cum calculăm costul</strong>
       </div>
-      <ol class="fx-explain-list">
-        <li>Pornim de la cursul oficial BNR al zilei (mid) — publicat de Banca Națională a României.</li>
-        <li>Adăugăm spread-ul MaestroBank — diferența noastră, inclusă transparent în curs.</li>
-        <li>Adăugăm comisionul fix, afișat înainte de confirmare.</li>
-        <li>Rezultă costul total estimat — exact cât te costă schimbul, în simulare.</li>
+      <ol class="fx-steps">
+        <li>
+          <span class="fx-steps__icon"><app-icon name="globe" [size]="14" /></span>
+          <p>Pornim de la cursul oficial BNR al zilei (mid) — publicat de Banca Națională a României.</p>
+        </li>
+        <li>
+          <span class="fx-steps__icon"><app-icon name="flash" [size]="14" /></span>
+          <p>Adăugăm spread-ul MaestroBank — diferența noastră, inclusă transparent în curs.</p>
+        </li>
+        <li>
+          <span class="fx-steps__icon"><app-icon name="receipt" [size]="14" /></span>
+          <p>Adăugăm comisionul fix, afișat înainte de confirmare.</p>
+        </li>
+        <li>
+          <span class="fx-steps__icon"><app-icon name="check" [size]="14" /></span>
+          <p>Rezultă costul total estimat — exact cât te costă schimbul, în simulare.</p>
+        </li>
       </ol>
     </div>
 
@@ -111,10 +131,15 @@
       </div>
       @for (rate of rates(); track rate.currency) {
         <div class="fx-rate-row">
-          <span>RON / {{ rate.currency }}</span>
-          <span>
+          <span class="fx-rate-row__pair">
+            <span class="fx-currency-dot" [style.background]="'var(' + currencyColor(rate.currency) + ')'"></span>
+            RON / {{ rate.currency }}
+          </span>
+          <span class="fx-rate-row__value">
             {{ rate.mid_rate }}
-            <small class="fx-rate-source">{{ rate.source === 'BNR' ? 'BNR' : 'demo' }}</small>
+            <small class="fx-rate-source" [class.fx-rate-source--live]="rate.source === 'BNR'">
+              {{ rate.source === 'BNR' ? 'BNR' : 'demo' }}
+            </small>
           </span>
         </div>
       }

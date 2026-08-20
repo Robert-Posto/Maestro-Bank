@@ -143,8 +143,8 @@
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-md);
   padding: var(--mb-space-4);
-  background: linear-gradient(120deg, #fff8f8, var(--mb-negative-bg));
-  border-color: #f7d9d9;
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-negative-bg));
+  border-color: rgba(220, 38, 38, 0.35);
   margin-bottom: var(--mb-space-5);
 }
 
@@ -163,7 +163,7 @@
   height: 30px;
   border-radius: 9px;
   color: var(--mb-negative);
-  background: #fff;
+  background: var(--mb-surface);
 }
 
 .details-panel__coming-soon {

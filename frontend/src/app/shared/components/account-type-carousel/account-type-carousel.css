@@ -41,7 +41,7 @@
 .atc__card h3 {
   font-size: var(--mb-font-size-lg);
   font-weight: var(--mb-font-weight-semibold);
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
 }
 
 .atc__tagline {
