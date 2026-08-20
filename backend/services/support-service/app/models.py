@@ -38,3 +38,35 @@ class TicketOut(BaseModel):
     @classmethod
     def convert_object_id(cls, value: Any) -> str:
         return str(value)
+
+
+# --- Notificări (istoric persistent, alimentat de alte servicii) ---------
+#
+# Vezi app/routers/notifications.py — POST /internal/notifications e apelat
+# de accounts-service (card blocat), budgets-service (prag de buget atins),
+# transactions-service (transfer reușit), NU direct de frontend.
+
+NotificationKind = Literal["budget", "card", "transfer", "system"]
+
+
+class NotificationCreate(BaseModel):
+    """Payload-ul trimis de UN ALT serviciu, prin POST /internal/notifications."""
+
+    user_id: str
+    kind: NotificationKind
+    text: str = Field(min_length=1, max_length=280)
+
+
+class NotificationOut(BaseModel):
+    id: str = Field(alias="_id")
+    kind: str
+    text: str
+    read: bool
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)

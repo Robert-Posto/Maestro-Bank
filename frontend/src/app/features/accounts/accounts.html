@@ -40,6 +40,20 @@
     </div>
   </div>
 
+  <div class="accounts-tabs">
+    <button type="button" [class.accounts-tab--active]="tab() === 'accounts'" (click)="tab.set('accounts')">
+      <app-icon name="accounts" [size]="15" /> Conturi
+      <span class="accounts-tabs__count">{{ accounts().length }}</span>
+    </button>
+    <button type="button" [class.accounts-tab--active]="tab() === 'pockets'" (click)="tab.set('pockets')">
+      <app-icon name="wallet" [size]="15" /> Obiective
+      @if (pockets().length > 0) {
+        <span class="accounts-tabs__count">{{ pockets().length }}</span>
+      }
+    </button>
+  </div>
+
+  @if (tab() === 'accounts') {
   <div class="accounts-grid">
     @for (account of accounts(); track account.id) {
       <div class="account-card">
@@ -114,6 +128,75 @@
       <app-icon name="transactions" [size]="16" /> Vezi toate tranzacțiile
     </app-action-button>
   </div>
+  }
+
+  @if (tab() === 'pockets') {
+  <section class="pockets-section">
+    <div class="pockets-section__header">
+      <div>
+        <h2>Obiective de economisire</h2>
+        <p class="pockets-section__subtitle">
+          Bani rezervați din contul tău RON — rămân disponibili instant, doar etichetați pentru un scop.
+        </p>
+      </div>
+      <app-action-button variant="secondary" (pressed)="openPocketCreateModal()">
+        <app-icon name="plus" [size]="16" />
+        Obiectiv nou
+      </app-action-button>
+    </div>
+
+    @if (pocketsLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="90" />
+    } @else if (pockets().length === 0) {
+      <app-empty-state
+        icon="wallet"
+        title="Niciun obiectiv încă"
+        description="Creează unul pentru vacanță, un fond de urgență sau orice altceva vrei să economisești."
+      />
+    } @else {
+      <div class="pockets-grid">
+        @for (pocket of pockets(); track pocket.id) {
+          <div class="pocket-card">
+            <div class="pocket-card__top">
+              <span class="pocket-card__name">{{ pocket.name }}</span>
+              <button
+                type="button"
+                class="pocket-card__delete"
+                aria-label="Șterge obiectivul"
+                (click)="deletePocket(pocket)"
+              >
+                <app-icon name="trash" [size]="15" />
+              </button>
+            </div>
+
+            <div class="pocket-card__amounts">
+              <span class="pocket-card__saved">{{ pocket.saved_minor | money: currentAccount()?.currency }}</span>
+              <span class="pocket-card__target">din {{ pocket.target_minor | money: currentAccount()?.currency }}</span>
+            </div>
+
+            <div class="pocket-card__bar">
+              <div
+                class="pocket-card__bar-fill"
+                [style.width.%]="pocket.target_minor > 0 ? (pocket.saved_minor / pocket.target_minor) * 100 : 0"
+              ></div>
+            </div>
+
+            <div class="pocket-card__actions">
+              <app-action-button variant="secondary" (pressed)="openDepositModal(pocket)">Adaugă</app-action-button>
+              @if (pocket.saved_minor > 0) {
+                <app-action-button variant="ghost" (pressed)="withdrawAll(pocket)">Eliberează tot</app-action-button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <p class="pockets-section__total">
+        Total alocat: {{ totalAllocatedMinor() | money: currentAccount()?.currency }}
+      </p>
+    }
+  </section>
+  }
 }
 
 @if (createModalOpen()) {
@@ -136,4 +219,53 @@
     (confirmed)="confirmDelete()"
     (cancelled)="pendingDeleteAccount.set(null)"
   />
+}
+
+@if (pocketCreateModalOpen()) {
+  <app-modal title="Obiectiv nou" (closed)="pocketCreateModalOpen.set(false)">
+    <div class="pocket-form">
+      <label>
+        <span>Nume</span>
+        <input
+          type="text"
+          placeholder="Ex: Vacanță"
+          [ngModel]="newPocketName()"
+          (ngModelChange)="newPocketName.set($event)"
+        />
+      </label>
+      <label>
+        <span>Sumă țintă (lei)</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [ngModel]="newPocketTargetRon()"
+          (ngModelChange)="newPocketTargetRon.set($event)"
+        />
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="creatingPocket()" (pressed)="saveNewPocket()">
+        Creează obiectiv
+      </app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (depositModalPocket(); as pocket) {
+  <app-modal [title]="'Adaugă la \'' + pocket.name + '\''" (closed)="depositModalPocket.set(null)">
+    <div class="pocket-form">
+      <label>
+        <span>Sumă (lei)</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [ngModel]="depositAmountRon()"
+          (ngModelChange)="depositAmountRon.set($event)"
+        />
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="depositBusy()" (pressed)="confirmDeposit()">
+        Confirmă
+      </app-action-button>
+    </div>
+  </app-modal>
 }

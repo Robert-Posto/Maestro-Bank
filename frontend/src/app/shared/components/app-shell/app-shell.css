@@ -24,3 +24,27 @@
     padding: var(--mb-space-4);
   }
 }
+
+/* Fiecare navigare montează un nou component-rădăcină ca fiu direct al
+   .app-shell__content — animația se re-declanșează natural la fiecare
+   schimbare de rută, fără @angular/animations sau cod TS suplimentar. */
+.app-shell__content > * {
+  animation: route-fade-in 220ms ease;
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell__content > * {
+    animation: none;
+  }
+}

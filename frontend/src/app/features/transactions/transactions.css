@@ -1,8 +1,55 @@
 .tx-filters {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--mb-space-3);
+}
+
+.tx-filters-advanced {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--mb-transition-base);
+}
+
+.tx-filters-advanced--open {
+  grid-template-rows: 1fr;
+}
+
+.tx-filters-advanced__inner {
+  overflow: hidden;
+}
+
+.tx-filters-advanced--open .tx-filters-advanced__inner {
   margin-bottom: var(--mb-space-5);
+}
+
+.tx-filters-advanced__inner app-action-button {
+  display: block;
+  width: fit-content;
+  margin-top: var(--mb-space-3);
+}
+
+.tx-filters-chevron {
+  transition: transform var(--mb-transition-base);
+}
+
+.tx-filters-chevron--open {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-filters-advanced,
+  .tx-filters-chevron {
+    transition: none;
+  }
+}
+
+.tx-filter--inline {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  min-height: 46px;
+  min-width: 190px;
+  justify-content: center;
 }
 
 .tx-filter {
@@ -78,7 +125,7 @@
   display: flex;
   align-items: center;
   gap: var(--mb-space-3);
-  margin-bottom: var(--mb-space-5);
+  margin-bottom: var(--mb-space-6);
   flex-wrap: wrap;
 }
 

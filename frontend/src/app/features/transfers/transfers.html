@@ -1,5 +1,18 @@
 <app-page-header title="Plăți & Transferuri" subtitle="Trimite bani către un IBAN, în câțiva pași." />
 
+<div class="transfers-tabs">
+  <button type="button" [class.transfers-tab--active]="mainTab() === 'new'" (click)="mainTab.set('new')">
+    <app-icon name="transfer" [size]="15" /> Transfer nou
+  </button>
+  <button type="button" [class.transfers-tab--active]="mainTab() === 'scheduled'" (click)="mainTab.set('scheduled')">
+    <app-icon name="calendar" [size]="15" /> Programate
+    @if (scheduledTransfers().length > 0) {
+      <span class="transfers-tabs__count">{{ scheduledTransfers().length }}</span>
+    }
+  </button>
+</div>
+
+@if (mainTab() === 'new') {
 <ol class="transfer-stepper">
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'form'" [class.transfer-stepper__step--done]="step() !== 'form'">
     <span class="transfer-stepper__dot">@if (step() !== 'form') {<app-icon name="check" [size]="12" />} @else {1}</span>
@@ -203,4 +216,87 @@
       </div>
     </div>
   </div>
+}
+}
+
+@if (mainTab() === 'scheduled') {
+<section class="scheduled-section">
+  <div class="scheduled-section__header">
+    <div>
+      <h2>Transferuri programate</h2>
+      <p class="scheduled-section__subtitle">Automatizează plăți recurente — se execută singure, la data stabilită.</p>
+    </div>
+    <app-action-button variant="secondary" (pressed)="openScheduleModal()">
+      <app-icon name="plus" [size]="16" />
+      Transfer nou programat
+    </app-action-button>
+  </div>
+
+  @if (!scheduledLoading() && scheduledTransfers().length === 0) {
+    <app-empty-state
+      icon="calendar"
+      title="Niciun transfer programat"
+      description="Creează unul pentru chirie, abonamente sau orice plată recurentă."
+    />
+  } @else if (scheduledTransfers().length > 0) {
+    <div class="scheduled-list">
+      @for (schedule of scheduledTransfers(); track schedule.id) {
+        <div class="scheduled-row">
+          <div class="scheduled-row__info">
+            <span class="scheduled-row__iban">{{ schedule.to_iban }}</span>
+            @if (schedule.description) {
+              <span class="scheduled-row__desc">{{ schedule.description }}</span>
+            }
+          </div>
+          <span class="scheduled-row__amount">{{ schedule.amount_minor | money: account()?.currency }}</span>
+          <span class="scheduled-row__frequency">{{ frequencyLabel(schedule.frequency) }}</span>
+          <span class="scheduled-row__next">Următoarea: {{ schedule.next_run_at | date: 'dd MMM yyyy' }}</span>
+          <button type="button" class="scheduled-row__cancel" (click)="cancelSchedule(schedule)">
+            <app-icon name="trash" [size]="15" />
+          </button>
+        </div>
+      }
+    </div>
+  }
+</section>
+}
+
+@if (scheduleModalOpen()) {
+  <app-modal title="Transfer programat nou" (closed)="scheduleModalOpen.set(false)">
+    <div class="schedule-form">
+      <label>
+        <span>IBAN destinație</span>
+        <input
+          type="text"
+          placeholder="RO49 MAES 1234 5678 9012 3456"
+          [ngModel]="scheduleToIban()"
+          (ngModelChange)="scheduleToIban.set($event)"
+        />
+      </label>
+      <label>
+        <span>Sumă (lei)</span>
+        <input type="number" min="0.01" step="0.01" [ngModel]="scheduleAmountRon()" (ngModelChange)="scheduleAmountRon.set($event)" />
+      </label>
+      <label>
+        <span>Descriere</span>
+        <input
+          type="text"
+          placeholder="Ex: Chirie"
+          maxlength="140"
+          [ngModel]="scheduleDescription()"
+          (ngModelChange)="scheduleDescription.set($event)"
+        />
+      </label>
+      <label>
+        <span>Frecvență</span>
+        <select [ngModel]="scheduleFrequency()" (ngModelChange)="scheduleFrequency.set($event)">
+          <option value="weekly">Săptămânal</option>
+          <option value="monthly">Lunar</option>
+        </select>
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="scheduleSaving()" (pressed)="saveSchedule()">
+        Creează transfer programat
+      </app-action-button>
+    </div>
+  </app-modal>
 }

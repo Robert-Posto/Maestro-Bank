@@ -110,6 +110,41 @@
      desktop-first: 1440 / 1366 / 1280 / tablet 1024 / mobile 640 */
 }
 
+/* ==========================================================================
+   Dark mode — redefinește DOAR tokenii de suprafață/text/semantic de mai
+   sus, nu inventează valori noi. Activat prin [data-theme="dark"] pe
+   <html> (vezi ThemeService), NU prin prefers-color-scheme direct — userul
+   alege explicit, preferința persistă în localStorage. Culorile de brand
+   (navy sidebar, categorii) rămân identice în ambele teme — sidebar-ul e
+   deja "dark" prin design, indiferent de temă.
+   ========================================================================== */
+:root[data-theme='dark'] {
+  --mb-bg: #0b0f1a;
+  --mb-surface: #131829;
+  --mb-surface-muted: #171d31;
+  --mb-border: #232a41;
+  --mb-border-strong: #2e3550;
+
+  --mb-text-primary: #eef1fa;
+  --mb-text-secondary: #9aa2ba;
+  --mb-text-tertiary: #6d7590;
+
+  --mb-blue-50: #16213d;
+  --mb-blue-100: #1c2c4d;
+
+  --mb-positive-bg: #113321;
+  --mb-negative-bg: #3a1818;
+  --mb-warning-bg: #3a2a10;
+  --mb-info-bg: var(--mb-blue-50);
+
+  --mb-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --mb-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --mb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32), 0 2px 4px rgba(0, 0, 0, 0.24);
+  --mb-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.24);
+
+  color-scheme: dark;
+}
+
 *,
 *::before,
 *::after {

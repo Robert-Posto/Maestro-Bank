@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import close_database_connection, ping_database
+from app.routers.notifications import internal_router as notifications_internal_router
+from app.routers.notifications import router as notifications_router
 from app.routers.support import router as support_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [support-service] %(levelname)s %(message)s")
@@ -23,6 +25,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MaestroBank Support Service", lifespan=lifespan)
 app.include_router(support_router)
+app.include_router(notifications_router)
+app.include_router(notifications_internal_router)
 
 
 @app.get("/health")

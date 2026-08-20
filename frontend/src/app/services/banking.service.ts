@@ -67,6 +67,14 @@ export interface CardRevealView {
 /** Taxă de emitere card fizic — vezi accounts-service::_PHYSICAL_CARD_FEE_MINOR. */
 export const PHYSICAL_CARD_FEE_MINOR = 2_000;
 
+export interface PocketView {
+  id: string;
+  name: string;
+  target_minor: number;
+  saved_minor: number;
+  created_at: string;
+}
+
 export interface Beneficiary {
   id: string;
   name: string;
@@ -96,6 +104,26 @@ export interface TransferPayload {
   amount_minor: number;
   description: string;
   category?: string;
+}
+
+export type ScheduleFrequency = 'weekly' | 'monthly';
+
+export interface ScheduledTransferView {
+  id: string;
+  to_iban: string;
+  amount_minor: number;
+  description: string;
+  frequency: ScheduleFrequency;
+  next_run_at: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ScheduledTransferPayload {
+  to_iban: string;
+  amount_minor: number;
+  description: string;
+  frequency: ScheduleFrequency;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -186,5 +214,45 @@ export class BankingService {
 
   deleteBeneficiary(id: string): Observable<void> {
     return this.http.delete<void>(`${API_BASE_URL}/accounts/beneficiaries/${id}`);
+  }
+
+  // --- Pockets (obiective de economisire) ---------------------------------
+
+  getPockets(): Observable<PocketView[]> {
+    return this.http.get<PocketView[]>(`${API_BASE_URL}/accounts/pockets`);
+  }
+
+  createPocket(name: string, targetMinor: number): Observable<PocketView> {
+    return this.http.post<PocketView>(`${API_BASE_URL}/accounts/pockets`, { name, target_minor: targetMinor });
+  }
+
+  depositToPocket(pocketId: string, amountMinor: number): Observable<PocketView> {
+    return this.http.post<PocketView>(`${API_BASE_URL}/accounts/pockets/${pocketId}/deposit`, {
+      amount_minor: amountMinor,
+    });
+  }
+
+  withdrawFromPocket(pocketId: string, amountMinor: number): Observable<PocketView> {
+    return this.http.post<PocketView>(`${API_BASE_URL}/accounts/pockets/${pocketId}/withdraw`, {
+      amount_minor: amountMinor,
+    });
+  }
+
+  deletePocket(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/accounts/pockets/${id}`);
+  }
+
+  // --- Transferuri programate/recurente -----------------------------------
+
+  getScheduledTransfers(): Observable<ScheduledTransferView[]> {
+    return this.http.get<ScheduledTransferView[]>(`${API_BASE_URL}/transactions/scheduled-transfers`);
+  }
+
+  createScheduledTransfer(payload: ScheduledTransferPayload): Observable<ScheduledTransferView> {
+    return this.http.post<ScheduledTransferView>(`${API_BASE_URL}/transactions/scheduled-transfers`, payload);
+  }
+
+  cancelScheduledTransfer(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/transactions/scheduled-transfers/${id}`);
   }
 }

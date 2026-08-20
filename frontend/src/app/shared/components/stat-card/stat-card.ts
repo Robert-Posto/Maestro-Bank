@@ -4,13 +4,13 @@ import { Icon } from '../icon/icon';
 
 export type StatTrend = 'up' | 'down' | 'neutral';
 
-/** Card de KPI pentru Overview (Sold total, Cheltuieli, Venituri, Progres buget). */
+/** Card de KPI (valoare + etichetă + trend opțional). */
 @Component({
   selector: 'app-stat-card',
   standalone: true,
   imports: [Icon],
   template: `
-    <div class="stat-card">
+    <div class="stat-card" [class.stat-card--flush]="flush()">
       <div class="stat-card__row">
         <span class="stat-card__label">{{ label() }}</span>
         @if (icon()) {
@@ -38,6 +38,15 @@ export type StatTrend = 'up' | 'down' | 'neutral';
         flex-direction: column;
         gap: var(--mb-space-2);
         min-width: 0;
+      }
+      /* Pentru situația în care mai multe stat-card-uri stau într-un rând
+         unificat (o singură cutie cu divizoare), nu fiecare în cutia lui —
+         wrapper-ul din pagina consumatoare oferă fundalul/bordura/shadow-ul. */
+      .stat-card--flush {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
       }
       .stat-card__row {
         display: flex;
@@ -100,4 +109,5 @@ export class StatCard {
   readonly iconTone = input<'blue' | 'red' | 'green'>('blue');
   readonly trendText = input<string | undefined>(undefined);
   readonly trend = input<StatTrend>('neutral');
+  readonly flush = input(false);
 }

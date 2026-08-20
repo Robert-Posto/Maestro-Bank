@@ -3,7 +3,12 @@
 .budgets-summary {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--mb-space-4);
+  gap: 1px;
+  background: var(--mb-border);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(16, 24, 48, 0.04);
   margin-bottom: var(--mb-space-6);
 }
 
@@ -12,10 +17,7 @@
   align-items: center;
   gap: var(--mb-space-3);
   background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-lg);
   padding: var(--mb-space-4);
-  box-shadow: 0 2px 8px rgba(16, 24, 48, 0.04);
 }
 
 .budgets-summary__card > div {
@@ -121,6 +123,16 @@
 }
 
 /* --- Cards grid --- */
+
+.budgets-grid,
+app-empty-state {
+  animation: budgets-tab-fade 200ms ease;
+}
+
+@keyframes budgets-tab-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .budgets-grid {
   display: grid;
@@ -408,5 +420,9 @@
   .budget-card,
   .budget-card__progress-fill {
     transition: none;
+  }
+  .budgets-grid,
+  app-empty-state {
+    animation: none;
   }
 }

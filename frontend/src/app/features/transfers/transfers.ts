@@ -3,15 +3,27 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { AccountView, BankingService, Beneficiary, TransactionView } from '../../services/banking.service';
+import {
+  AccountView,
+  BankingService,
+  Beneficiary,
+  ScheduleFrequency,
+  ScheduledTransferView,
+  TransactionView,
+} from '../../services/banking.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { Icon } from '../../shared/components/icon/icon';
+import { Modal } from '../../shared/components/modal/modal';
+import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { DatePipe } from '@angular/common';
 import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { extractErrorMessage } from '../../shared/error-utils';
 
 type TransferStep = 'form' | 'review' | 'success';
+type MainTab = 'new' | 'scheduled';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -23,7 +35,7 @@ type TransferStep = 'form' | 'review' | 'success';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, MoneyPipe],
+  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe],
   templateUrl: './transfers.html',
   styleUrl: './transfers.css',
 })
@@ -34,6 +46,7 @@ export class Transfers implements OnInit {
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
+  protected readonly mainTab = signal<MainTab>('new');
 
   protected readonly account = signal<AccountView | null>(null);
   protected readonly beneficiaries = signal<Beneficiary[]>([]);
@@ -52,6 +65,17 @@ export class Transfers implements OnInit {
 
   protected readonly amountMinor = computed(() => Math.round((this.amount() ?? 0) * 100));
 
+  // --- Transferuri programate/recurente ------------------------------------
+  protected readonly scheduledTransfers = signal<ScheduledTransferView[]>([]);
+  protected readonly scheduledLoading = signal(true);
+
+  protected readonly scheduleModalOpen = signal(false);
+  protected readonly scheduleToIban = signal('');
+  protected readonly scheduleAmountRon = signal(100);
+  protected readonly scheduleDescription = signal('');
+  protected readonly scheduleFrequency = signal<ScheduleFrequency>('monthly');
+  protected readonly scheduleSaving = signal(false);
+
   ngOnInit(): void {
     this.loadingContext.set(true);
     this.banking.getMyAccount().subscribe({
@@ -62,6 +86,70 @@ export class Transfers implements OnInit {
       error: () => this.loadingContext.set(false),
     });
     this.banking.getBeneficiaries().subscribe({ next: (list) => this.beneficiaries.set(list) });
+    this.loadScheduledTransfers();
+  }
+
+  private loadScheduledTransfers(): void {
+    this.scheduledLoading.set(true);
+    this.banking.getScheduledTransfers().subscribe({
+      next: (list) => {
+        this.scheduledTransfers.set(list);
+        this.scheduledLoading.set(false);
+      },
+      error: () => this.scheduledLoading.set(false),
+    });
+  }
+
+  protected openScheduleModal(): void {
+    this.scheduleToIban.set('');
+    this.scheduleAmountRon.set(100);
+    this.scheduleDescription.set('');
+    this.scheduleFrequency.set('monthly');
+    this.scheduleModalOpen.set(true);
+  }
+
+  protected saveSchedule(): void {
+    const iban = this.scheduleToIban().trim().toUpperCase().replace(/\s+/g, '');
+    const amountMinor = Math.round(this.scheduleAmountRon() * 100);
+    if (iban.length < 10 || amountMinor <= 0) {
+      this.toast.error('Completează un IBAN valid și o sumă mai mare decât 0.');
+      return;
+    }
+
+    this.scheduleSaving.set(true);
+    this.banking
+      .createScheduledTransfer({
+        to_iban: iban,
+        amount_minor: amountMinor,
+        description: this.scheduleDescription().trim(),
+        frequency: this.scheduleFrequency(),
+      })
+      .subscribe({
+        next: (schedule) => {
+          this.scheduledTransfers.update((list) => [...list, schedule]);
+          this.scheduleSaving.set(false);
+          this.scheduleModalOpen.set(false);
+          this.toast.success('Transfer programat creat.');
+        },
+        error: (err) => {
+          this.scheduleSaving.set(false);
+          this.toast.error(extractErrorMessage(err, 'Nu am putut crea transferul programat.'));
+        },
+      });
+  }
+
+  protected cancelSchedule(schedule: ScheduledTransferView): void {
+    this.banking.cancelScheduledTransfer(schedule.id).subscribe({
+      next: () => {
+        this.scheduledTransfers.update((list) => list.filter((s) => s.id !== schedule.id));
+        this.toast.success('Transfer programat anulat.');
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Anularea a eșuat.')),
+    });
+  }
+
+  protected frequencyLabel(frequency: ScheduleFrequency): string {
+    return frequency === 'weekly' ? 'Săptămânal' : 'Lunar';
   }
 
   protected selectBeneficiary(beneficiary: Beneficiary): void {

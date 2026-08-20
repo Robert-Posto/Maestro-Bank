@@ -6,15 +6,8 @@
   <app-empty-state icon="info" title="Nu am putut încărca analiza" [description]="error()!" />
 } @else {
   <div class="sf-stats">
-    <app-stat-card label="Cheltuieli luna aceasta" [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')" icon="arrow-up-right" iconTone="red" />
-    <app-stat-card label="Medie zilnică cheltuită" [value]="(spending()?.average_daily_spending_minor ?? 0 | money: 'RON')" icon="spending" iconTone="blue" />
-    <app-stat-card label="Cheltuieli estimate rest de lună" [value]="(forecast()?.expected_expenses_minor ?? 0 | money: 'RON')" icon="calendar" iconTone="red" />
-    <app-stat-card
-      label="Sold estimat la final de lună"
-      [value]="(forecast()?.estimated_end_of_month_balance_minor ?? 0 | money: 'RON')"
-      icon="wallet"
-      iconTone="blue"
-    />
+    <app-stat-card [flush]="true" label="Cheltuieli luna aceasta" [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')" icon="arrow-up-right" iconTone="red" />
+    <app-stat-card [flush]="true" label="Medie zilnică cheltuită" [value]="(spending()?.average_daily_spending_minor ?? 0 | money: 'RON')" icon="spending" iconTone="blue" />
   </div>
 
   <div class="sf-grid">
@@ -57,7 +50,7 @@
     </section>
   </div>
 
-  <section class="sf-panel sf-forecast">
+  <section class="sf-panel sf-forecast" id="forecast">
     <h2>Forecast lunar</h2>
     <div class="sf-forecast-grid">
       <div>
