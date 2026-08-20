@@ -394,23 +394,35 @@
 }
 
 @if (revealModalOpen()) {
-  <app-modal title="Confirmă parola" [maxWidth]="400" (closed)="closeRevealModal()">
-    <form class="reveal-form" (ngSubmit)="submitReveal()">
+  <app-modal title="Confirmă identitatea" [maxWidth]="400" (closed)="closeRevealModal()">
+    <div class="reveal-form">
       <p class="reveal-form__desc">
-        Pentru a vedea numărul complet și CVV-ul cardului **** {{ revealTarget()?.last_four }}, confirmă parola contului tău.
+        Pentru a vedea numărul complet și CVV-ul cardului **** {{ revealTarget()?.last_four }}, confirmă identitatea.
       </p>
-      <label>
-        <span>Parolă</span>
-        <input
-          type="password"
-          autocomplete="current-password"
-          placeholder="Parola contului"
-          [ngModel]="revealPassword()"
-          (ngModelChange)="revealPassword.set($event)"
-          name="revealPassword"
-        />
-      </label>
-      <app-action-button type="submit" [fullWidth]="true" [loading]="revealBusy()">Confirmă și afișează</app-action-button>
-    </form>
+
+      @if (passkeyAvailable()) {
+        <app-action-button [fullWidth]="true" [loading]="revealBiometricBusy()" (pressed)="submitRevealWithBiometrics()">
+          <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
+        </app-action-button>
+        <div class="reveal-divider"><span>sau introdu parola</span></div>
+      }
+
+      <form (ngSubmit)="submitReveal()">
+        <label>
+          <span>Parolă</span>
+          <input
+            type="password"
+            autocomplete="current-password"
+            placeholder="Parola contului"
+            [ngModel]="revealPassword()"
+            (ngModelChange)="revealPassword.set($event)"
+            name="revealPassword"
+          />
+        </label>
+        <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="revealBusy()">
+          Confirmă cu parola
+        </app-action-button>
+      </form>
+    </div>
   </app-modal>
 }

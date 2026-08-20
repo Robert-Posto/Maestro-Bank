@@ -9,21 +9,28 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app import webauthn_service
 from app.database import close_database_connection, ping_database
 from app.routers.auth import router as auth_router
 from app.routers.internal import router as internal_router
+from app.routers.webauthn import router as webauthn_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [auth-service] %(levelname)s %(message)s")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Indexare idempotentă — nu există migrări în acest proiect (Mongo,
+    # nu SQL), vezi accounts-service::backfill_missing_account_types
+    # pentru același pattern.
+    await webauthn_service.ensure_webauthn_indexes()
     yield
     await close_database_connection()
 
 
 app = FastAPI(title="MaestroBank Auth Service", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(webauthn_router)
 app.include_router(internal_router)
 
 

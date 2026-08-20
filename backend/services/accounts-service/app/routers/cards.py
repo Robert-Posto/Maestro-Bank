@@ -34,7 +34,7 @@ async def create_card(payload: CardCreateRequest, user_id: str = CurrentUserId):
 
 @router.post("/{card_id}/reveal", response_model=CardRevealOut)
 async def reveal_card(card_id: str, payload: CardRevealRequest, user_id: str = CurrentUserId):
-    return await service.reveal_card(card_id, user_id, payload.password)
+    return await service.reveal_card(card_id, user_id, payload)
 
 
 @router.patch("/{card_id}/freeze", response_model=CardOut, response_model_by_alias=False)

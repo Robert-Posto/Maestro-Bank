@@ -10,8 +10,9 @@ browser/Angular.
 
 from fastapi import APIRouter
 
-from app import service
+from app import service, webauthn_service
 from app.models import InternalPasswordVerifyRequest, InternalPasswordVerifyResponse, InternalUserNameView
+from app.models_webauthn import InternalWebauthnVerifyRequest, InternalWebauthnVerifyResponse
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -25,3 +26,11 @@ async def get_user_name(user_id: str):
 async def verify_password(payload: InternalPasswordVerifyRequest):
     valid = await service.verify_user_password(payload.user_id, payload.password)
     return InternalPasswordVerifyResponse(valid=valid)
+
+
+@router.post("/auth/verify-webauthn", response_model=InternalWebauthnVerifyResponse)
+async def verify_webauthn(payload: InternalWebauthnVerifyRequest):
+    valid = await webauthn_service.verify_step_up(
+        payload.user_id, payload.challenge_id, payload.action, payload.action_payload, payload.credential
+    )
+    return InternalWebauthnVerifyResponse(valid=valid)

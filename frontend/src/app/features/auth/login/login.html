@@ -62,6 +62,14 @@
       </button>
     </form>
 
+    @if (passkeySupported) {
+      <div class="auth-divider"><span>sau</span></div>
+      <button type="button" class="auth-passkey" [disabled]="passkeyBusy()" (click)="loginWithPasskey()">
+        <app-icon name="fingerprint" [size]="18" />
+        {{ passkeyBusy() ? 'Se confirmă...' : 'Autentificare cu passkey' }}
+      </button>
+    }
+
     <p class="auth-switch">Nu ai cont? <a routerLink="/register">Creează unul</a></p>
     </section>
   </main>
