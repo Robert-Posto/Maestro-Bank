@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../core/api-config';
+import { WebauthnStepUpProof } from './webauthn.service';
 
 /** "current" e provizionat automat la înregistrare — celelalte 3 se deschid manual, vezi CreatableAccountType. */
 export type AccountType = 'current' | 'savings' | 'deposit' | 'student';
@@ -180,8 +181,11 @@ export class BankingService {
     return this.http.post<CardView>(`${API_BASE_URL}/accounts/cards`, payload);
   }
 
-  revealCard(cardId: string, password: string): Observable<CardRevealView> {
-    return this.http.post<CardRevealView>(`${API_BASE_URL}/accounts/cards/${cardId}/reveal`, { password });
+  /** `proof` e fie o parolă, fie un assertion WebAuthn (vezi
+   * WebauthnService.getStepUpAssertion) — accounts-service acceptă exact
+   * una dintre cele două metode, nu ambele. */
+  revealCard(cardId: string, proof: { password: string } | WebauthnStepUpProof): Observable<CardRevealView> {
+    return this.http.post<CardRevealView>(`${API_BASE_URL}/accounts/cards/${cardId}/reveal`, proof);
   }
 
   freezeCard(cardId: string): Observable<CardView> {

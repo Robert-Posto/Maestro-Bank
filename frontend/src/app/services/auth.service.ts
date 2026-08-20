@@ -81,7 +81,10 @@ export class AuthService {
     return this.getToken() !== null;
   }
 
-  private setToken(token: string): void {
+  /** Public — folosit și de WebauthnService după un login reușit cu
+   * passkey, ca sesiunea rezultată să fie identică cu una obținută prin
+   * parolă (același storage, aceeași sursă de adevăr pentru token). */
+  setToken(token: string): void {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
   }
 }

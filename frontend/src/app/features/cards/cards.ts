@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 
 import {
   AccountView,
@@ -14,6 +14,7 @@ import {
 } from '../../services/banking.service';
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
 import { AuthService } from '../../services/auth.service';
+import { WebauthnService } from '../../services/webauthn.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { ToggleControl } from '../../shared/components/toggle-control/toggle-control';
@@ -78,6 +79,7 @@ export class Cards implements OnInit, OnDestroy {
   private readonly banking = inject(BankingService);
   private readonly transactionsApi = inject(TransactionsService);
   private readonly auth = inject(AuthService);
+  private readonly webauthn = inject(WebauthnService);
   private readonly toast = inject(ToastService);
 
   protected readonly loading = signal(true);
@@ -125,14 +127,18 @@ export class Cards implements OnInit, OnDestroy {
     () => this.addCardType() === 'physical' && (this.account()?.balance_minor ?? 0) < PHYSICAL_CARD_FEE_MINOR,
   );
 
-  // --- Vezi date card + CVV (necesită parolă) --------------------------
+  // --- Vezi date card + CVV (passkey, cu fallback pe parolă) -----------
   protected readonly revealModalOpen = signal(false);
   protected readonly revealPassword = signal('');
   protected readonly revealBusy = signal(false);
+  protected readonly revealBiometricBusy = signal(false);
   protected readonly revealTarget = signal<CardView | null>(null);
   protected readonly revealedCardId = signal<string | null>(null);
   protected readonly revealedData = signal<CardRevealView | null>(null);
   private autoHideTimer?: ReturnType<typeof setTimeout>;
+
+  private readonly hasPasskey = signal(false);
+  protected readonly passkeyAvailable = computed(() => this.webauthn.isSupported() && this.hasPasskey());
 
   ngOnInit(): void {
     this.load();
@@ -151,13 +157,17 @@ export class Cards implements OnInit, OnDestroy {
       cards: this.banking.getMyCards(),
       spending: this.transactionsApi.getSpendingAnalytics(),
       transactions: this.banking.getTransactions(4, 0),
+      // Doar dacă browserul suportă WebAuthn — evită un apel de rețea inutil
+      // pe unul care nu-l suportă oricum (vezi passkeyAvailable).
+      passkeys: this.webauthn.isSupported() ? this.webauthn.listCredentials() : of([]),
     }).subscribe({
-      next: ({ account, cards, spending, transactions }) => {
+      next: ({ account, cards, spending, transactions, passkeys }) => {
         this.account.set(account);
         this.cards.set(cards);
         this.activeIndex.set(0);
         this.spending.set(spending);
         this.recentTransactions.set(transactions);
+        this.hasPasskey.set(passkeys.length > 0);
         this.loading.set(false);
       },
       error: () => {
@@ -324,7 +334,7 @@ export class Cards implements OnInit, OnDestroy {
     });
   }
 
-  // --- Vezi date card + CVV (necesită parolă) -----------------------------
+  // --- Vezi date card + CVV (passkey, cu fallback pe parolă) --------------
 
   protected isRevealedCard(cardId: string): boolean {
     return this.revealedCardId() === cardId && this.revealedData() !== null;
@@ -355,21 +365,47 @@ export class Cards implements OnInit, OnDestroy {
     }
 
     this.revealBusy.set(true);
-    this.banking.revealCard(target.id, this.revealPassword()).subscribe({
-      next: (data) => {
-        this.revealedData.set(data);
-        this.revealedCardId.set(target.id);
-        this.revealBusy.set(false);
-        this.revealModalOpen.set(false);
-        this.revealPassword.set('');
-        this.revealTarget.set(null);
-        this.scheduleAutoHide();
-      },
+    this.banking.revealCard(target.id, { password: this.revealPassword() }).subscribe({
+      next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBusy.set(false)),
       error: (err) => {
         this.revealBusy.set(false);
         this.toast.error(extractErrorMessage(err, 'Parolă incorectă.'));
       },
     });
+  }
+
+  protected async submitRevealWithBiometrics(): Promise<void> {
+    const target = this.revealTarget();
+    if (!target) return;
+
+    this.revealBiometricBusy.set(true);
+    try {
+      const proof = await this.webauthn.getStepUpAssertion('card_reveal', target.id);
+      this.banking.revealCard(target.id, proof).subscribe({
+        next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBiometricBusy.set(false)),
+        error: (err) => {
+          this.revealBiometricBusy.set(false);
+          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi parola.'));
+        },
+      });
+    } catch (err) {
+      this.revealBiometricBusy.set(false);
+      // Userul a anulat prompt-ul biometric (NotAllowedError) — nu e o
+      // eroare de afișat, câmpul parolei rămâne oricum disponibil mai jos.
+      if ((err as { name?: string })?.name !== 'NotAllowedError') {
+        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi parola.');
+      }
+    }
+  }
+
+  private applyRevealSuccess(cardId: string, data: CardRevealView, clearBusy: () => void): void {
+    this.revealedData.set(data);
+    this.revealedCardId.set(cardId);
+    clearBusy();
+    this.revealModalOpen.set(false);
+    this.revealPassword.set('');
+    this.revealTarget.set(null);
+    this.scheduleAutoHide();
   }
 
   protected hideReveal(): void {

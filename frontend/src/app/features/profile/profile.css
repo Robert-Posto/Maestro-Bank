@@ -39,6 +39,75 @@
   color: var(--mb-text-primary);
 }
 
+.profile-panel__desc {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-4);
+  max-width: 480px;
+}
+
+.profile-passkey-unsupported,
+.profile-passkey-empty {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+}
+
+.profile-passkey-list {
+  list-style: none;
+  margin: 0 0 var(--mb-space-4);
+  padding: 0;
+}
+
+.profile-passkey-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-4);
+  padding: var(--mb-space-3) 0;
+  border-bottom: 1px solid var(--mb-border);
+  color: var(--mb-text-secondary);
+}
+
+.profile-passkey-row:last-child {
+  border-bottom: none;
+}
+
+.profile-passkey-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-passkey-row__title {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+}
+
+.profile-passkey-row__meta {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: 1px;
+}
+
+.profile-passkey-row__revoke {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.profile-passkey-row__revoke:hover {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+}
+
 .profile-password-form {
   display: flex;
   flex-direction: column;

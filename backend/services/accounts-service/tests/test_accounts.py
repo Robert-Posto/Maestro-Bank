@@ -267,6 +267,63 @@ async def _async_bool(value: bool) -> bool:
     return value
 
 
+async def test_reveal_card_rejects_both_password_and_webauthn(client: AsyncClient):
+    _, token, card_id = await _provision_with_card(client)
+
+    response = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={"password": "whatever", "webauthn_challenge_id": "abc", "webauthn_assertion": {"id": "x"}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_reveal_card_rejects_neither_password_nor_webauthn(client: AsyncClient):
+    _, token, card_id = await _provision_with_card(client)
+
+    response = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_reveal_card_with_webauthn_assertion(client: AsyncClient, monkeypatch):
+    _, token, card_id = await _provision_with_card(client)
+
+    captured: dict = {}
+
+    async def _fake_verify(user_id: str, card_id_arg: str, challenge_id: str, assertion: dict) -> bool:
+        captured["card_id"] = card_id_arg
+        captured["challenge_id"] = challenge_id
+        captured["assertion"] = assertion
+        return challenge_id == "good-challenge"
+
+    monkeypatch.setattr(service_module, "_verify_webauthn_with_auth_service", _fake_verify)
+
+    wrong = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={"webauthn_challenge_id": "bad-challenge", "webauthn_assertion": {"id": "x"}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert wrong.status_code == 401
+
+    correct = await client.post(
+        f"/cards/{card_id}/reveal",
+        json={"webauthn_challenge_id": "good-challenge", "webauthn_assertion": {"id": "x"}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert correct.status_code == 200
+    body = correct.json()
+    assert len(body["pan"]) == 16
+    assert len(body["cvv"]) == 3
+    # card_id trimis către auth-service e cel REZOLVAT server-side (din URL),
+    # nu unul pe care l-ar putea falsifica clientul — vezi
+    # service.py::_verify_webauthn_with_auth_service.
+    assert captured["card_id"] == card_id
+
+
 async def test_provisioned_account_has_current_type(client: AsyncClient):
     _, body = await _provision(client)
     assert body["account"]["account_type"] == "current"

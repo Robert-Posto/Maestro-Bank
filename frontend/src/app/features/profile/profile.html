@@ -33,6 +33,48 @@
   </section>
 
   <section class="profile-panel profile-panel--wide">
+    <h2>Passkeys</h2>
+    <p class="profile-panel__desc">
+      Autentifică-te și confirmă acțiuni sensibile (ex. vezi datele unui card) cu Face ID, Touch ID sau Windows Hello, în
+      loc de parolă.
+    </p>
+
+    @if (!passkeySupported) {
+      <p class="profile-passkey-unsupported">Browserul tău nu suportă passkey-uri — poți folosi în continuare parola.</p>
+    } @else {
+      @if (passkeysLoading()) {
+        <p class="profile-passkey-empty">Se încarcă...</p>
+      } @else if (passkeys().length === 0) {
+        <p class="profile-passkey-empty">Niciun passkey înregistrat încă.</p>
+      } @else {
+        <ul class="profile-passkey-list">
+          @for (p of passkeys(); track p.id) {
+            <li class="profile-passkey-row">
+              <app-icon name="fingerprint" [size]="18" />
+              <div class="profile-passkey-row__info">
+                <p class="profile-passkey-row__title">Passkey</p>
+                <p class="profile-passkey-row__meta">
+                  Adăugat {{ p.created_at | date: 'dd MMM yyyy' }}
+                  @if (p.last_used_at) {
+                    · folosit ultima dată {{ p.last_used_at | date: 'dd MMM yyyy' }}
+                  }
+                </p>
+              </div>
+              <button type="button" class="profile-passkey-row__revoke" (click)="pendingRevoke.set(p)">
+                <app-icon name="trash" [size]="15" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <app-action-button variant="secondary" [loading]="enrollingPasskey()" (pressed)="addPasskey()">
+        <app-icon name="plus" [size]="16" /> Adaugă un passkey
+      </app-action-button>
+    }
+  </section>
+
+  <section class="profile-panel profile-panel--wide">
     <h2>Schimbă parola</h2>
     <form class="profile-password-form" (ngSubmit)="changePassword()">
       <label>
@@ -59,3 +101,15 @@
     </form>
   </section>
 </div>
+
+@if (pendingRevoke(); as p) {
+  <app-confirm-dialog
+    title="Revocă passkey-ul?"
+    message="Nu vei mai putea folosi acest passkey pentru autentificare sau confirmări biometrice."
+    confirmLabel="Revocă"
+    [danger]="true"
+    [loading]="revokingPasskey()"
+    (confirmed)="confirmRevokePasskey()"
+    (cancelled)="pendingRevoke.set(null)"
+  />
+}
