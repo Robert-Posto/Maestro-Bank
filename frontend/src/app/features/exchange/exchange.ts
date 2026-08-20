@@ -10,6 +10,7 @@ import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { currencyColorVar } from '../../shared/currencies';
 
 /**
  * Schimb valutar — vezi UI reference/Exchange.png și task-ul MaestroBank,
@@ -46,7 +47,27 @@ export class Exchange implements OnInit {
   protected readonly confirming = signal(false);
   protected readonly confirmed = signal(false);
 
-  protected readonly currencyOptions = computed(() => ['RON', ...this.rates().map((r) => r.currency)]);
+  protected readonly foreignCurrencies = computed(() => this.rates().map((r) => r.currency));
+
+  /**
+   * Backend-ul suportă STRICT perechi RON <-> valută străină, nu perechi
+   * între două valute străine (vezi exchange-service/app/service.py::_foreign_currency,
+   * care respinge cu 400 orice pereche fără RON). Constrângem fiecare
+   * dropdown la opțiunile valide dat fiind celălalt selector, ca userul să
+   * nu poată alege manual o pereche imposibilă (ex. EUR -> USD) — partea
+   * de RON se schimbă doar prin butonul de inversare (swap).
+   */
+  protected readonly fromOptions = computed(() =>
+    this.toCurrency() === 'RON' ? this.foreignCurrencies() : ['RON'],
+  );
+  protected readonly toOptions = computed(() =>
+    this.fromCurrency() === 'RON' ? this.foreignCurrencies() : ['RON'],
+  );
+
+  /** Culoarea insignei fiecărei monede (selectoare + lista de cursuri) — vezi shared/currencies.ts. */
+  protected currencyColor(code: string): string {
+    return currencyColorVar(code);
+  }
 
   ngOnInit(): void {
     this.banking.getMyAccount().subscribe({ next: (account) => this.account.set(account) });

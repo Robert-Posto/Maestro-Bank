@@ -2,7 +2,7 @@
 
 .transfers-tabs {
   display: inline-flex;
-  background: #eef1f7;
+  background: var(--mb-surface-muted);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-md);
   padding: 5px;
@@ -30,7 +30,7 @@
 
 .transfers-tab--active {
   background: var(--mb-surface) !important;
-  color: var(--mb-navy-900) !important;
+  color: var(--mb-text-primary) !important;
   box-shadow: 0 2px 7px rgba(13, 25, 48, 0.08);
 }
 

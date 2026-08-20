@@ -29,7 +29,7 @@
   gap: var(--mb-space-4);
   padding: var(--mb-space-5) var(--mb-space-6);
   border-bottom: 1px solid var(--mb-border);
-  background: linear-gradient(120deg, #fbfcff, var(--mb-blue-50));
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-blue-50));
 }
 
 .support-chat__identity {
@@ -479,7 +479,7 @@
 
 .support-chat__header {
   padding: var(--mb-space-4) var(--mb-space-5);
-  background: linear-gradient(120deg, #fff, #f7faff);
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-surface-muted));
 }
 
 .support-chat__identity {

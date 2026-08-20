@@ -213,7 +213,7 @@
 }
 
 .tx-table__row--active {
-  background: #f8fbff;
+  background: var(--mb-blue-50);
   box-shadow: inset 0 0 0 1px var(--mb-blue-500);
 }
 

@@ -39,7 +39,7 @@
 .budgets-summary__icon--blue { color: var(--mb-blue-600); background: var(--mb-blue-50); }
 .budgets-summary__icon--red { color: var(--mb-negative); background: var(--mb-negative-bg); }
 .budgets-summary__icon--green { color: var(--mb-positive); background: var(--mb-positive-bg); }
-.budgets-summary__icon--navy { color: var(--mb-navy-900); background: var(--mb-blue-50); }
+.budgets-summary__icon--navy { color: var(--mb-text-primary); background: var(--mb-blue-50); }
 
 .budgets-summary__label {
   font-size: var(--mb-font-size-xs);
@@ -49,7 +49,7 @@
 
 .budgets-summary__card strong {
   font-size: var(--mb-font-size-md);
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -71,7 +71,7 @@
 
 .budgets-tabs {
   display: inline-flex;
-  background: #eef1f7;
+  background: var(--mb-surface-muted);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-md);
   padding: 5px;
@@ -99,7 +99,7 @@
 
 .budgets-tab--active {
   background: var(--mb-surface) !important;
-  color: var(--mb-navy-900) !important;
+  color: var(--mb-text-primary) !important;
   box-shadow: 0 2px 7px rgba(13, 25, 48, 0.08);
 }
 
@@ -193,7 +193,7 @@ app-empty-state {
 
 .budget-card__name {
   font-weight: var(--mb-font-weight-semibold);
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   font-size: var(--mb-font-size-base);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -294,7 +294,7 @@ app-empty-state {
 }
 
 .budget-card__numbers strong {
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   font-size: var(--mb-font-size-base);
 }
 
@@ -321,7 +321,7 @@ app-empty-state {
   gap: 5px;
   font-size: var(--mb-font-size-lg);
   font-weight: var(--mb-font-weight-semibold);
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   margin-bottom: var(--mb-space-4);
 }
 
