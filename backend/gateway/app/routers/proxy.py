@@ -35,6 +35,7 @@ SERVICES: dict[str, dict[str, str]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
+    "verification": {"base_url": settings.verification_service_url, "internal_prefix": ""},
 }
 
 # Headere care nu trebuie retransmise ca atare (sunt specifice conexiunii
@@ -58,12 +59,15 @@ def _is_protected(service: str, path: str) -> bool:
         path="" pentru GET /api/transactions);
       - budgets: TOT e protejat (budgets, subscriptions);
       - support: TOT e protejat (tickets);
-      - exchange: TOT e protejat (rate/quote personalizate per user).
+      - exchange: TOT e protejat (rate/quote personalizate per user);
+      - verification: TOT e protejat (identitatea userului curent).
     """
     if service == "auth":
         if path in (
             "me",
             "change-password",
+            "verify-email",
+            "resend-verification-email",
             "webauthn/register/options",
             "webauthn/register/verify",
             "webauthn/credentials",
@@ -71,7 +75,7 @@ def _is_protected(service: str, path: str) -> bool:
         ):
             return True
         return path.startswith("webauthn/credentials/")
-    if service in ("accounts", "transactions", "budgets", "support", "exchange"):
+    if service in ("accounts", "transactions", "budgets", "support", "exchange", "verification"):
         return True
     return False
 
