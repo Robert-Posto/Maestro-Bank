@@ -13,16 +13,10 @@
       >
         <app-icon [name]="item.icon" [size]="19" />
         <span>{{ item.label }}</span>
+        @if (item.badge) {
+          <span class="sidebar__link-badge">{{ item.badge }}</span>
+        }
       </a>
     }
   </nav>
-
-  <div class="sidebar__footer">
-    <div class="sidebar__copilot-promo">
-      <app-icon name="copilot" [size]="18" />
-      <p class="sidebar__copilot-title">MaestroAssistent</p>
-      <p class="sidebar__copilot-text">Vine în etapa următoare a MaestroBank.</p>
-      <a class="sidebar__copilot-cta" routerLink="/app/copilot">Vezi detalii</a>
-    </div>
-  </div>
 </aside>
