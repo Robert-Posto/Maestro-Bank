@@ -7,6 +7,8 @@ interface NavItem {
   label: string;
   route: string;
   icon: string;
+  /** Insignă mică opțională lângă etichetă (ex. "AI") — vezi sidebar.css::sidebar__link-badge. */
+  badge?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -18,13 +20,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Schimb valutar', route: '/app/exchange', icon: 'exchange' },
   { label: 'Bugete', route: '/app/budgets', icon: 'budgets' },
   { label: 'Spending & Forecast', route: '/app/spending-forecast', icon: 'spending' },
+  // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
+  // Spending + Forecast, peste GPT-5-mini), deci e o intrare normală de
+  // navigare, ca oricare alta — NU mai e un card promo separat în footer.
+  { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot', badge: 'AI' },
   { label: 'Support', route: '/app/support', icon: 'support' },
   // Profil & Securitate și Ieși din cont NU sunt aici — trăiesc doar în
   // dropdown-ul de profil din topbar, ca sidebar-ul să nu fie aglomerat
   // cu ceva ce ține de cont, nu de navigare între secțiuni.
-  // MaestroAssistent NU e aici — link-ul lui trăiește doar în promo-ul din
-  // footer (mai jos), ca să nu apară de 2 ori în același sidebar pentru o
-  // funcționalitate care oricum e doar placeholder ("Coming soon").
 ];
 
 /** Sidebar bleumarin — vezi UI reference/*.png. Comun tuturor paginilor /app/*. */

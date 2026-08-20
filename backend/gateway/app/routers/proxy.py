@@ -28,7 +28,7 @@ from app.security import get_current_user_id
 
 router = APIRouter()
 
-SERVICES: dict[str, dict[str, str]] = {
+SERVICES: dict[str, dict[str, str | float]] = {
     "auth": {"base_url": settings.auth_service_url, "internal_prefix": "/auth"},
     "accounts": {"base_url": settings.accounts_service_url, "internal_prefix": ""},
     "transactions": {"base_url": settings.transactions_service_url, "internal_prefix": "/transactions"},
@@ -36,7 +36,15 @@ SERVICES: dict[str, dict[str, str]] = {
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
     "verification": {"base_url": settings.verification_service_url, "internal_prefix": ""},
+    # timeout mai mare decât restul — răspunsul implică 1+ apeluri GPT
+    # (tool-calling), semnificativ mai lente decât un query Mongo obișnuit.
+    # 100s — acoperă confortabil 2 runde de tool-calling la 45s/apel
+    # (timeout-ul per-apel setat în ai-orchestrator-service), fără să
+    # lase userul agățat la infinit dacă Azure chiar nu răspunde.
+    "ai": {"base_url": settings.ai_service_url, "internal_prefix": "", "timeout_seconds": 100.0},
 }
+
+_DEFAULT_TIMEOUT_SECONDS = 10.0
 
 # Headere care nu trebuie retransmise ca atare (sunt specifice conexiunii
 # curente, nu au sens propagate mai departe).
@@ -60,7 +68,9 @@ def _is_protected(service: str, path: str) -> bool:
       - budgets: TOT e protejat (budgets, subscriptions);
       - support: TOT e protejat (tickets);
       - exchange: TOT e protejat (rate/quote personalizate per user);
-      - verification: TOT e protejat (identitatea userului curent).
+      - verification: TOT e protejat (identitatea userului curent);
+      - ai: TOT e protejat (identitatea userului vine STRICT din JWT,
+        agentul nu acceptă user_id arbitrar în request).
     """
     if service == "auth":
         if path in (
@@ -75,7 +85,7 @@ def _is_protected(service: str, path: str) -> bool:
         ):
             return True
         return path.startswith("webauthn/credentials/")
-    if service in ("accounts", "transactions", "budgets", "support", "exchange", "verification"):
+    if service in ("accounts", "transactions", "budgets", "support", "exchange", "verification", "ai"):
         return True
     return False
 
@@ -107,8 +117,9 @@ async def _forward(service: str, path: str, request: Request) -> Response:
     }
     body = await request.body()
 
+    timeout_seconds = service_config.get("timeout_seconds", _DEFAULT_TIMEOUT_SECONDS)
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             upstream = await client.request(
                 method=request.method,
                 url=target_url,
