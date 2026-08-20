@@ -24,6 +24,7 @@ from app.models import (
     BeneficiaryCreate,
     CardCreateRequest,
     CardLimitUpdate,
+    CardRevealRequest,
     CardSettingsUpdate,
     CreatableAccountType,
     InternalAccountView,
@@ -399,15 +400,55 @@ async def _verify_password_with_auth_service(user_id: str, password: str) -> boo
     return bool(response.json().get("valid", False))
 
 
-async def reveal_card(card_id: str, user_id: str, password: str) -> dict:
-    """Dezvăluie PAN + CVV pentru un card — DOAR după ce parola curentă a
-    userului a fost confirmată de auth-service. Acțiune sensibilă: nu se
-    bazează doar pe JWT (care poate rămâne valid ore întregi), la fel ca la
-    orice bancă reală care cere reautentificare pentru date de card."""
+async def _verify_webauthn_with_auth_service(user_id: str, card_id: str, challenge_id: str, assertion: dict) -> bool:
+    """`card_id` e valoarea REZOLVATĂ server-side (din _get_card_for_user,
+    apelat înainte de asta în reveal_card) — niciodată una trimisă de
+    client — ca action_payload din challenge-ul de step-up. Astfel un
+    assertion capturat pentru cardul A nu poate fi refolosit ca să
+    dezvăluie cardul B, chiar dacă atacatorul ar reuși să retrimită
+    challenge_id + assertion neschimbate."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.auth_service_url}/internal/auth/verify-webauthn",
+                json={
+                    "user_id": user_id,
+                    "challenge_id": challenge_id,
+                    "action": "card_reveal",
+                    "action_payload": card_id,
+                    "credential": assertion,
+                },
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.error("accounts-service: verificarea passkey-ului a eșuat (user_id=%s): %s", user_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nu am putut verifica passkey-ul — serviciul de autentificare este indisponibil.",
+        ) from exc
+
+    return bool(response.json().get("valid", False))
+
+
+async def reveal_card(card_id: str, user_id: str, payload: CardRevealRequest) -> dict:
+    """Dezvăluie PAN + CVV pentru un card — DOAR după reconfirmarea
+    identității userului (parolă SAU passkey, vezi CardRevealRequest).
+    Acțiune sensibilă: nu se bazează doar pe JWT (care poate rămâne valid
+    ore întregi), la fel ca la orice bancă reală care cere reautentificare
+    pentru date de card."""
     card = await _get_card_for_user(card_id, user_id)
 
-    if not await _verify_password_with_auth_service(user_id, password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Parolă incorectă.")
+    if payload.password is not None:
+        ok = await _verify_password_with_auth_service(user_id, payload.password)
+        error_detail = "Parolă incorectă."
+    else:
+        ok = await _verify_webauthn_with_auth_service(
+            user_id, card_id, payload.webauthn_challenge_id, payload.webauthn_assertion
+        )
+        error_detail = "Confirmarea biometrică a eșuat."
+
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_detail)
 
     card = await _ensure_card_secrets(card)
     return {

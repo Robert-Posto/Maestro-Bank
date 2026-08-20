@@ -503,9 +503,31 @@
   gap: var(--mb-space-4);
 }
 
+.reveal-form form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
 .reveal-form__desc {
   font-size: var(--mb-font-size-sm);
   color: var(--mb-text-secondary);
+}
+
+.reveal-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+}
+
+.reveal-divider::before,
+.reveal-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--mb-border);
 }
 
 .reveal-form label {

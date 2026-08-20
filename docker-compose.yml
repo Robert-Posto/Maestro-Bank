@@ -41,6 +41,12 @@ services:
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRES_MINUTES=${JWT_EXPIRES_MINUTES:-60}
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
+      # WebAuthn/passkeys — rp_id/origin trebuie să reflecte unde navighează
+      # EFECTIV browserul (Angular pe :4200), nu Nginx (:8080, doar API).
+      - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
+      - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME:-MaestroBank}
+      - WEBAUTHN_ORIGINS=${WEBAUTHN_ORIGINS:-http://localhost:4200}
+      - WEBAUTHN_CHALLENGE_TTL_SECONDS=${WEBAUTHN_CHALLENGE_TTL_SECONDS:-120}
     volumes:
       - ./backend/services/auth-service/app:/app/app
       - ./backend/services/auth-service/tests:/app/tests

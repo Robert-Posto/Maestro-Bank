@@ -115,6 +115,16 @@ import { Component, input } from '@angular/core';
         @case ('flash') {
           <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
         }
+        @case ('fingerprint') {
+          <path d="M12 10a2 2 0 0 0-2 2c0 3-.3 5.5-1 7.5" />
+          <path d="M14 13c0 3-.2 5.7-.9 8" />
+          <path d="M8 21c.3-.9.6-1.8.8-2.8" />
+          <path d="M3 12a9 9 0 0 1 15-6.7" />
+          <path d="M21 12a9 9 0 0 1-.3 2.3" />
+          <path d="M6 12a6 6 0 0 1 10.3-4.2" />
+          <path d="M6.3 18.5c.5-1.6.9-3.6 1-6.5a4.7 4.7 0 0 1 .3-1.7" />
+          <path d="M17.5 16.5c.2-1 .4-2.2.5-3.5" />
+        }
         @case ('close') {
           <path d="M6 6l12 12" />
           <path d="M18 6L6 18" />

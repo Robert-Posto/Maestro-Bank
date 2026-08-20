@@ -156,11 +156,24 @@ class CardCreateRequest(BaseModel):
 
 
 class CardRevealRequest(BaseModel):
-    """POST /cards/{id}/reveal — necesită parola curentă a userului (nu doar
-    JWT-ul) înainte de a dezvălui PAN/CVV — acțiune sensibilă, ca la orice
-    bancă reală."""
+    """POST /cards/{id}/reveal — necesită o reconfirmare a identității (nu
+    doar JWT-ul) înainte de a dezvălui PAN/CVV — acțiune sensibilă, ca la
+    orice bancă reală. Exact UNA dintre cele două metode: fie parola, fie
+    un assertion WebAuthn (passkey) pentru challenge-ul de step-up deschis
+    în prealabil prin auth-service (POST /auth/webauthn/stepup/options).
+    """
 
-    password: str = Field(min_length=1)
+    password: str | None = Field(default=None, min_length=1)
+    webauthn_challenge_id: str | None = None
+    webauthn_assertion: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_method(self) -> "CardRevealRequest":
+        has_password = self.password is not None
+        has_webauthn = self.webauthn_challenge_id is not None and self.webauthn_assertion is not None
+        if has_password == has_webauthn:
+            raise ValueError("Trimite fie parola, fie o confirmare biometrică — nu ambele sau niciuna.")
+        return self
 
 
 class CardRevealOut(BaseModel):

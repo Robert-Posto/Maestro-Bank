@@ -48,7 +48,10 @@ def _is_protected(service: str, path: str) -> bool:
 
     Regulă:
       - auth: "me" și "change-password" sunt protejate (register/login
-        rămân publice);
+        rămân publice). La fel, sub /webauthn: register/options,
+        register/verify, credentials (+ /{id}) și stepup/options sunt
+        protejate — dar login/options și login/verify rămân PUBLICE
+        (nu știm încă cine e userul, exact ca /auth/login cu parolă);
       - accounts: TOT e protejat (me, me/cards, cards/*, beneficiaries,
         dev/fund, {id});
       - transactions: TOT e protejat (nu există rute publice, inclusiv
@@ -58,7 +61,16 @@ def _is_protected(service: str, path: str) -> bool:
       - exchange: TOT e protejat (rate/quote personalizate per user).
     """
     if service == "auth":
-        return path in ("me", "change-password")
+        if path in (
+            "me",
+            "change-password",
+            "webauthn/register/options",
+            "webauthn/register/verify",
+            "webauthn/credentials",
+            "webauthn/stepup/options",
+        ):
+            return True
+        return path.startswith("webauthn/credentials/")
     if service in ("accounts", "transactions", "budgets", "support", "exchange"):
         return True
     return False
