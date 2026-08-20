@@ -1,0 +1,28 @@
+@import '../../../shared/styles/auth-screen.css';
+
+.verify-email-code {
+  text-align: center;
+  font-size: 1.5rem !important;
+  letter-spacing: 0.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.verify-email-resend {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-blue-600);
+  cursor: pointer;
+}
+
+.verify-email-resend:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.verify-email-resend:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

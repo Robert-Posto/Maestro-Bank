@@ -35,6 +35,7 @@ SERVICES: dict[str, dict[str, str | float]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
+    "verification": {"base_url": settings.verification_service_url, "internal_prefix": ""},
     # timeout mai mare decât restul — răspunsul implică 1+ apeluri GPT
     # (tool-calling), semnificativ mai lente decât un query Mongo obișnuit.
     # 100s — acoperă confortabil 2 runde de tool-calling la 45s/apel
@@ -67,6 +68,7 @@ def _is_protected(service: str, path: str) -> bool:
       - budgets: TOT e protejat (budgets, subscriptions);
       - support: TOT e protejat (tickets);
       - exchange: TOT e protejat (rate/quote personalizate per user);
+      - verification: TOT e protejat (identitatea userului curent);
       - ai: TOT e protejat (identitatea userului vine STRICT din JWT,
         agentul nu acceptă user_id arbitrar în request).
     """
@@ -74,6 +76,8 @@ def _is_protected(service: str, path: str) -> bool:
         if path in (
             "me",
             "change-password",
+            "verify-email",
+            "resend-verification-email",
             "webauthn/register/options",
             "webauthn/register/verify",
             "webauthn/credentials",
@@ -81,7 +85,7 @@ def _is_protected(service: str, path: str) -> bool:
         ):
             return True
         return path.startswith("webauthn/credentials/")
-    if service in ("accounts", "transactions", "budgets", "support", "exchange", "ai"):
+    if service in ("accounts", "transactions", "budgets", "support", "exchange", "verification", "ai"):
         return True
     return False
 

@@ -1,0 +1,81 @@
+<div class="auth-screen">
+  <main class="auth-layout auth-layout--wide">
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-brand">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="auth-visual__content">
+        <p class="auth-visual__eyebrow">Pasul 2 din 3</p>
+        <h2 class="auth-visual__title">Confirmă că ești chiar tu.</h2>
+        <p class="auth-visual__text">Comparăm poza buletinului cu un selfie live — verificare reală, nu doar bifată la formular.</p>
+      </div>
+
+      <p class="auth-visual__security">Imaginile NU sunt salvate — doar rezultatul comparării</p>
+    </aside>
+
+    <section class="auth-card">
+      <div class="auth-brand auth-brand--mobile">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <h1 class="auth-title">Verifică-ți identitatea</h1>
+      <p class="auth-subtitle">Încarcă buletinul, apoi fă un selfie — le comparăm automat.</p>
+
+      <div class="identity-grid">
+        <div class="identity-slot">
+          <p class="identity-slot__label"><app-icon name="cards" [size]="15" /> Buletin</p>
+
+          @if (idDocumentPreviewUrl()) {
+            <img class="identity-slot__preview" [src]="idDocumentPreviewUrl()" alt="Previzualizare buletin" />
+            <label class="identity-slot__action">
+              Schimbă poza
+              <input type="file" accept="image/*" (change)="onIdDocumentSelected($event)" hidden />
+            </label>
+          } @else {
+            <label class="identity-slot__dropzone">
+              <app-icon name="upload" [size]="24" />
+              <span>Încarcă poza buletinului</span>
+              <input type="file" accept="image/*" (change)="onIdDocumentSelected($event)" hidden />
+            </label>
+          }
+        </div>
+
+        <div class="identity-slot">
+          <p class="identity-slot__label"><app-icon name="camera" [size]="15" /> Selfie</p>
+
+          @if (selfiePreviewUrl()) {
+            <img class="identity-slot__preview" [src]="selfiePreviewUrl()" alt="Previzualizare selfie" />
+            <button type="button" class="identity-slot__action" (click)="retakePhoto()">Refă poza</button>
+          } @else if (cameraActive()) {
+            <div class="identity-camera">
+              <video #video [srcObject]="cameraStream()" autoplay playsinline muted></video>
+              <button type="button" class="identity-camera__shutter" aria-label="Fă poza" (click)="capturePhoto()"></button>
+            </div>
+          } @else {
+            <button type="button" class="identity-slot__dropzone" (click)="startCamera()">
+              <app-icon name="camera" [size]="24" />
+              <span>Pornește camera</span>
+            </button>
+          }
+
+          @if (cameraError()) {
+            <p class="auth-error">{{ cameraError() }}</p>
+          }
+        </div>
+      </div>
+
+      <canvas #canvas class="identity-canvas" hidden></canvas>
+
+      @if (error()) {
+        <p class="auth-error">{{ error() }}</p>
+      }
+
+      <button type="button" class="auth-submit identity-submit" [disabled]="submitting()" (click)="submit()">
+        {{ submitting() ? 'Se verifică...' : 'Confirmă identitatea' }}
+      </button>
+    </section>
+  </main>
+</div>

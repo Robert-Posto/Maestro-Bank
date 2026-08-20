@@ -1,0 +1,63 @@
+<div class="auth-screen">
+  <main class="auth-layout">
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-brand">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="auth-visual__content">
+        <p class="auth-visual__eyebrow">Pasul 1 din 3</p>
+        <h2 class="auth-visual__title">Confirmă-ți adresa de email.</h2>
+        <p class="auth-visual__text">Un cont verificat înseamnă un cont mai sigur — un singur cod, primit pe mail, e tot ce ne trebuie.</p>
+      </div>
+
+      <p class="auth-visual__security">Conexiune securizată și date protejate</p>
+    </aside>
+
+    <section class="auth-card">
+      <div class="auth-brand auth-brand--mobile">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <h1 class="auth-title">Verifică-ți emailul</h1>
+      <p class="auth-subtitle">Am trimis un cod de 6 cifre către <strong>{{ email }}</strong>.</p>
+
+      <form class="auth-form" (ngSubmit)="submit()">
+        <label class="auth-field">
+          <span>Cod de verificare</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            maxlength="6"
+            autocomplete="one-time-code"
+            class="verify-email-code"
+            [ngModel]="code()"
+            (ngModelChange)="code.set($event)"
+            name="code"
+            placeholder="000000"
+          />
+        </label>
+
+        @if (error()) {
+          <p class="auth-error">{{ error() }}</p>
+        }
+        @if (resent()) {
+          <p class="auth-success">Cod nou trimis.</p>
+        }
+
+        <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Se verifică...' : 'Confirmă' }}
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        N-ai primit codul?
+        <button type="button" class="verify-email-resend" [disabled]="resending()" (click)="resendCode()">
+          {{ resending() ? 'Se retrimite...' : 'Retrimite codul' }}
+        </button>
+      </p>
+    </section>
+  </main>
+</div>

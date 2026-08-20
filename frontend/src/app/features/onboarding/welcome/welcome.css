@@ -1,0 +1,49 @@
+@import '../../../shared/styles/auth-screen.css';
+
+.welcome-card {
+  text-align: center;
+  align-items: center;
+}
+
+.welcome-badge {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto var(--mb-space-5);
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+}
+
+.welcome-card .auth-subtitle {
+  text-align: center;
+}
+
+.welcome-bonus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: var(--mb-space-5);
+  margin-bottom: var(--mb-space-6);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-positive-bg);
+}
+
+.welcome-bonus__label {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.welcome-bonus__amount {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-positive);
+}
+
+.welcome-bonus__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: 4px;
+}

@@ -4,13 +4,15 @@ Doar validare (Pydantic) și delegare către app/service.py — logica de
 business (acces la bază, hashing, provisioning) trăiește acolo.
 
 Extern (prin Gateway) acestea devin: /api/auth/register, /api/auth/login,
-/api/auth/me — vezi backend/gateway/app/routers/proxy.py.
+/api/auth/me, /api/auth/verify-email, /api/auth/resend-verification-email
+— vezi backend/gateway/app/routers/proxy.py.
 """
 
-from fastapi import APIRouter, Header, status
+from fastapi import APIRouter, Depends, Header, status
 
 from app import service
-from app.models import ChangePasswordRequest, TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
+from app.models import ChangePasswordRequest, EmailVerifyRequest, TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
+from app.security import get_current_user_id_from_header
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,3 +41,13 @@ async def get_me(authorization: str | None = Header(default=None)):
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(payload: ChangePasswordRequest, authorization: str | None = Header(default=None)):
     await service.change_password(authorization, payload)
+
+
+@router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_email(payload: EmailVerifyRequest, user_id: str = Depends(get_current_user_id_from_header)):
+    await service.verify_email_code(user_id, payload.code)
+
+
+@router.post("/resend-verification-email", status_code=status.HTTP_204_NO_CONTENT)
+async def resend_verification_email(user_id: str = Depends(get_current_user_id_from_header)):
+    await service.send_verification_code(user_id)

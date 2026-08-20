@@ -81,11 +81,17 @@ class UserMeOut(UserOut):
 
     created_at: datetime
     is_active: bool
+    email_verified: bool = False
+    identity_verified: bool = False
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class EmailVerifyRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -121,3 +127,11 @@ class InternalPasswordVerifyRequest(BaseModel):
 
 class InternalPasswordVerifyResponse(BaseModel):
     valid: bool
+
+
+class InternalMarkIdentityVerifiedRequest(BaseModel):
+    """Apelat DOAR de verification-service, după un match facial reușit
+    între buletin și selfie (vezi verification-service/app/service.py).
+    Nu circulă imagini aici — doar rezultatul (userul e deja confirmat)."""
+
+    user_id: str
