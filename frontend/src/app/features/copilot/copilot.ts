@@ -9,6 +9,10 @@ import { Icon } from '../../shared/components/icon/icon';
  * (NU OpenAI, NU Azure Foundry, NU agenți, NU orchestrator). Vezi
  * task-ul MaestroBank, secțiunea 23. Chat input dezactivat intenționat —
  * nu generăm răspunsuri false care ar părea produse de un AI real.
+ *
+ * Support Agent (backend/ai-orchestrator-service) e conectat la pagina
+ * Suport (vezi features/support/support.ts), NU aici — MaestroAssistent
+ * e rezervat pentru un agent viitor (Spending + Forecast).
  */
 @Component({
   selector: 'app-copilot',

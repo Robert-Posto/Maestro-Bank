@@ -35,7 +35,14 @@ SERVICES: dict[str, dict[str, str]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
+    # ai-orchestrator-service — Support Agent, singurul agent implementat
+    # până acum, expune POST /support intern -> extern /api/ai/support.
+    # Timeout mult mai mare decât restul: un turn de tool-calling LLM poate
+    # însemna 2+ apeluri către Azure OpenAI, fiecare de câteva secunde.
+    "ai": {"base_url": settings.ai_service_url, "internal_prefix": "", "timeout": "60"},
 }
+
+_DEFAULT_FORWARD_TIMEOUT_SECONDS = 10.0
 
 # Headere care nu trebuie retransmise ca atare (sunt specifice conexiunii
 # curente, nu au sens propagate mai departe).
@@ -58,7 +65,8 @@ def _is_protected(service: str, path: str) -> bool:
         path="" pentru GET /api/transactions);
       - budgets: TOT e protejat (budgets, subscriptions);
       - support: TOT e protejat (tickets);
-      - exchange: TOT e protejat (rate/quote personalizate per user).
+      - exchange: TOT e protejat (rate/quote personalizate per user);
+      - ai: TOT e protejat (Support Agent operează STRICT pe userul din JWT).
     """
     if service == "auth":
         if path in (
@@ -71,7 +79,7 @@ def _is_protected(service: str, path: str) -> bool:
         ):
             return True
         return path.startswith("webauthn/credentials/")
-    if service in ("accounts", "transactions", "budgets", "support", "exchange"):
+    if service in ("accounts", "transactions", "budgets", "support", "exchange", "ai"):
         return True
     return False
 
@@ -103,8 +111,10 @@ async def _forward(service: str, path: str, request: Request) -> Response:
     }
     body = await request.body()
 
+    timeout_seconds = float(service_config.get("timeout", _DEFAULT_FORWARD_TIMEOUT_SECONDS))
+
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             upstream = await client.request(
                 method=request.method,
                 url=target_url,

@@ -133,7 +133,7 @@
 .support-chat__message-col {
   display: flex;
   flex-direction: column;
-  max-width: min(72%, 660px);
+  max-width: min(82%, 720px);
 }
 
 .support-chat__message-row--user .support-chat__message-col {
@@ -145,10 +145,16 @@
   border: 1px solid var(--mb-border);
   border-radius: 16px 16px 16px 4px;
   background: var(--mb-surface);
-  color: var(--mb-text-secondary);
+  color: var(--mb-text-primary);
   font-size: var(--mb-font-size-md);
   line-height: 1.55;
+  white-space: pre-line;
   box-shadow: var(--mb-shadow-xs);
+}
+
+.support-chat__bubble strong {
+  color: var(--mb-blue-700);
+  font-weight: var(--mb-font-weight-semibold);
 }
 
 .support-chat__bubble--user {
@@ -158,11 +164,118 @@
   color: #fff;
 }
 
+.support-chat__bubble--user strong {
+  color: #fff;
+  font-weight: var(--mb-font-weight-bold);
+}
+
 .support-chat__time {
   margin-top: var(--mb-space-1);
   padding: 0 var(--mb-space-1);
   color: var(--mb-text-tertiary);
   font-size: var(--mb-font-size-sm);
+}
+
+/* --- Date structurate atașate unui răspuns al agentului (tranzacții,
+   card, cont, tichete) — populate determinist de backend, randate cu
+   componente reale, nu doar text brut. --- */
+
+.support-chat__context-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-1);
+  margin-top: var(--mb-space-2);
+  padding: var(--mb-space-2) var(--mb-space-4);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.support-chat__context-card app-transaction-row:not(:last-child) {
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.support-chat__context-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  margin-top: var(--mb-space-2);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.support-chat__context-account-iban {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.support-chat__context-account-balance {
+  font-size: var(--mb-font-size-md);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+}
+
+.support-chat__context-card-status {
+  margin-top: var(--mb-space-2);
+  padding: var(--mb-space-4);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.support-chat__context-card-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-3);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+}
+
+.support-chat__context-card-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-2);
+}
+
+.support-chat__context-feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.support-chat__context-feature--off {
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-tertiary);
+}
+
+.support-chat__context-ticket {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  padding: var(--mb-space-2) 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-primary);
+}
+
+.support-chat__context-ticket:not(:last-child) {
+  border-bottom: 1px solid var(--mb-border);
 }
 
 .support-chat__bubble--typing {
