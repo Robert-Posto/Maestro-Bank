@@ -15,6 +15,7 @@ from fastapi import APIRouter, status
 
 from app import service
 from app.models import (
+    FraudHoldingAccountView,
     InternalAccountView,
     InternalTransferRequest,
     InternalTransferResponse,
@@ -29,6 +30,11 @@ router = APIRouter(prefix="/internal/accounts", tags=["internal"])
 async def provision_account(payload: ProvisionRequest):
     account, card = await service.provision_account(payload.user_id)
     return ProvisionResponse(account=account, card=card)
+
+
+@router.get("/fraud-holding-account", response_model=FraudHoldingAccountView)
+async def get_fraud_holding_account():
+    return FraudHoldingAccountView(account_id=await service.get_fraud_holding_account_id())
 
 
 @router.get("/by-user/{user_id}", response_model=InternalAccountView)

@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
+import { AuthService } from '../../../services/auth.service';
 import { Icon } from '../icon/icon';
 
 interface NavItem {
@@ -27,6 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   // funcționalitate care oricum e doar placeholder ("Coming soon").
 ];
 
+const STAFF_NAV_ITEM: NavItem = { label: 'Personal — Rețineri', route: '/app/staff-holds', icon: 'shield' };
+
 /** Sidebar bleumarin — vezi UI reference/*.png. Comun tuturor paginilor /app/*. */
 @Component({
   selector: 'app-sidebar',
@@ -36,5 +39,15 @@ const NAV_ITEMS: NavItem[] = [
   styleUrl: './sidebar.css',
 })
 export class Sidebar {
-  protected readonly navItems = NAV_ITEMS;
+  private readonly auth = inject(AuthService);
+
+  // currentUser e populat de AppShell la intrarea în /app/* (vezi
+  // app-shell.ts) — până se rezolvă, role e undefined și intrarea de
+  // personal rămâne ascunsă (fail-safe: mai bine ascunsă o clipă în plus
+  // decât arătată cuiva care nu e staff). Server-side, require_staff tot
+  // ar bloca oricum orice apel real — asta e DOAR un indiciu de UI.
+  protected readonly navItems = computed<NavItem[]>(() => {
+    const isStaff = this.auth.currentUser()?.role === 'staff';
+    return isStaff ? [...NAV_ITEMS, STAFF_NAV_ITEM] : NAV_ITEMS;
+  });
 }

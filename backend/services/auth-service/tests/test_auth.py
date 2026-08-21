@@ -14,6 +14,7 @@ iar altfel testele ar crea conturi reale în accounts_db la fiecare rulare.
 
 from datetime import datetime, timedelta, timezone
 
+import jwt
 import pytest
 from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
@@ -22,6 +23,7 @@ from webauthn import base64url_to_bytes
 from app.config import settings
 from app.database import get_database
 from app.main import app
+from app.security import hash_password
 from webauthn_test_authenticator import SoftwareAuthenticator, b64url
 
 pytestmark = pytest.mark.asyncio
@@ -30,6 +32,7 @@ VALID_PAYLOAD = {
     "first_name": "Octavia",
     "last_name": "Test",
     "email": "octavia.autotest@maestrobank.local",
+    "phone_number": "+40711111111",
     "password": "Test1234!",
 }
 
@@ -81,6 +84,42 @@ async def test_register_duplicate_email_rejected(client: AsyncClient):
 
     second = await client.post("/auth/register", json=VALID_PAYLOAD)
     assert second.status_code == 409
+
+
+async def test_internal_get_user_contact_returns_phone_and_email(client: AsyncClient):
+    """Consumat de transactions-service/app/holds.py — lista de personal
+    are nevoie de datele de contact ca să sune clientul."""
+    register_response = await client.post("/auth/register", json=VALID_PAYLOAD)
+    user_id = register_response.json()["id"]
+
+    response = await client.get(f"/internal/users/{user_id}/contact")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == VALID_PAYLOAD["email"]
+    assert body["phone_number"] == VALID_PAYLOAD["phone_number"]
+    assert body["first_name"] == VALID_PAYLOAD["first_name"]
+
+
+async def test_internal_get_user_contact_404_for_unknown_user(client: AsyncClient):
+    response = await client.get(f"/internal/users/{ObjectId()}/contact")
+    assert response.status_code == 404
+
+
+async def test_register_rejects_malformed_phone_number(client: AsyncClient):
+    response = await client.post("/auth/register", json={**VALID_PAYLOAD, "phone_number": "not-a-phone!"})
+    assert response.status_code == 422
+
+
+async def test_register_rejects_missing_phone_number(client: AsyncClient):
+    payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "phone_number"}
+    response = await client.post("/auth/register", json=payload)
+    assert response.status_code == 422
+
+
+async def test_me_includes_phone_number(client: AsyncClient):
+    token = await _register_and_login(client)
+    response = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.json()["phone_number"] == VALID_PAYLOAD["phone_number"]
 
 
 async def test_login_valid(client: AsyncClient):
@@ -469,3 +508,75 @@ async def test_internal_verify_webauthn_succeeds_for_matching_payload(client: As
     )
     assert matched.status_code == 200
     assert matched.json()["valid"] is True
+
+
+# --- Roluri de personal (role="staff" în JWT) ------------------------------
+#
+# UserRegister nu are câmp "role" (vezi app/models.py) — un client nu poate
+# NICIODATĂ cere rolul "staff" prin înregistrare publică. Singura cale spre
+# role="staff" e o scriere directă în Mongo (scripts/create_staff_user.py,
+# reprodusă aici prin _seed_staff_user, la fel cum alte teste din acest
+# fișier scriu direct în colecții pentru scenarii pe care API-ul public nu
+# le poate produce).
+
+
+async def test_register_always_yields_customer_role(client: AsyncClient):
+    token = await _register_and_login(client)
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    assert payload["role"] == "customer"
+
+    me_resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_resp.json()["role"] == "customer"
+
+
+async def _seed_staff_user(email: str, password: str) -> None:
+    await get_database().users.insert_one(
+        {
+            "first_name": "Staff",
+            "last_name": "Test",
+            "email": email,
+            "password_hash": hash_password(password),
+            "created_at": datetime.now(timezone.utc),
+            "is_active": True,
+            "role": "staff",
+        }
+    )
+
+
+async def test_staff_role_included_in_password_login_jwt(client: AsyncClient):
+    email, password = "staff.autotest@maestrobank.local", "StaffPass123"
+    await _seed_staff_user(email, password)
+
+    response = await client.post("/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200
+
+    payload = jwt.decode(response.json()["access_token"], settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    assert payload["role"] == "staff"
+
+
+async def test_staff_role_included_in_webauthn_login_jwt(client: AsyncClient):
+    """Ambele căi de autentificare converg pe create_access_token — vezi
+    app/webauthn_service.py — deci rolul trebuie să apară identic indiferent
+    de metodă (parolă sau passkey)."""
+    email, password = "staff.webauthn.autotest@maestrobank.local", "StaffPass123"
+    await _seed_staff_user(email, password)
+
+    password_token = (await client.post("/auth/login", json={"email": email, "password": password})).json()["access_token"]
+    authenticator = SoftwareAuthenticator()
+    await _register_passkey(client, password_token, authenticator)
+
+    challenge_id, options = await _login_options(client, email)
+    credential = authenticator.get(
+        challenge=base64url_to_bytes(options["challenge"]),
+        rp_id=settings.webauthn_rp_id,
+        origin=settings.webauthn_origins[0],
+    )
+    verify_resp = await client.post(
+        "/auth/webauthn/login/verify", json={"challenge_id": challenge_id, "credential": credential}
+    )
+    assert verify_resp.status_code == 200
+
+    payload = jwt.decode(
+        verify_resp.json()["access_token"], settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+    )
+    assert payload["role"] == "staff"

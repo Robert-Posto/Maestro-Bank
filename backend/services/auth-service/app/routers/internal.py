@@ -11,8 +11,17 @@ browser/Angular.
 from fastapi import APIRouter
 
 from app import service, webauthn_service
-from app.models import InternalPasswordVerifyRequest, InternalPasswordVerifyResponse, InternalUserNameView
-from app.models_webauthn import InternalWebauthnVerifyRequest, InternalWebauthnVerifyResponse
+from app.models import (
+    InternalPasswordVerifyRequest,
+    InternalPasswordVerifyResponse,
+    InternalUserContactView,
+    InternalUserNameView,
+)
+from app.models_webauthn import (
+    InternalLatestCredentialView,
+    InternalWebauthnVerifyRequest,
+    InternalWebauthnVerifyResponse,
+)
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -20,6 +29,17 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 @router.get("/users/{user_id}", response_model=InternalUserNameView)
 async def get_user_name(user_id: str):
     return await service.get_user_name(user_id)
+
+
+@router.get("/users/{user_id}/contact", response_model=InternalUserContactView)
+async def get_user_contact(user_id: str):
+    return await service.get_user_contact(user_id)
+
+
+@router.get("/webauthn/credentials/by-user/{user_id}/latest", response_model=InternalLatestCredentialView)
+async def get_latest_credential(user_id: str):
+    latest_created_at = await webauthn_service.get_latest_credential_created_at(user_id)
+    return InternalLatestCredentialView(latest_created_at=latest_created_at)
 
 
 @router.post("/auth/verify-password", response_model=InternalPasswordVerifyResponse)

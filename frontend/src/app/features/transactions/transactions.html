@@ -135,10 +135,12 @@
       [transaction]="tx"
       [recognizing]="recognizing()"
       [reporting]="reporting()"
+      [cancellingHold]="cancellingHold()"
       (closed)="closeDetails()"
       (recognize)="recognize()"
       (report)="report()"
       (contactSupport)="contactSupport()"
+      (cancelHold)="cancelHold()"
     />
   }
 </div>

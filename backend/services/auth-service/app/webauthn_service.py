@@ -325,7 +325,7 @@ async def finish_login(challenge_id: str, credential: dict[str, Any]) -> tuple[s
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_GENERIC_NO_PASSKEY_DETAIL)
 
-    token = create_access_token(user_id=str(user["_id"]), email=user["email"])
+    token = create_access_token(user_id=str(user["_id"]), email=user["email"], role=user.get("role", "customer"))
     return token, user
 
 
@@ -405,6 +405,15 @@ async def verify_step_up(user_id: str, challenge_id: str, action: str, action_pa
 async def list_credentials(user_id: str) -> list[dict]:
     db = get_database()
     return await db.webauthn_credentials.find({"user_id": user_id}).sort("created_at", -1).to_list(length=_MAX_CREDENTIALS_PER_USER)
+
+
+async def get_latest_credential_created_at(user_id: str) -> datetime | None:
+    """Data înrolării celui mai recent passkey al userului — folosit intern
+    de transactions-service (regula fraud DEV-03). Acoperit deja de indexul
+    `user_id` (vezi ensure_webauthn_indexes), fără index nou necesar."""
+    db = get_database()
+    latest = await db.webauthn_credentials.find({"user_id": user_id}).sort("created_at", -1).limit(1).to_list(length=1)
+    return latest[0]["created_at"] if latest else None
 
 
 async def revoke_credential(user_id: str, credential_id: str) -> None:

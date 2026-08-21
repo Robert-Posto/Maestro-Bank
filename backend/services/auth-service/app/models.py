@@ -4,8 +4,9 @@ Colecția `users` este singura folosită. Nu implementăm încă OAuth/MFA —
 doar nume + email + parolă (hash bcrypt) + JWT.
 """
 
+import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 import email_validator
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -25,6 +26,11 @@ class UserRegister(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
+    # Fictiv/necesar doar pentru fluxul de personal ("sună clientul" —
+    # vezi transactions-service/app/holds.py) — NU e verificat prin SMS
+    # nici acum, nici în viitorul apropiat; doar format, ca un placeholder
+    # plauzibil (la fel ca IBAN-urile/PAN-urile demo din acest proiect).
+    phone_number: str = Field(min_length=7, max_length=20)
     password: str = Field(min_length=8, max_length=128)
 
     @field_validator("first_name", "last_name")
@@ -33,6 +39,7 @@ class UserRegister(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("Numele nu poate fi gol.")
+
         return stripped
 
     @field_validator("email")
@@ -41,6 +48,14 @@ class UserRegister(BaseModel):
         # Normalizare: fără spații, litere mici — ca "Test@Ex.com" și
         # "test@ex.com" să fie tratate drept ACELAȘI cont.
         return str(value).strip().lower()
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str) -> str:
+        stripped = value.strip()
+        if not re.fullmatch(r"\+?[0-9 ]{7,20}", stripped):
+            raise ValueError("Numărul de telefon trebuie să conțină doar cifre, spații și un + opțional la început.")
+        return stripped
 
     @field_validator("password")
     @classmethod
@@ -81,6 +96,15 @@ class UserMeOut(UserOut):
 
     created_at: datetime
     is_active: bool
+    # Absent pe conturile create înainte de introducerea rolurilor -> cade
+    # automat pe "customer" (același pattern ca account_type în
+    # accounts-service), fără nicio migrare. NU e citit vreodată dintr-un
+    # filtru Mongo nicăieri (doar de pe un document deja găsit), deci NU
+    # are nevoie de backfill — spre deosebire de account_type.
+    role: Literal["customer", "staff"] = "customer"
+    # Absent pe conturile create înainte de introducerea acestui câmp ->
+    # cade pe None, fără migrare (același motiv ca role, mai sus).
+    phone_number: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -107,6 +131,19 @@ class InternalUserNameView(BaseModel):
 
     first_name: str
     last_name: str
+
+
+class InternalUserContactView(BaseModel):
+    """Vedere DOAR pentru personal (transactions-service::routers/staff.py —
+    lista de hold-uri de revizuit), NU pentru alte scopuri (ex. contrapartida
+    unui transfer, care folosește InternalUserNameView, mai restrictiv).
+    Separată deliberat de InternalUserNameView — restul apelanților nu ar
+    trebui să primească email/telefon doar pentru că a apărut acest câmp."""
+
+    first_name: str
+    last_name: str
+    email: str
+    phone_number: str | None = None
 
 
 class InternalPasswordVerifyRequest(BaseModel):
