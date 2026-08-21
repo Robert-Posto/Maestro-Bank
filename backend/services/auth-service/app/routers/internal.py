@@ -8,10 +8,15 @@ backend/gateway/app/routers/proxy.py), deci nu sunt accesibile din
 browser/Angular.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from app import service, webauthn_service
-from app.models import InternalPasswordVerifyRequest, InternalPasswordVerifyResponse, InternalUserNameView
+from app.models import (
+    InternalMarkIdentityVerifiedRequest,
+    InternalPasswordVerifyRequest,
+    InternalPasswordVerifyResponse,
+    InternalUserNameView,
+)
 from app.models_webauthn import InternalWebauthnVerifyRequest, InternalWebauthnVerifyResponse
 
 router = APIRouter(prefix="/internal", tags=["internal"])
@@ -34,3 +39,8 @@ async def verify_webauthn(payload: InternalWebauthnVerifyRequest):
         payload.user_id, payload.challenge_id, payload.action, payload.action_payload, payload.credential
     )
     return InternalWebauthnVerifyResponse(valid=valid)
+
+
+@router.post("/auth/mark-identity-verified", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_identity_verified(payload: InternalMarkIdentityVerifiedRequest):
+    await service.mark_identity_verified(payload.user_id)

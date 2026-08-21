@@ -1,0 +1,124 @@
+@import '../../../shared/styles/auth-screen.css';
+
+.auth-layout--wide {
+  width: min(100%, 1200px);
+  grid-template-columns: minmax(260px, 0.7fr) minmax(560px, 1.3fr);
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mb-space-4);
+  margin-bottom: var(--mb-space-5);
+}
+
+.identity-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  min-width: 0;
+}
+
+.identity-slot__label {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-secondary);
+}
+
+.identity-slot__dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mb-space-2);
+  height: 220px;
+  border: 1.5px dashed var(--mb-border-strong);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-tertiary);
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.identity-slot__dropzone:hover {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.identity-slot__preview {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface-muted);
+}
+
+.identity-slot__action {
+  display: block;
+  width: fit-content;
+  align-self: center;
+  font-family: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-blue-600);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.identity-slot__action:hover {
+  text-decoration: underline;
+}
+
+.identity-camera {
+  position: relative;
+  height: 220px;
+  border-radius: var(--mb-radius-md);
+  overflow: hidden;
+  background: #000;
+}
+
+.identity-camera video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* efect "oglindă", firesc pentru un selfie */
+}
+
+.identity-camera__shutter {
+  position: absolute;
+  bottom: var(--mb-space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.identity-camera__shutter:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.identity-canvas {
+  display: none;
+}
+
+.identity-submit {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .identity-grid {
+    grid-template-columns: 1fr;
+  }
+}
