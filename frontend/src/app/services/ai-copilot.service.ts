@@ -71,6 +71,11 @@ export interface SpendingForecastResponse {
   estimated_expenses: SpendingForecastEstimatedExpenses;
   financial_summary: SpendingForecastFinancialSummary;
   recommendation: string;
+  /** Care dintre cardurile analysis/recurring_payments/estimated_expenses/
+   * financial_summary sunt relevante pentru ACEST răspuns — datele sunt
+   * mereu calculate, dar afișăm doar cardurile care chiar răspund la
+   * întrebare (vezi copilot.html). Poate fi goală. */
+  relevant_cards: string[];
   budgets: BudgetStatus[] | null;
   pending_action: PendingAction | null;
   metadata: { agent: string; forecast_method: string; currency: string };

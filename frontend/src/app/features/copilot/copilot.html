@@ -38,7 +38,9 @@
               <div class="copilot-answer" [innerHTML]="msg.text | markdownLite"></div>
 
               @if (msg.response; as r) {
+                @if (r.relevant_cards.length > 0) {
                 <div class="copilot-cards">
+                  @if (r.relevant_cards.includes('analysis')) {
                   <div
                     class="copilot-card"
                     [class.copilot-card--positive]="r.affordable === true"
@@ -51,21 +53,27 @@
                     <div class="copilot-card__row"><span>Sold curent</span><span>{{ r.analysis.current_balance_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row"><span>Buffer recomandat</span><span>{{ r.analysis.recommended_buffer_minor | money: 'RON' }}</span></div>
                   </div>
+                  }
 
+                  @if (r.relevant_cards.includes('recurring_payments')) {
                   <div class="copilot-card">
                     <div class="copilot-card__header"><app-icon name="calendar" [size]="15" /> Plăți recurente rămase</div>
                     <div class="copilot-card__row"><span>Total luna asta</span><span>{{ r.recurring_payments.total_remaining_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row"><span>Deja plătite</span><span>{{ r.recurring_payments.already_paid_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row copilot-card__row--total"><span>Rămase de plată</span><span>{{ r.recurring_payments.remaining_minor | money: 'RON' }}</span></div>
                   </div>
+                  }
 
+                  @if (r.relevant_cards.includes('estimated_expenses')) {
                   <div class="copilot-card">
                     <div class="copilot-card__header"><app-icon name="receipt" [size]="15" /> Cheltuieli estimate</div>
                     <div class="copilot-card__row"><span>Esențiale</span><span>{{ r.estimated_expenses.variable_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row"><span>Discreționare</span><span>{{ r.estimated_expenses.discretionary_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row copilot-card__row--total"><span>Total estimat</span><span>{{ r.estimated_expenses.total_minor | money: 'RON' }}</span></div>
                   </div>
+                  }
 
+                  @if (r.relevant_cards.includes('financial_summary')) {
                   <div class="copilot-card">
                     <div class="copilot-card__header"><app-icon name="wallet" [size]="15" /> Rezumat financiar</div>
                     <div class="copilot-card__row"><span>Sold disponibil</span><span>{{ r.financial_summary.current_balance_minor | money: 'RON' }}</span></div>
@@ -75,7 +83,9 @@
                     <div class="copilot-card__row"><span>Cheltuieli proiectate</span><span>-{{ r.financial_summary.projected_expenses_minor | money: 'RON' }}</span></div>
                     <div class="copilot-card__row copilot-card__row--total"><span>Sold estimat la final</span><span>{{ r.financial_summary.estimated_end_balance_minor | money: 'RON' }}</span></div>
                   </div>
+                  }
                 </div>
+                }
 
                 @if (r.budgets && r.budgets.length > 0) {
                   <div class="copilot-budgets">
@@ -103,9 +113,11 @@
                   </div>
                 }
 
+                @if (r.relevant_cards.length > 0 || r.affordable !== null) {
                 <div class="copilot-recommendation" [class.copilot-recommendation--negative]="r.affordable === false">
                   <app-icon name="sparkles" [size]="15" /> {{ r.recommendation }}
                 </div>
+                }
 
                 @if (r.pending_action; as action) {
                   <div class="copilot-action">

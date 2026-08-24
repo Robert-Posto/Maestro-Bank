@@ -110,6 +110,14 @@ class SpendingForecastResponse(BaseModel):
 
     recommendation: str
 
+    # Cardurile din `analysis`/`recurring_payments`/`estimated_expenses`/
+    # `financial_summary` pe care frontend-ul chiar trebuie să le arate
+    # pentru ACEST răspuns — datele alea 4 secțiuni sunt mereu calculate
+    # (mai jos, niciodată None), dar nu mereu relevante pentru întrebare
+    # (vezi app/agents/spending_forecast.py::_relevant_cards). Poate fi
+    # goală (ex. întrebare conceptuală, fără date de cont implicate).
+    relevant_cards: list[str] = Field(default_factory=list)
+
     # Populate DOAR dacă GPT a ales tool-ul corespunzător pentru întrebare
     # (vezi app/tools/registry.py) — nu la fiecare răspuns.
     budgets: list[BudgetStatus] | None = None
