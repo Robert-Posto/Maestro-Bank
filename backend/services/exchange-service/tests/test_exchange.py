@@ -9,10 +9,12 @@ separată, ca să nu polueze exchange_db real):
 """
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock
 
 import jwt
 import pytest
 from bson import ObjectId
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
@@ -54,12 +56,12 @@ async def test_rates_require_jwt(client: AsyncClient):
     assert response.status_code == 401
 
 
-async def test_get_rates_marked_as_demo(client: AsyncClient):
+async def test_get_rates(client: AsyncClient):
     response = await client.get("/rates", headers=AUTH_HEADER)
     assert response.status_code == 200
     body = response.json()
     assert len(body) > 0
-    assert all(rate["is_demo"] is True for rate in body)
+    assert all(rate["mid_rate"] > 0 for rate in body)
 
 
 async def test_quote_ron_to_eur(client: AsyncClient):
@@ -68,7 +70,6 @@ async def test_quote_ron_to_eur(client: AsyncClient):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["is_demo"] is True
     assert body["received_minor"] > 0
     assert body["received_minor"] < body["amount_minor"]  # curs > 1, deci mai puține unități EUR decât bani RON
     assert body["total_cost_minor"] > 0
@@ -117,21 +118,49 @@ async def test_rates_use_bnr_after_successful_refresh(client: AsyncClient, monke
     assert eur["mid_rate"] == 5.1234
 
 
-async def test_demo_exchange_is_recorded_and_isolated(client: AsyncClient):
+async def test_execute_exchange_is_recorded_and_isolated(client: AsyncClient, monkeypatch):
+    """apply_internal_exchange (accounts-service) e mock-uit — testat separat,
+    la nivelul lui, în accounts-service; aici verificăm doar wiring-ul
+    exchange-service-ului (execuție -> înregistrare -> istoric per user)."""
+    mock_apply = AsyncMock(return_value=None)
+    monkeypatch.setattr("app.service._apply_exchange_in_accounts_service", mock_apply)
+
     other_user_token = f"Bearer {_make_token(str(ObjectId()))}"
 
     response = await client.post(
-        "/demo",
+        "/execute",
         json={"from_currency": "RON", "to_currency": "EUR", "amount_minor": 500_000},
         headers=AUTH_HEADER,
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["is_demo"] is True
-    assert "Simulare" in body["note"]
+    assert body["from_currency"] == "RON"
+    assert body["to_currency"] == "EUR"
+    mock_apply.assert_awaited_once()
 
-    mine = await client.get("/demo/history", headers=AUTH_HEADER)
+    mine = await client.get("/history", headers=AUTH_HEADER)
     assert len(mine.json()) == 1
 
-    others = await client.get("/demo/history", headers={"Authorization": other_user_token})
+    others = await client.get("/history", headers={"Authorization": other_user_token})
     assert others.json() == []
+
+
+async def test_execute_exchange_propagates_missing_account_error(client: AsyncClient, monkeypatch):
+    """Dacă userul n-are încă un cont pe valuta țintă, accounts-service
+    întoarce 404 -> exchange-service îl traduce în 400 cu mesaj clar,
+    fără să înregistreze nimic în istoric."""
+
+    async def fake_apply(*args, **kwargs):
+        raise HTTPException(status_code=400, detail="Nu ai încă un cont pentru moneda asta.")
+
+    monkeypatch.setattr("app.service._apply_exchange_in_accounts_service", fake_apply)
+
+    response = await client.post(
+        "/execute",
+        json={"from_currency": "RON", "to_currency": "EUR", "amount_minor": 500_000},
+        headers=AUTH_HEADER,
+    )
+    assert response.status_code == 400
+
+    mine = await client.get("/history", headers=AUTH_HEADER)
+    assert mine.json() == []

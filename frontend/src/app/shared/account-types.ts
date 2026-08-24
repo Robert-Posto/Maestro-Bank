@@ -61,7 +61,38 @@ export const ACCOUNT_TYPE_CATALOG: Record<AccountType, AccountTypeMeta> = {
     requiresDocument: true,
     documentHint: 'Adeverință de student sau carnet — încarci un fișier, verificarea e automată în acest demo.',
   },
+  // Conturi pe valută REALĂ — necesare pentru Schimb valutar (exchange-service
+  // chiar mută soldul între contul curent RON și contul pe valuta asta, nu
+  // doar afișează RON convertit). Aceleași culori ca insignele de monedă de
+  // pe pagina de schimb — vezi shared/currencies.ts.
+  eur: {
+    type: 'eur',
+    label: 'Cont EUR',
+    tagline: 'Sold real în euro — folosit direct din Schimb valutar, fără conversie ascunsă.',
+    icon: 'globe',
+    colorVar: '--mb-blue-600',
+    rateLabel: 'Fără dobândă',
+    benefits: ['IBAN propriu, în EUR', 'Alimentat prin Schimb valutar', 'Fără card atașat'],
+  },
+  usd: {
+    type: 'usd',
+    label: 'Cont USD',
+    tagline: 'Sold real în dolari — folosit direct din Schimb valutar, fără conversie ascunsă.',
+    icon: 'globe',
+    colorVar: '--mb-positive',
+    rateLabel: 'Fără dobândă',
+    benefits: ['IBAN propriu, în USD', 'Alimentat prin Schimb valutar', 'Fără card atașat'],
+  },
+  gbp: {
+    type: 'gbp',
+    label: 'Cont GBP',
+    tagline: 'Sold real în lire sterline — folosit direct din Schimb valutar, fără conversie ascunsă.',
+    icon: 'globe',
+    colorVar: '--mb-cat-shopping',
+    rateLabel: 'Fără dobândă',
+    benefits: ['IBAN propriu, în GBP', 'Alimentat prin Schimb valutar', 'Fără card atașat'],
+  },
 };
 
 /** Tipurile pe care userul le poate deschide manual (nu include "current" — acela vine automat la înregistrare). */
-export const CREATABLE_ACCOUNT_TYPES: CreatableAccountType[] = ['savings', 'deposit', 'student'];
+export const CREATABLE_ACCOUNT_TYPES: CreatableAccountType[] = ['savings', 'deposit', 'student', 'eur', 'usd', 'gbp'];

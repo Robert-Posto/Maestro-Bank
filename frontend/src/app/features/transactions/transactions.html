@@ -12,17 +12,7 @@
     />
   </div>
 
-  <label class="tx-filter tx-filter--inline">
-    <div class="tx-filter__control">
-      <app-icon name="cards" [size]="16" />
-      <select [ngModel]="category()" (ngModelChange)="category.set($event)">
-        <option value="">Toate categoriile</option>
-        @for (cat of categories; track cat.value) {
-          <option [value]="cat.value">{{ cat.label }}</option>
-        }
-      </select>
-    </div>
-  </label>
+  <app-select class="tx-category-select" [options]="categoryOptions" [value]="category()" placeholder="Toate categoriile" (changed)="onCategoryChange($event)" />
 
   <app-action-button variant="secondary" (pressed)="toggleFilters()">
     <app-icon name="filter" [size]="16" /> Filtre avansate
@@ -49,14 +39,7 @@
 
       <label class="tx-filter">
         <span>Direcție</span>
-        <div class="tx-filter__control">
-          <app-icon name="transfer" [size]="16" />
-          <select [ngModel]="direction()" (ngModelChange)="direction.set($event)">
-            <option value="">Toate</option>
-            <option value="incoming">Încasări</option>
-            <option value="outgoing">Plăți</option>
-          </select>
-        </div>
+        <app-select [options]="directionOptions" [value]="direction()" placeholder="Toate" (changed)="direction.set($event)" />
       </label>
 
       <label class="tx-filter">

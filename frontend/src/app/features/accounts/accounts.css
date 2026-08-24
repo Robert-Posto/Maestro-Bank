@@ -276,48 +276,6 @@
   cursor: not-allowed;
 }
 
-.account-card--add {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 6px;
-  border: 1.5px dashed var(--mb-border-strong);
-  box-shadow: none;
-  background: var(--mb-surface-muted);
-  cursor: pointer;
-  min-height: 200px;
-  font-family: inherit;
-}
-
-.account-card--add:hover {
-  border-color: var(--mb-blue-500);
-  background: var(--mb-blue-50);
-}
-
-.account-card--add__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--mb-surface);
-  border: 1px solid var(--mb-border-strong);
-  color: var(--mb-blue-600);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--mb-space-2);
-}
-
-.account-card--add p {
-  font-weight: var(--mb-font-weight-medium);
-  color: var(--mb-text-primary);
-  font-size: var(--mb-font-size-sm);
-}
-
-.account-card--add small {
-  color: var(--mb-text-tertiary);
-  font-size: var(--mb-font-size-xs);
-}
-
 .accounts-footer {
   margin-top: var(--mb-space-6);
 }

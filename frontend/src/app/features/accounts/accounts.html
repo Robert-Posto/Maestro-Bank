@@ -1,5 +1,7 @@
 <app-page-header title="Conturi" subtitle="Toate conturile tale MaestroBank.">
-  <app-action-button (pressed)="openCreateModal()"><app-icon name="plus" [size]="16" /> Cont nou</app-action-button>
+  @if (availableTypes().length > 0) {
+    <app-action-button (pressed)="openCreateModal()"><app-icon name="plus" [size]="16" /> Cont nou</app-action-button>
+  }
 </app-page-header>
 
 @if (loading()) {
@@ -35,7 +37,7 @@
       <span class="accounts-summary__icon accounts-summary__icon--navy"><app-icon name="building" [size]="18" /></span>
       <div>
         <span class="accounts-summary__label">Conturi deschise</span>
-        <strong>{{ accounts().length }} / 4</strong>
+        <strong>{{ accounts().length }} / {{ maxAccounts }}</strong>
       </div>
     </div>
   </div>
@@ -63,7 +65,7 @@
           <span
             class="account-card__icon"
             [style.color]="'var(' + catalog[account.account_type].colorVar + ')'"
-            [style.background]="'color-mix(in srgb, var(' + catalog[account.account_type].colorVar + ') 14%, white)'"
+            [style.background]="'color-mix(in srgb, var(' + catalog[account.account_type].colorVar + ') 14%, var(--mb-surface))'"
           >
             <app-icon [name]="catalog[account.account_type].icon" [size]="20" />
           </span>
@@ -112,14 +114,6 @@
           </button>
         </div>
       </div>
-    }
-
-    @if (availableTypes().length > 0) {
-      <button type="button" class="account-card account-card--add" (click)="openCreateModal()">
-        <span class="account-card--add__icon"><app-icon name="plus" [size]="22" /></span>
-        <p>Deschide un cont nou</p>
-        <small>Economii, depozit sau student</small>
-      </button>
     }
   </div>
 

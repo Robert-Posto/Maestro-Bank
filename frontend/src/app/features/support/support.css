@@ -124,8 +124,9 @@
   width: 34px;
   height: 34px;
   border-radius: 11px;
-  color: #fff;
-  background: var(--mb-navy-800);
+  border: 1px solid var(--mb-border);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface);
   font-family: Georgia, 'Times New Roman', serif;
   font-size: var(--mb-font-size-sm);
 }

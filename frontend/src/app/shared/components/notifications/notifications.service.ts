@@ -3,7 +3,14 @@ import { Injectable, inject, signal } from '@angular/core';
 
 import { API_BASE_URL } from '../../../core/api-config';
 
-export type NotificationKind = 'budget' | 'card' | 'transfer' | 'system';
+export type NotificationKind =
+  | 'budget'
+  | 'card'
+  | 'transfer'
+  | 'transfer_received'
+  | 'transfer_hold'
+  | 'transfer_hold_cancelled'
+  | 'system';
 
 export interface AppNotification {
   id: string;

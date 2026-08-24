@@ -28,7 +28,7 @@ export interface AccountCreateEvent {
       <div class="atc__track" #track (scroll)="onScroll()">
         @for (t of types(); track t.type) {
           <article class="atc__card">
-            <span class="atc__icon" [style.color]="'var(' + t.colorVar + ')'" [style.background]="'color-mix(in srgb, var(' + t.colorVar + ') 14%, white)'">
+            <span class="atc__icon" [style.color]="'var(' + t.colorVar + ')'" [style.background]="'color-mix(in srgb, var(' + t.colorVar + ') 14%, var(--mb-surface))'">
               <app-icon [name]="t.icon" [size]="26" />
             </span>
             <h3>{{ t.label }}</h3>

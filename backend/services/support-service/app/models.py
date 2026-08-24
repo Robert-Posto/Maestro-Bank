@@ -46,7 +46,9 @@ class TicketOut(BaseModel):
 # de accounts-service (card blocat), budgets-service (prag de buget atins),
 # transactions-service (transfer reușit), NU direct de frontend.
 
-NotificationKind = Literal["budget", "card", "transfer", "system"]
+NotificationKind = Literal[
+    "budget", "card", "transfer", "transfer_received", "transfer_hold", "transfer_hold_cancelled", "system"
+]
 
 
 class NotificationCreate(BaseModel):

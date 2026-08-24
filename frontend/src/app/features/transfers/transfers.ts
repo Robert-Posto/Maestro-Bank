@@ -19,6 +19,7 @@ import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { DatePipe } from '@angular/common';
 import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
+import { Select, SelectOption } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
@@ -35,7 +36,7 @@ type MainTab = 'new' | 'scheduled';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe],
+  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe, Select],
   templateUrl: './transfers.html',
   styleUrl: './transfers.css',
 })
@@ -44,6 +45,11 @@ export class Transfers implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
+  protected readonly categoryOptions: SelectOption[] = TRANSACTION_CATEGORIES.map((c) => ({
+    value: c.value,
+    label: c.label,
+    colorVar: c.colorVar,
+  }));
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
   protected readonly mainTab = signal<MainTab>('new');

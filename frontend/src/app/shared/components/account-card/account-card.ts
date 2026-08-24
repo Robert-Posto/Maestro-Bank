@@ -51,8 +51,9 @@ export interface AccountRowData {
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: var(--mb-navy-900);
-        color: var(--mb-text-on-navy);
+        border: 1px solid var(--mb-border);
+        background: var(--mb-surface-muted);
+        color: var(--mb-text-secondary);
         display: inline-flex;
         align-items: center;
         justify-content: center;

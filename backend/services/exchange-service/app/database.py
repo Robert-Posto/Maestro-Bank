@@ -1,8 +1,9 @@
 """Conexiunea la MongoDB pentru exchange-service.
 
 Folosește exclusiv baza `exchange_db`. Colecția `demo_exchanges` reține
-istoricul simulărilor de schimb valutar (POST /exchange/demo) — NU
-reprezintă fonduri reale mutate.
+istoricul schimburilor valutare EXECUTATE (POST /exchange/execute) — numele
+colecției a rămas din faza inițială (doar simulare), dar solduri chiar se
+mută acum, prin accounts-service — vezi app/service.py::execute_exchange.
 """
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
