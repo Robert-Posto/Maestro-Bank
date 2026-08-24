@@ -91,6 +91,11 @@ export class TransactionsService {
     return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/${id}/report`, { reason });
   }
 
+  /** Doar pentru tranzacții proprii, încă "pending_review" — vezi app/holds.py::cancel_hold din backend. */
+  cancelHold(id: string): Observable<TransactionView> {
+    return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/${id}/hold/cancel`, {});
+  }
+
   exportCsv(filters: TransactionFilters): Observable<Blob> {
     const params = this.buildParams(filters);
     return this.http.get(`${API_BASE_URL}/transactions/export`, { params, responseType: 'blob' });

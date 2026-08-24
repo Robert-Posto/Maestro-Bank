@@ -22,6 +22,7 @@ export interface TransactionDetail {
   recognized: boolean;
   reported: boolean;
   created_at: string;
+  hold?: { expires_at: string; resolution: string | null } | null;
 }
 
 /**
@@ -42,11 +43,15 @@ export class TransactionDetailsPanel {
   readonly accountLabel = input('Cont curent RON');
   readonly recognizing = input(false);
   readonly reporting = input(false);
+  readonly cancellingHold = input(false);
 
   readonly closed = output<void>();
   readonly recognize = output<void>();
   readonly report = output<void>();
   readonly contactSupport = output<void>();
+  readonly cancelHold = output<void>();
+
+  protected readonly isPendingReview = computed(() => this.transaction().status === 'pending_review');
 
   protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
   protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));

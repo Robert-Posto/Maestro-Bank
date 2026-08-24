@@ -82,3 +82,12 @@ class InternalWebauthnVerifyRequest(BaseModel):
 
 class InternalWebauthnVerifyResponse(BaseModel):
     valid: bool
+
+
+class InternalLatestCredentialView(BaseModel):
+    """Folosit de transactions-service (regula fraud DEV-03 — passkey nou
+    înrolat recent). Expune DOAR data înrolării celui mai recent credential
+    — fereastra de timp ("ultimele 60 min") e o decizie de politică a
+    apelantului, nu a auth-service-ului."""
+
+    latest_created_at: datetime | None = None

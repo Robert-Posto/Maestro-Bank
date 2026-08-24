@@ -83,6 +83,12 @@ export interface Beneficiary {
   created_at: string;
 }
 
+export interface HoldInfo {
+  expires_at: string;
+  /** null cât timp reținerea e activă — vezi app/holds.py din backend. */
+  resolution: string | null;
+}
+
 export interface TransactionView {
   id: string;
   direction: 'incoming' | 'outgoing';
@@ -98,6 +104,8 @@ export interface TransactionView {
   recognized: boolean;
   reported: boolean;
   created_at: string;
+  /** Prezent DOAR pe tranzacții care AU FOST reținute de motorul de fraud (status="pending_review") — vezi app/holds.py. */
+  hold: HoldInfo | null;
 }
 
 export interface TransferPayload {

@@ -8,9 +8,11 @@ const STATUS_TONE_MAP: Record<string, BadgeTone> = {
   resolved: 'success',
   open: 'info',
   pending: 'warning',
+  pending_review: 'warning',
   in_progress: 'warning',
   frozen: 'error',
   failed: 'error',
+  cancelled: 'neutral',
   inactive: 'neutral',
   disabled: 'neutral',
 };
@@ -19,11 +21,14 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   active: 'Activ',
   completed: 'Procesată',
   pending: 'În procesare',
+  // Reținut de motorul de fraud (scor peste prag) — vezi backend app/holds.py.
+  pending_review: 'Reținut pentru verificare',
   failed: 'Eșuată',
   resolved: 'Rezolvat',
   open: 'Deschis',
   in_progress: 'În lucru',
   frozen: 'Blocat',
+  cancelled: 'Anulată',
   inactive: 'Inactiv',
   disabled: 'Dezactivat',
 };

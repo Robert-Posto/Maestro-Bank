@@ -8,6 +8,7 @@
 export interface DecodedJwtPayload {
   sub?: string;
   email?: string;
+  role?: 'customer' | 'staff';
   iat?: number;
   exp?: number;
 }

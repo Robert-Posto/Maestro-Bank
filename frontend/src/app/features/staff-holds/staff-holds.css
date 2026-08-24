@@ -1,0 +1,123 @@
+.holds-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.hold-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-4) var(--mb-space-5);
+  box-shadow: var(--mb-shadow-xs);
+  flex-wrap: wrap;
+}
+
+.hold-card__main {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-6);
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
+.hold-card__customer {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  min-width: 180px;
+}
+
+.hold-card__name {
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+}
+
+.hold-card__phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-blue-600);
+  text-decoration: none;
+}
+
+.hold-card__phone:hover {
+  text-decoration: underline;
+}
+
+.hold-card__phone--missing {
+  color: var(--mb-text-tertiary);
+}
+
+.hold-card__transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 220px;
+}
+
+.hold-card__amount {
+  font-weight: var(--mb-font-weight-semibold);
+  font-size: var(--mb-font-size-md);
+  color: var(--mb-text-primary);
+}
+
+.hold-card__route {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-secondary);
+}
+
+.hold-card__description {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.hold-card__risk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  min-width: 160px;
+}
+
+.hold-card__rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.hold-card__rule-tag {
+  font-size: 0.68rem;
+  font-weight: var(--mb-font-weight-medium);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  border: 1px solid var(--mb-border);
+}
+
+.hold-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  min-width: 110px;
+}
+
+.hold-card__expiry {
+  color: var(--mb-warning);
+}
+
+.hold-card__actions {
+  display: flex;
+  gap: var(--mb-space-2);
+  flex: 0 0 auto;
+}

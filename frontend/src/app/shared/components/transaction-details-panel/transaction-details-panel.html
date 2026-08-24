@@ -57,21 +57,38 @@
     </div>
   </dl>
 
-  <div class="details-panel__actions">
-    <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
-      <app-icon name="shield" [size]="17" /> Nu recunosc această tranzacție
-    </app-action-button>
-    <app-action-button
-      variant="secondary"
-      [fullWidth]="true"
-      [disabled]="transaction().recognized"
-      [loading]="recognizing()"
-      (pressed)="recognize.emit()"
-    >
-      <app-icon name="check" [size]="17" />
-      {{ transaction().recognized ? 'Marcată ca recunoscută' : 'Marchează ca recunoscută' }}
-    </app-action-button>
-  </div>
+  @if (isPendingReview()) {
+    <div class="details-panel__hold-notice">
+      <app-icon name="shield" [size]="17" />
+      <div>
+        <p><strong>Transfer reținut pentru verificare de securitate.</strong></p>
+        @if (transaction().hold?.expires_at) {
+          <p>Se anulează automat pe {{ transaction().hold!.expires_at | date: 'dd MMM yyyy, HH:mm' }} dacă nu e rezolvat.</p>
+        }
+      </div>
+    </div>
+    <div class="details-panel__actions">
+      <app-action-button variant="danger" [fullWidth]="true" [loading]="cancellingHold()" (pressed)="cancelHold.emit()">
+        <app-icon name="close" [size]="17" /> Anulează transferul
+      </app-action-button>
+    </div>
+  } @else {
+    <div class="details-panel__actions">
+      <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
+        <app-icon name="shield" [size]="17" /> Nu recunosc această tranzacție
+      </app-action-button>
+      <app-action-button
+        variant="secondary"
+        [fullWidth]="true"
+        [disabled]="transaction().recognized"
+        [loading]="recognizing()"
+        (pressed)="recognize.emit()"
+      >
+        <app-icon name="check" [size]="17" />
+        {{ transaction().recognized ? 'Marcată ca recunoscută' : 'Marchează ca recunoscută' }}
+      </app-action-button>
+    </div>
+  }
 
   @if (transaction().reported) {
     <p class="details-panel__reported-note">Tranzacția a fost raportată echipei de suport MaestroBank.</p>

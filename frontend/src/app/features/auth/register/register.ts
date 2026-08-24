@@ -19,6 +19,7 @@ export class Register {
   protected readonly firstName = signal('');
   protected readonly lastName = signal('');
   protected readonly email = signal('');
+  protected readonly phoneNumber = signal('');
   protected readonly password = signal('');
   protected readonly isSubmitting = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -27,7 +28,7 @@ export class Register {
   submit(): void {
     this.error.set(null);
 
-    if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim() || !this.password()) {
+    if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim() || !this.phoneNumber().trim() || !this.password()) {
       this.error.set('Completează toate câmpurile.');
       return;
     }
@@ -38,6 +39,7 @@ export class Register {
         first_name: this.firstName().trim(),
         last_name: this.lastName().trim(),
         email: this.email().trim(),
+        phone_number: this.phoneNumber().trim(),
         password: this.password(),
       })
       .subscribe({
