@@ -29,6 +29,33 @@ from app.services.affordability_service import recommended_buffer_minor
 _ESSENTIAL_CATEGORIES = {"groceries", "transport", "bills"}
 _DISCRETIONARY_CATEGORIES = {"shopping", "restaurants", "entertainment", "other"}
 
+_CATEGORY_LABELS_RO = {
+    "groceries": "alimente",
+    "shopping": "shopping",
+    "transport": "transport",
+    "bills": "facturi",
+    "restaurants": "restaurante",
+    "entertainment": "entertainment",
+    "subscriptions": "abonamente",
+    "other": "alte cheltuieli",
+}
+
+
+def top_discretionary_category(spending_summary: dict) -> tuple[str, int] | None:
+    """Categoria discreționară cu cea mai mare cheltuială ÎNREGISTRATĂ deja
+    luna asta (nu o proiecție) — sursa pentru un sfat de economisire
+    CONCRET ("aici cheltuiești cel mai mult din ce poți controla ușor"),
+    nu un sfat generic desprins de datele reale. Întoarce None dacă nu
+    există nicio cheltuială discreționară înregistrată încă.
+    """
+    by_category = spending_summary.get("by_category", [])
+    discretionary = [c for c in by_category if c["category"] in _DISCRETIONARY_CATEGORIES]
+    if not discretionary:
+        return None
+    top = max(discretionary, key=lambda c: c["amount_minor"])
+    label = _CATEGORY_LABELS_RO.get(top["category"], top["category"])
+    return label, top["amount_minor"]
+
 
 def split_recurring_payments(subscriptions: list[dict], today_day: int | None = None) -> dict:
     """Abonamente active ale lunii curente, împărțite în deja-plătite vs.

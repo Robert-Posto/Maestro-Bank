@@ -13,6 +13,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.config import settings
+from app.services import moderation_service
 from app.tools.errors import ToolError
 
 pytestmark = pytest.mark.asyncio
@@ -172,6 +173,17 @@ async def test_general_question_does_not_call_affordability(client: AsyncClient,
     assert body["requested_amount_minor"] is None
     # DTO tot complet, chiar dacă GPT n-a cerut explicit forecast/subscriptions
     assert body["financial_summary"]["estimated_end_balance_minor"] == FORECAST["estimated_end_of_month_balance_minor"]
+    # Recomandarea determinist-template include un sfat de economisire CONCRET,
+    # ancorat în categoria discreționară reală cu cea mai mare cheltuială
+    # (SPENDING_SUMMARY: "restaurants" 520 lei) — vezi
+    # app/agents/spending_forecast.py::_default_recommendation.
+    assert "restaurante" in body["recommendation"]
+    assert "520,00 lei" in body["recommendation"]
+    # GPT a chemat DOAR get_spending_summary -> DOAR cardul "Cheltuieli
+    # estimate" e relevant, NU toate 4 (feedback: "as vrea sa mi afiseze
+    # asta doar cand e cazul nu mereu" — vezi
+    # app/agents/spending_forecast.py::_relevant_cards).
+    assert body["relevant_cards"] == ["estimated_expenses"]
 
 
 async def test_affordability_question_uses_deterministic_tool(client: AsyncClient, monkeypatch, mock_tools):
@@ -200,6 +212,10 @@ async def test_affordability_question_uses_deterministic_tool(client: AsyncClien
     # nu inventează date: cifrele vin exact din fixture-urile mock-uite
     assert body["analysis"]["current_balance_minor"] == ACCOUNT["balance_minor"]
     assert "rezervă" in body["recommendation"]
+    # GPT a chemat DOAR evaluate_affordability -> DOAR cardul "Analiză" e
+    # relevant (nu și "Rezumat financiar"/"Cheltuieli estimate", chiar dacă
+    # datele alea sunt calculate oricum pentru DTO).
+    assert body["relevant_cards"] == ["analysis"]
 
 
 async def test_amount_conversion_from_ron_to_minor_is_deterministic(client: AsyncClient, monkeypatch, mock_tools):
@@ -387,6 +403,9 @@ async def test_budget_status_question_populates_budgets(client: AsyncClient, mon
     assert body["budgets"][0]["spent_minor"] == 52000
     assert body["budgets"][0]["over_budget"] is False
     assert body["pending_action"] is None
+    # get_budget_status nu declanșează niciunul dintre cele 4 carduri de
+    # forecast — bugetele au propria secțiune în UI (r.budgets), separată.
+    assert body["relevant_cards"] == []
 
 
 async def test_create_budget_request_produces_pending_action_not_execution(client: AsyncClient, monkeypatch, mock_tools):
@@ -452,4 +471,76 @@ async def test_confirm_action_invalid_payload_returns_clean_error(client: AsyncC
         headers={"Authorization": f"Bearer {make_token()}"},
     )
     assert response.status_code == 422
+
+
+async def test_profanity_short_circuits_before_any_gpt_call(client: AsyncClient, monkeypatch, mock_tools):
+    """Mesaj cu limbaj jignitor -> răspunsul determinist "reformulează",
+    FĂRĂ niciun apel GPT (verificat prin lista de răspunsuri mock GOALĂ —
+    dacă agentul ar mai apela chat_completion, testul ar pica cu
+    AssertionError din fake, nu doar prin lipsa unui răspuns potrivit)."""
+    monkeypatch.setattr("app.agents.spending_forecast.chat_completion", _make_fake_chat_completion([]))
+
+    response = await client.post(
+        "/spending-forecast/chat",
+        json={"message": "esti prost, nu inteleg nimic din ce zici"},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer"] == moderation_service.REPHRASE_REQUEST_ANSWER
+    assert body["relevant_cards"] == []
+    assert body["affordable"] is None
+    # DTO tot complet (context financiar pentru sidebar), chiar dacă GPT
+    # n-a fost apelat deloc.
+    assert body["financial_summary"]["estimated_end_balance_minor"] == FORECAST["estimated_end_of_month_balance_minor"]
+
+
+async def test_no_tool_calls_means_no_relevant_cards(client: AsyncClient, monkeypatch, mock_tools):
+    """Întrebare conceptuală, în afara domeniului sau la care GPT răspunde
+    direct fără niciun tool -> `relevant_cards` gol, deci UI-ul nu arată
+    NICIUN card de forecast (DTO-ul e completat oricum pentru integritate,
+    dar nu are sens să fie afișat dacă n-are legătură cu întrebarea)."""
+    responses = [FakeMessage(content="Nu e domeniul meu, dar te pot ajuta cu bugetul sau cheltuielile tale.")]
+    monkeypatch.setattr("app.agents.spending_forecast.chat_completion", _make_fake_chat_completion(responses))
+
+    response = await client.post(
+        "/spending-forecast/chat",
+        json={"message": "Ce vreme e azi?"},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["relevant_cards"] == []
+    assert body["affordable"] is None
+
+
+async def test_multiple_tool_calls_show_multiple_cards_in_stable_order(client: AsyncClient, monkeypatch, mock_tools):
+    """'Ce cheltuieli urmează să mai am luna asta?' -> GPT cheamă atât
+    get_forecast cât și get_upcoming_subscriptions (prompt-ul cere să
+    acopere ȘI obligațiile fixe, ȘI cheltuiala variabilă) -> ambele carduri
+    relevante apar, în ordinea stabilă din UI (analysis, recurring_payments,
+    estimated_expenses, financial_summary), indiferent de ordinea în care
+    GPT le-a chemat."""
+    responses = [
+        FakeMessage(
+            tool_calls=[
+                FakeToolCall("call_1", "get_upcoming_subscriptions", "{}"),
+                FakeToolCall("call_2", "get_forecast", "{}"),
+            ],
+        ),
+        FakeMessage(content="Mai ai un abonament de plătit și cheltuieli variabile estimate până la finalul lunii."),
+    ]
+    monkeypatch.setattr("app.agents.spending_forecast.chat_completion", _make_fake_chat_completion(responses))
+
+    response = await client.post(
+        "/spending-forecast/chat",
+        json={"message": "Ce cheltuieli urmează să mai am luna asta?"},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["relevant_cards"] == ["recurring_payments", "estimated_expenses", "financial_summary"]
     assert "Traceback" not in response.text

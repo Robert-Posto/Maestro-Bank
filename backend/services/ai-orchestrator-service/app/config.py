@@ -46,6 +46,11 @@ class Settings:
     # evită o buclă infinită dacă modelul tot cere tool-uri.
     max_tool_call_rounds: int = int(os.getenv("AI_MAX_TOOL_CALL_ROUNDS", "4"))
 
+    # Analog, dar pentru Support Agent (vezi app/agents/support.py) — un
+    # plafon separat, nu reutilizăm max_tool_call_rounds de mai sus, ca cei
+    # doi agenți să poată fi tuning-uiți independent unul de altul.
+    agent_max_tool_iterations: int = int(os.getenv("SUPPORT_AGENT_MAX_TOOL_ITERATIONS", "6"))
+
     @property
     def azure_openai_configured(self) -> bool:
         return bool(self.azure_openai_endpoint and self.azure_openai_api_key)

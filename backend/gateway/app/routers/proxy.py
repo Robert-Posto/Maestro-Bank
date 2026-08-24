@@ -47,7 +47,8 @@ SERVICES: dict[str, dict[str, str | float]] = {
     # (tool-calling), semnificativ mai lente decât un query Mongo obișnuit.
     # 100s — acoperă confortabil 2 runde de tool-calling la 45s/apel
     # (timeout-ul per-apel setat în ai-orchestrator-service), fără să
-    # lase userul agățat la infinit dacă Azure chiar nu răspunde.
+    # lase userul agățat la infinit dacă Azure chiar nu răspunde. Folosit
+    # de ambii agenți găzduiți acolo (Spending + Forecast, Support Agent).
     "ai": {"base_url": settings.ai_service_url, "internal_prefix": "", "timeout_seconds": 100.0},
 }
 
@@ -76,8 +77,9 @@ def _is_protected(service: str, path: str) -> bool:
       - support: TOT e protejat (tickets);
       - exchange: TOT e protejat (rate/quote personalizate per user);
       - verification: TOT e protejat (identitatea userului curent);
-      - ai: TOT e protejat (identitatea userului vine STRICT din JWT,
-        agentul nu acceptă user_id arbitrar în request).
+      - ai: TOT e protejat (identitatea userului vine STRICT din JWT — nici
+        Spending + Forecast, nici Support Agent nu acceptă user_id
+        arbitrar în request).
     """
     if service == "auth":
         if path in (
