@@ -11,8 +11,11 @@
 GPT (prin function/tool calling) decide ce tool-uri cheamă, în funcție de
 întrebare (secțiunea 16 — nu încărcăm toate datele userului de fiecare
 dată). DUPĂ ce GPT termină, completăm determinist orice date lipsă din
-cache, ca DTO-ul structurat întors către UI să fie mereu complet (secțiunea
-12 — cardurile din UI apar mereu, indiferent de întrebare).
+cache, ca DTO-ul structurat întors către UI să fie mereu complet — dar
+cardurile arătate userului NU mai sunt toate mereu (vezi `_relevant_cards`
+mai jos): datele sunt mereu calculate corect, afișarea lor e condiționată
+de ce a chemat GPT efectiv pentru întrebarea asta (feedback: cardurile nu
+trebuie să apară dacă nu au legătură cu ce s-a întrebat).
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ from app.models.spending_forecast import (
 from app.prompts.spending_forecast_prompt import build_system_prompt
 from app.rag.retriever import Chunk, get_retriever
 from app.security import AuthContext
-from app.services import affordability_service, forecast_service
+from app.services import affordability_service, forecast_service, moderation_service
 from app.tools.errors import ToolError
 from app.tools.registry import TOOL_SCHEMAS, ToolResultCache, ensure_core_data, execute_tool
 
@@ -61,6 +64,32 @@ _FALLBACK_ANSWER = (
 # coerența unei conversații normale (câteva schimburi de replici).
 _MAX_HISTORY_MESSAGES = 12
 
+# Cardurile din UI (Analiză / Plăți recurente rămase / Cheltuieli estimate /
+# Rezumat financiar) NU mai apar mereu — doar cele relevante pentru
+# întrebarea userului (feedback: "as vrea sa mi afiseze asta doar cand e
+# cazul nu mereu"). DTO-ul rămâne complet (vezi ensure_core_data, mai jos —
+# păstrăm secțiunea 12 din task DOAR ca "datele sunt mereu calculate",
+# nu ca "sunt mereu arătate"), dar `relevant_cards` spune frontend-ului pe
+# care să le afișeze, dedus din tool-urile pe care GPT a ALES să le cheme
+# pentru ACEASTĂ întrebare — NU din completarea determinist-forțată de
+# ensure_core_data (care rulează DUPĂ ce citim called_tools, tocmai ca să
+# nu "polueze" relevanța cu date completate doar pentru integritatea DTO-ului).
+_CARD_TRIGGERS: dict[str, set[str]] = {
+    "get_account_balance": {"financial_summary"},
+    "get_spending_summary": {"estimated_expenses"},
+    "get_forecast": {"financial_summary", "estimated_expenses"},
+    "get_upcoming_subscriptions": {"recurring_payments"},
+    "evaluate_affordability": {"analysis"},
+}
+_CARD_ORDER = ["analysis", "recurring_payments", "estimated_expenses", "financial_summary"]
+
+
+def _relevant_cards(called_tools: list[str]) -> list[str]:
+    cards: set[str] = set()
+    for tool_name in called_tools:
+        cards |= _CARD_TRIGGERS.get(tool_name, set())
+    return [card for card in _CARD_ORDER if card in cards]
+
 
 async def _rag_context(query: str) -> tuple[str | None, list[tuple[Chunk, float]]]:
     hits = await get_retriever().retrieve(query)
@@ -74,16 +103,32 @@ async def _rag_context(query: str) -> tuple[str | None, list[tuple[Chunk, float]
     return message, hits
 
 
-def _default_recommendation(snapshot: dict) -> str:
+def _default_recommendation(snapshot: dict, spending_summary: dict) -> str:
     """Recomandare determinist-template pentru întrebări generale (fără o
     sumă cerută explicit) — reflectă direct numerele din forecast, nu
-    parafrazarea lui GPT.
+    parafrazarea lui GPT. Include un sfat de economisire CONCRET (categoria
+    discreționară cu cea mai mare cheltuială reală) atunci când există date
+    pentru asta — nu un sfat generic, desprins de cont (vezi feedback
+    userului: "sa ma ajute sa economisesc, sa mi dea sfaturi").
     """
     end_balance = snapshot["financial_summary"]["estimated_end_balance_minor"]
     buffer_minor = snapshot["analysis"]["recommended_buffer_minor"]
+    top_category = forecast_service.top_discretionary_category(spending_summary)
+
     if end_balance >= buffer_minor:
-        return f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — peste bufferul de siguranță recomandat."
-    return f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — sub bufferul de siguranță recomandat de {affordability_service.format_ron(buffer_minor)}. Poate merită să reduci cheltuielile discreționare."
+        base = f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — peste bufferul de siguranță recomandat."
+        if top_category:
+            label, amount_minor = top_category
+            base += f" Cea mai mare cheltuială discreționară de până acum e pe {label} ({affordability_service.format_ron(amount_minor)}) — dacă vrei să economisești mai mult, e primul loc de unde ai putea reduce."
+        return base
+
+    base = f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — sub bufferul de siguranță recomandat de {affordability_service.format_ron(buffer_minor)}."
+    if top_category:
+        label, amount_minor = top_category
+        base += f" Cea mai mare cheltuială discreționară e pe {label} ({affordability_service.format_ron(amount_minor)}) — reducerea ei e cea mai rapidă cale să te apropii de buffer."
+    else:
+        base += " Merită să urmărești cheltuielile discreționare din restul lunii."
+    return base
 
 
 async def handle_message(
@@ -92,80 +137,96 @@ async def handle_message(
     cache = ToolResultCache()
     auth_header = auth.authorization_header
 
-    rag_message, rag_hits = await _rag_context(message)
+    # Limbaj jignitor/injurii -> NU trecem deloc prin GPT (vezi
+    # app/services/moderation_service.py) — răspuns determinist, cerem
+    # reformularea. Verificare făcută ÎNAINTE de RAG/tool-calling, ca să nu
+    # irosim niciun apel real (feedback: "la injurii vreau sa nu raspunda,
+    # sa roage sa reformulezez").
+    if moderation_service.contains_profanity(message):
+        logger.info("agent: mesaj cu limbaj jignitor — răspuns determinist, fără apel GPT")
+        final_text = moderation_service.REPHRASE_REQUEST_ANSWER
+        relevant_cards: list[str] = []
+        rag_hits: list[tuple[Chunk, float]] = []
+    else:
+        rag_message, rag_hits = await _rag_context(message)
 
-    # Data curentă REALĂ, determinist — GPT n-are voie s-o ghicească (vezi
-    # docstring-ul din spending_forecast_prompt.py).
-    current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    messages: list[dict] = [{"role": "system", "content": build_system_prompt(current_date)}]
-    if rag_message:
-        messages.append({"role": "system", "content": rag_message})
-    # Istoricul conversației (dacă există) — vezi _MAX_HISTORY_MESSAGES mai
-    # sus. Trunchiem la cele mai RECENTE mesaje, ca modelul să știe ce s-a
-    # zis deja (nu mai repetă disclaimer-e, nu mai uită contextul unei
-    # întrebări de follow-up).
-    for entry in (history or [])[-_MAX_HISTORY_MESSAGES:]:
-        messages.append({"role": entry.role, "content": entry.content})
-    messages.append({"role": "user", "content": message})
+        # Data curentă REALĂ, determinist — GPT n-are voie s-o ghicească
+        # (vezi docstring-ul din spending_forecast_prompt.py).
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        messages: list[dict] = [{"role": "system", "content": build_system_prompt(current_date)}]
+        if rag_message:
+            messages.append({"role": "system", "content": rag_message})
+        # Istoricul conversației (dacă există) — vezi _MAX_HISTORY_MESSAGES
+        # mai sus. Trunchiem la cele mai RECENTE mesaje, ca modelul să știe
+        # ce s-a zis deja (nu mai repetă disclaimer-e, nu mai uită
+        # contextul unei întrebări de follow-up).
+        for entry in (history or [])[-_MAX_HISTORY_MESSAGES:]:
+            messages.append({"role": entry.role, "content": entry.content})
+        messages.append({"role": "user", "content": message})
 
-    final_text: str | None = None
-    try:
-        for round_index in range(settings.max_tool_call_rounds):
-            round_started = time.monotonic()
-            logger.info("agent: rundă %s — apelez GPT (mesaje=%s)", round_index, len(messages))
-            assistant_message = await chat_completion(messages, tools=TOOL_SCHEMAS)
-            logger.info(
-                "agent: rundă %s — GPT a răspuns în %.2fs (tool_calls=%s)",
-                round_index,
-                time.monotonic() - round_started,
-                len(assistant_message.tool_calls or []),
-            )
+        final_text = None
+        try:
+            for round_index in range(settings.max_tool_call_rounds):
+                round_started = time.monotonic()
+                logger.info("agent: rundă %s — apelez GPT (mesaje=%s)", round_index, len(messages))
+                assistant_message = await chat_completion(messages, tools=TOOL_SCHEMAS)
+                logger.info(
+                    "agent: rundă %s — GPT a răspuns în %.2fs (tool_calls=%s)",
+                    round_index,
+                    time.monotonic() - round_started,
+                    len(assistant_message.tool_calls or []),
+                )
 
-            if not assistant_message.tool_calls:
-                final_text = assistant_message.content or ""
-                break
+                if not assistant_message.tool_calls:
+                    final_text = assistant_message.content or ""
+                    break
 
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": assistant_message.content,
-                    "tool_calls": [tool_call.model_dump() for tool_call in assistant_message.tool_calls],
-                }
-            )
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": assistant_message.content,
+                        "tool_calls": [tool_call.model_dump() for tool_call in assistant_message.tool_calls],
+                    }
+                )
 
-            for tool_call in assistant_message.tool_calls:
-                try:
-                    arguments = json.loads(tool_call.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    arguments = {}
+                for tool_call in assistant_message.tool_calls:
+                    try:
+                        arguments = json.loads(tool_call.function.arguments or "{}")
+                    except json.JSONDecodeError:
+                        arguments = {}
 
-                try:
-                    result = await execute_tool(tool_call.function.name, arguments, auth_header, cache)
-                    tool_content = json.dumps(result)
-                except ToolError as exc:
-                    logger.warning("agent: tool %s a eșuat: %s", tool_call.function.name, exc)
-                    tool_content = json.dumps({"error": str(exc)})
+                    try:
+                        result = await execute_tool(tool_call.function.name, arguments, auth_header, cache)
+                        tool_content = json.dumps(result)
+                    except ToolError as exc:
+                        logger.warning("agent: tool %s a eșuat: %s", tool_call.function.name, exc)
+                        tool_content = json.dumps({"error": str(exc)})
 
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": tool_content})
-        else:
-            logger.warning(
-                "agent: limita de %s runde de tool-calling a fost atinsă fără răspuns final",
-                settings.max_tool_call_rounds,
-            )
-    except AzureOpenAINotConfigured as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Asistentul AI nu este configurat momentan.",
-        ) from exc
-    except openai.OpenAIError as exc:
-        logger.warning("agent: eroare Azure OpenAI: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Nu am putut contacta asistentul AI. Te rugăm să încerci din nou.",
-        ) from exc
+                    messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": tool_content})
+            else:
+                logger.warning(
+                    "agent: limita de %s runde de tool-calling a fost atinsă fără răspuns final",
+                    settings.max_tool_call_rounds,
+                )
+        except AzureOpenAINotConfigured as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Asistentul AI nu este configurat momentan.",
+            ) from exc
+        except openai.OpenAIError as exc:
+            logger.warning("agent: eroare Azure OpenAI: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Nu am putut contacta asistentul AI. Te rugăm să încerci din nou.",
+            ) from exc
 
-    if final_text is None:
-        final_text = _FALLBACK_ANSWER
+        if final_text is None:
+            final_text = _FALLBACK_ANSWER
+
+        # Citim called_tools ÎNAINTE de ensure_core_data — vezi
+        # _CARD_TRIGGERS mai sus, relevanța cardurilor reflectă DOAR
+        # alegerile reale ale GPT.
+        relevant_cards = _relevant_cards(cache.called_tools)
 
     # Garantăm date complete pentru DTO, indiferent ce tool-uri a ales GPT
     # să cheme pentru textul lui (vezi docstring-ul modulului).
@@ -190,7 +251,7 @@ async def handle_message(
     else:
         affordable = None
         requested_amount_minor = None
-        recommendation = _default_recommendation(snapshot)
+        recommendation = _default_recommendation(snapshot, cache.spending_summary)
 
     return SpendingForecastResponse(
         answer=final_text,
@@ -201,6 +262,7 @@ async def handle_message(
         estimated_expenses=EstimatedExpenses(**snapshot["estimated_expenses"]),
         financial_summary=FinancialSummary(**snapshot["financial_summary"]),
         recommendation=recommendation,
+        relevant_cards=relevant_cards,
         budgets=[BudgetStatus(**b) for b in cache.budget_status] if cache.budget_status is not None else None,
         pending_action=PendingAction(**cache.pending_action) if cache.pending_action is not None else None,
         metadata=Metadata(),

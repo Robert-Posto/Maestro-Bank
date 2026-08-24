@@ -94,3 +94,31 @@ def test_render_recommendation_explains_shortfall_when_not_affordable():
     )
     text = affordability_service.render_recommendation(result)
     assert "Nu recomandăm" in text
+
+
+def test_render_recommendation_adds_concrete_savings_tip_when_not_affordable():
+    spending_summary = {
+        "average_daily_spending_minor": 10000,
+        "by_category": [
+            {"category": "groceries", "amount_minor": 90000, "percentage": 60.0},
+            {"category": "shopping", "amount_minor": 50000, "percentage": 33.3},
+        ],
+    }
+    result = affordability_service.evaluate_affordability(
+        requested_amount_minor=400000,
+        estimated_end_of_month_balance_minor=420000,
+        spending_summary=spending_summary,
+    )
+    text = affordability_service.render_recommendation(result)
+    assert "shopping" in text
+    assert "500,00 lei" in text
+
+
+def test_render_recommendation_no_tip_when_no_discretionary_history():
+    result = affordability_service.evaluate_affordability(
+        requested_amount_minor=400000,
+        estimated_end_of_month_balance_minor=420000,
+        spending_summary=_spending(10000),  # fără by_category
+    )
+    text = affordability_service.render_recommendation(result)
+    assert "cea mai mare cheltuială discreționară" not in text

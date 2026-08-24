@@ -15,6 +15,10 @@ Formula (exact ca în task):
         = estimated_balance_after_purchase >= recommended_buffer
 """
 
+# NOTĂ import circular: forecast_service importă recommended_buffer_minor
+# de-aici, deci NU putem importa forecast_service la nivel de modul (ar
+# crea un cerc). Import local, doar în funcția care chiar are nevoie de
+# top_discretionary_category (vezi evaluate_affordability mai jos).
 from __future__ import annotations
 
 # Buffer-ul recomandat = o regulă simplă, documentată (task-ul, secțiunea
@@ -46,6 +50,10 @@ def evaluate_affordability(
     if requested_amount_minor <= 0:
         raise ValueError("Suma cerută trebuie să fie un număr pozitiv.")
 
+    # Import local — vezi nota de mai sus despre importul circular cu
+    # forecast_service.
+    from app.services.forecast_service import top_discretionary_category
+
     buffer_minor = recommended_buffer_minor(spending_summary)
     estimated_balance_without_purchase_minor = estimated_end_of_month_balance_minor
     estimated_balance_after_purchase_minor = estimated_balance_without_purchase_minor - requested_amount_minor
@@ -57,6 +65,7 @@ def evaluate_affordability(
         "recommended_buffer_minor": buffer_minor,
         "estimated_balance_without_purchase_minor": estimated_balance_without_purchase_minor,
         "estimated_balance_after_purchase_minor": estimated_balance_after_purchase_minor,
+        "top_discretionary_category": top_discretionary_category(spending_summary),
     }
 
 
@@ -75,6 +84,11 @@ def render_recommendation(result: dict) -> str:
     fidelitatea cu care modelul ar reformula cifrele (task-ul, secțiunea
     4: "nu lăsa GPT să facă aritmetica critică" — extindem asta și la
     parafrazarea rezultatului, nu doar la calculul lui).
+
+    Când cheltuiala NU se încadrează, adăugăm și un sfat de economisire
+    CONCRET (categoria discreționară cu cea mai mare cheltuială reală de
+    până acum) — nu doar verdictul sec (vezi feedback userului: "sa ma
+    ajute sa economisesc, sa mi dea sfaturi").
     """
     buffer_text = format_ron(result["recommended_buffer_minor"])
     if result["affordable"]:
@@ -83,8 +97,16 @@ def render_recommendation(result: dict) -> str:
             f"dar păstrează cel puțin {buffer_text} rezervă pentru cheltuieli neprevăzute."
         )
     shortfall_minor = result["recommended_buffer_minor"] - result["estimated_balance_after_purchase_minor"]
-    return (
+    base = (
         f"Nu recomandăm această cheltuială acum — ai rămâne cu "
         f"{format_ron(result['estimated_balance_after_purchase_minor'])}, sub bufferul de "
         f"siguranță recomandat de {buffer_text} (îți lipsesc {format_ron(shortfall_minor)})."
     )
+    top_category = result.get("top_discretionary_category")
+    if top_category:
+        label, amount_minor = top_category
+        base += (
+            f" Cea mai mare cheltuială discreționară de până acum e pe {label} "
+            f"({format_ron(amount_minor)}) — reducerea ei e cea mai rapidă cale să-ți acoperi diferența."
+        )
+    return base
