@@ -55,6 +55,19 @@
                   <span class="support-chat__context-account-balance">{{ account.balance_minor | money: account.currency }}</span>
                 </div>
               }
+              @if (chatMessage.context?.accounts; as accounts) {
+                <div class="support-chat__context-card">
+                  @for (a of accounts; track a.iban) {
+                    <div class="support-chat__context-account support-chat__context-account--row">
+                      <div>
+                        <span class="support-chat__context-account-type">{{ accountTypeLabel(a.account_type) }}</span>
+                        <span class="support-chat__context-account-iban">{{ a.iban }}</span>
+                      </div>
+                      <span class="support-chat__context-account-balance">{{ a.balance_minor | money: a.currency }}</span>
+                    </div>
+                  }
+                </div>
+              }
               @if (chatMessage.context?.card; as card) {
                 <div class="support-chat__context-card-status">
                   <div class="support-chat__context-card-status-header">
@@ -142,18 +155,6 @@
   </section>
 
   <aside class="support-sidebar">
-    <section class="support-panel">
-      <h2>Întrebări frecvente</h2>
-      <div class="support-faq">
-        @for (item of faqItems; track item.q) {
-          <details class="support-faq-item">
-            <summary>{{ item.q }}<app-icon class="support-faq-item__chevron" name="chevron-down" [size]="16" /></summary>
-            <p>{{ item.a }}</p>
-          </details>
-        }
-      </div>
-    </section>
-
     <section class="support-panel support-panel--agent">
       <div class="support-agent">
         <span class="support-agent__icon"><app-icon name="support" [size]="16" /></span>

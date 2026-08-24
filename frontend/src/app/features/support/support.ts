@@ -9,6 +9,9 @@ import {
   AiSupportService,
 } from '../../services/ai-support.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
+import { AccountType } from '../../services/banking.service';
+import { ACCOUNT_TYPE_CATALOG } from '../../shared/account-types';
+import { SUPPORT_CHAT_STORAGE_KEY } from '../../core/storage-keys';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
@@ -38,6 +41,7 @@ interface ChatAccountContext {
   currency: string;
   balance_minor: number;
   status: string;
+  account_type?: AccountType;
 }
 
 /** Date structurate atașate unui răspuns al Support Agent — populate
@@ -49,6 +53,10 @@ interface ChatContext {
   card?: ChatCardContext;
   cards?: ChatCardContext[];
   account?: ChatAccountContext;
+  /** TOATE conturile userului (vezi get_my_accounts din
+   * app/tools/support_accounts_tools.py) — distinct de `account` (doar
+   * contul curent, de la get_my_account). */
+  accounts?: ChatAccountContext[];
   tickets?: SupportTicket[];
 }
 
@@ -73,6 +81,39 @@ interface ChatMessage {
 
 function formatChatTime(date: Date): string {
   return date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Conversația se ține minte între vizite (refresh, navigare și înapoi) —
+// persistată în `sessionStorage` (ca JWT-ul, vezi AuthService), NU
+// `localStorage`: dispare la închiderea tab-ului, nu rămâne pe disc la
+// nesfârșit. Ștearsă explicit la logout (vezi AuthService.logout()), ca
+// userul următor de pe același tab să nu vadă conversația celui dinainte.
+// Backend-ul e tot stateless — istoricul persistat AICI e cel retrimis la
+// fiecare mesaj (vezi askAgent), plafonat server-side oricum (vezi
+// app/agents/support.py::_MAX_HISTORY_MESSAGES). Cap generos, DOAR pentru
+// spațiul de stocare local (transcriptul vizibil poate fi mai lung decât
+// ce se retrimite efectiv ca `history`).
+const _MAX_PERSISTED_MESSAGES = 100;
+
+function loadPersistedMessages(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(SUPPORT_CHAT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ChatMessage[]) : [];
+  } catch {
+    // Date corupte/format vechi — pornim curat, nu blocăm pagina.
+    return [];
+  }
+}
+
+function persistMessages(messages: ChatMessage[]): void {
+  try {
+    sessionStorage.setItem(SUPPORT_CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-_MAX_PERSISTED_MESSAGES)));
+  } catch {
+    // sessionStorage plin/indisponibil (mod privat etc.) — chat-ul tot
+    // funcționează în pagina curentă, doar nu supraviețuiește unui refresh.
+  }
 }
 
 /**
@@ -117,9 +158,11 @@ export class Support implements OnInit {
   protected readonly supportTypingSlow = signal(false);
   private slowTimer?: ReturnType<typeof setTimeout>;
   private readonly pendingAction = signal<AiPendingAction | null>(null);
-  /** Gol la start (ca MaestroAssistent — vezi features/copilot/copilot.ts)
-   * -> arată ecranul de bun-venit cu sugestii, nu un mesaj seedat static. */
-  protected readonly chatMessages = signal<ChatMessage[]>([]);
+  /** Reia conversația din `sessionStorage`, dacă există (vezi
+   * loadPersistedMessages mai sus) — gol doar la prima vizită din tab-ul
+   * ăsta, caz în care arată ecranul de bun-venit cu sugestii, nu un mesaj
+   * seedat static (ca MaestroAssistent — vezi features/copilot/copilot.ts). */
+  protected readonly chatMessages = signal<ChatMessage[]>(loadPersistedMessages());
 
   constructor() {
     effect(() => {
@@ -127,6 +170,13 @@ export class Support implements OnInit {
       this.supportTyping();
       const el = this.messagesEl()?.nativeElement;
       if (el) queueMicrotask(() => (el.scrollTop = el.scrollHeight));
+    });
+
+    // Persistă conversația la fiecare schimbare — separat de efectul de
+    // mai sus (ăla mai reacționează și la `supportTyping`, ceea ce ar
+    // însemna scrieri inutile în sessionStorage la fiecare tick de "scrie...").
+    effect(() => {
+      persistMessages(this.chatMessages());
     });
   }
 
@@ -225,6 +275,13 @@ export class Support implements OnInit {
     this.supportTyping.set(false);
     this.supportTypingSlow.set(false);
     clearTimeout(this.slowTimer);
+  }
+
+  /** Eticheta reală a unui tip de cont (ex. "Cont de economii") — REFOLOSEȘTE
+   * catalogul din pagina Conturi (shared/account-types.ts), ca eticheta din
+   * chat să fie mereu identică cu ce vede userul acolo, niciodată inventată. */
+  protected accountTypeLabel(type: AccountType | undefined): string {
+    return type ? ACCOUNT_TYPE_CATALOG[type].label : 'Cont';
   }
 
   /** Transformă flag-urile booleene ale unui card într-o listă afișabilă,
