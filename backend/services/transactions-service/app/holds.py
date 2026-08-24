@@ -286,6 +286,9 @@ async def list_pending_holds() -> list[dict]:
                 "hold_expires_at": hold.get("hold", {}).get("expires_at"),
                 "score": evaluation["score"] if evaluation else None,
                 "fired_rule_ids": [r["rule_id"] for r in evaluation["fired_rules"]] if evaluation else [],
+                "guardian_staff_explanation": (evaluation.get("guardian") or {}).get("staff_explanation")
+                if evaluation
+                else None,
                 "customer": contact,
             }
         )

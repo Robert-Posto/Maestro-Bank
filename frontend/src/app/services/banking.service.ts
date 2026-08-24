@@ -89,6 +89,17 @@ export interface HoldInfo {
   resolution: string | null;
 }
 
+/** Evaluarea de risc Financial Guardian, orientată client — vezi
+ * app/guardian/ din backend. `phrase` e null cât timp `status` e "pending"
+ * (fraza pentru "unusual"/"potentially_dangerous" se generează asincron,
+ * la scurt timp după creare) — "safe"/"held" au mereu status "ready",
+ * frază fixă, calculate sincron. NU conține NICIODATĂ ID-uri de regulă. */
+export interface TransactionRisk {
+  tier: 'safe' | 'unusual' | 'potentially_dangerous' | 'held';
+  phrase: string | null;
+  status: 'pending' | 'ready' | 'template_fallback';
+}
+
 export interface TransactionView {
   id: string;
   direction: 'incoming' | 'outgoing';
@@ -106,6 +117,8 @@ export interface TransactionView {
   created_at: string;
   /** Prezent DOAR pe tranzacții care AU FOST reținute de motorul de fraud (status="pending_review") — vezi app/holds.py. */
   hold: HoldInfo | null;
+  /** null DOAR pentru tranzacții dinainte de Financial Guardian sau când motorul e dezactivat — vezi app/guardian/. */
+  risk: TransactionRisk | null;
 }
 
 export interface TransferPayload {

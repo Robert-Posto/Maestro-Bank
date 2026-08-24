@@ -57,6 +57,9 @@
         </div>
 
         <div class="hold-card__actions">
+          <app-action-button variant="ghost" (pressed)="openAnalysis(hold)">
+            <app-icon name="sparkles" [size]="15" /> Analiză AI
+          </app-action-button>
           @if (hold.user_id) {
             <app-action-button variant="ghost" (pressed)="viewCustomer(hold)">
               <app-icon name="profile" [size]="15" /> Vezi contul clientului
@@ -88,4 +91,27 @@
     (confirmed)="confirmAction()"
     (cancelled)="cancelAction()"
   />
+}
+
+@if (analysisTarget(); as hold) {
+  <app-modal title="Analiză Financial Guardian" [maxWidth]="520" (closed)="closeAnalysis()">
+    <div class="analysis">
+      <div class="analysis__header">
+        <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
+        <div class="analysis__rules">
+          @for (ruleId of hold.fired_rule_ids; track ruleId) {
+            <span class="hold-card__rule-tag">{{ ruleId }}</span>
+          }
+        </div>
+      </div>
+      @if (hold.guardian_staff_explanation) {
+        <p class="analysis__text">{{ hold.guardian_staff_explanation }}</p>
+      } @else {
+        <p class="analysis__text analysis__text--pending">Analiza se generează încă — reîmprospătează pagina peste câteva secunde.</p>
+      }
+      <p class="analysis__disclaimer">
+        <app-icon name="sparkles" [size]="13" /> Generat automat de Financial Guardian, pe baza regulilor determinist declanșate mai sus — informativ, nu înlocuiește verificarea telefonică a clientului.
+      </p>
+    </div>
+  </app-modal>
 }

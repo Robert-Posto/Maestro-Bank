@@ -364,5 +364,47 @@ async def test_list_pending_holds_composes_score_and_contact(mock_ledger, monkey
     assert result[0]["customer"]["phone_number"] == "+40700000000"
 
 
+async def test_list_pending_holds_composes_guardian_staff_explanation(mock_ledger, monkeypatch):
+    """Vezi app/guardian/ — raportul AI pentru personal (guardian.
+    staff_explanation, scris de generate_guardian_explanations) trebuie
+    compus în lista de rețineri exact cum sunt deja score/fired_rule_ids."""
+    tx = await _seed_pending_transaction()
+    await _create_hold_for(tx, mock_ledger)
+    await get_database().fraud_evaluations.insert_one(
+        {
+            "transaction_id": tx["_id"],
+            "user_id": "user-123",
+            "status": "ok",
+            "score": 92,
+            "fired_rules": [{"rule_id": "AMT-04", "family": "amount", "weight": 40, "contribution": 40.0, "excluded_from_score": False, "values": {}}],
+            "decision_would_apply": "hold",
+            "ruleset_version": "test-1",
+            "shadow_mode": False,
+            "evaluated_at": datetime.now(timezone.utc),
+            "error": None,
+            "created_at": datetime.now(timezone.utc),
+            "guardian": {
+                "status": "ready",
+                "staff_explanation": "Scor 92/100 — golire de cont, prima plată către acest beneficiar.",
+                "customer_tier": "held",
+                "customer_phrase": "Tranzacția a fost reținută pentru verificare.",
+                "source": "llm",
+                "generated_at": datetime.now(timezone.utc),
+                "model": "gpt-5-mini",
+            },
+        }
+    )
+
+    async def fake_fetch_contact(user_id: str) -> dict | None:
+        return {"first_name": "Ana", "last_name": "Pop", "email": "ana@example.com", "phone_number": "+40700000000"}
+
+    monkeypatch.setattr("app.holds._fetch_user_contact", fake_fetch_contact)
+
+    result = await holds.list_pending_holds()
+
+    assert len(result) == 1
+    assert result[0]["guardian_staff_explanation"] == "Scor 92/100 — golire de cont, prima plată către acest beneficiar."
+
+
 async def test_list_pending_holds_empty_when_none_pending(mock_ledger):
     assert await holds.list_pending_holds() == []

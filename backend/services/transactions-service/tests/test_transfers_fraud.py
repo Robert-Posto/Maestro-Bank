@@ -219,6 +219,69 @@ async def test_fraud_engine_disabled_short_circuits_to_noop(client: AsyncClient,
     assert await _get_evaluation(response.json()["id"]) is None
 
 
+async def test_customer_endpoint_never_leaks_guardian_staff_explanation(client: AsyncClient, mock_accounts):
+    """Vezi app/guardian/ — guardian.staff_explanation trăiește STRICT pe
+    fraud_evaluations și nu are voie să ajungă NICIODATĂ la client, pe
+    NICIUN endpoint orientat spre client (nu doar câmpurile "cunoscute" —
+    căutare pe tot corpul JSON, ca să prindă și o eventuală scăpare
+    viitoare, nu doar bug-ul de azi)."""
+    db = get_database()
+    tx_id = ObjectId()
+    marker = "SECRET-STAFF-ONLY-EXPLANATION-MARKER"
+    await db.transactions.insert_one(
+        {
+            "_id": tx_id,
+            "from_account_id": SOURCE_ACCOUNT_ID,
+            "to_account_id": DEST_ACCOUNT_ID,
+            "from_iban": SOURCE_ACCOUNT["iban"],
+            "to_iban": DEST_ACCOUNT["iban"],
+            "amount_minor": 99_000,
+            "currency": "RON",
+            "description": "",
+            "category": "shopping",
+            "type": "transfer",
+            "status": "pending_review",
+            "recognized": False,
+            "reported": False,
+            "created_at": datetime.now(timezone.utc),
+            "hold": {"expires_at": datetime.now(timezone.utc) + timedelta(hours=24), "resolution": None},
+            "risk": {"tier": "held", "phrase": "Tranzacția a fost reținută pentru verificare.", "status": "ready"},
+        }
+    )
+    await db.fraud_evaluations.insert_one(
+        {
+            "transaction_id": tx_id,
+            "user_id": USER_ID,
+            "status": "ok",
+            "score": 95,
+            "fired_rules": [],
+            "decision_would_apply": "hold",
+            "ruleset_version": "test-1",
+            "shadow_mode": False,
+            "evaluated_at": datetime.now(timezone.utc),
+            "error": None,
+            "created_at": datetime.now(timezone.utc),
+            "guardian": {
+                "status": "ready",
+                "staff_explanation": marker,
+                "customer_tier": "held",
+                "customer_phrase": "Tranzacția a fost reținută pentru verificare.",
+                "source": "llm",
+                "generated_at": datetime.now(timezone.utc),
+                "model": "gpt-5-mini",
+            },
+        }
+    )
+
+    detail_response = await client.get(f"/transactions/{tx_id}", headers=AUTH_HEADER)
+    assert detail_response.status_code == 200
+    assert marker not in detail_response.text
+
+    list_response = await client.get("/transactions", headers=AUTH_HEADER)
+    assert list_response.status_code == 200
+    assert marker not in list_response.text
+
+
 async def test_dev03_fails_open_when_auth_service_unreachable(monkeypatch):
     """DEV-03 e singurul network hop al motorului — dacă auth-service nu
     răspunde, regula pur și simplu nu se declanșează, niciodată confundată
