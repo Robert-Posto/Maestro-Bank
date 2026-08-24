@@ -1,11 +1,13 @@
 """Configurație pentru exchange-service.
 
-Cursul de bază (mid_rate) e acum REAL — preluat zilnic de la Banca
-Națională a României (vezi app/bnr_rates.py), NU mai e hardcodat. Spread-ul
-și comisionul rămân o politică SIMULATĂ MaestroBank (nicio bancă reală nu
-publică propriul spread) — exact cum face și un neobank real: ia un curs
-de referință public + aplică propria marjă. Simularea de schimb valutar
-(POST /exchange/demo) tot NU mută fonduri reale — vezi app/service.py.
+Cursul de bază (mid_rate) e REAL — preluat zilnic de la Banca Națională a
+României (vezi app/bnr_rates.py), NU e hardcodat. Spread-ul și comisionul
+rămân o politică SIMULATĂ MaestroBank (nicio bancă reală nu publică
+propriul spread) — exact cum face și un neobank real: ia un curs de
+referință public + aplică propria marjă. Execuția schimbului (POST
+/exchange/execute) chiar mută solduri acum, între contul RON al userului
+și contul lui pe valuta respectivă (eur/usd/gbp) — vezi app/service.py și
+accounts-service/app/service.py::apply_internal_exchange.
 
 `DEMO_MID_RATES` de mai jos rămâne doar ca FALLBACK (folosit dacă feed-ul
 BNR e indisponibil și nu avem încă niciun curs salvat în DB).
@@ -25,6 +27,11 @@ class Settings:
     # lucrătoare — verificăm mai des (implicit la 6h) ca să prindem rapid
     # publicarea zilei, fără să bombardăm feed-ul BNR inutil.
     rates_refresh_interval_seconds: int = int(os.getenv("RATES_REFRESH_INTERVAL_SECONDS", str(6 * 60 * 60)))
+
+    # Adresă INTERNĂ Docker — execuția schimbului cere accounts-service să
+    # debiteze/crediteze efectiv (vezi /internal/accounts/exchange, NEexpus
+    # prin Gateway, la fel ca restul rutelor /internal/*).
+    accounts_service_url: str = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-service:8000")
 
 
 settings = Settings()

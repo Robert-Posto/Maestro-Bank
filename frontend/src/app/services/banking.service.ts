@@ -5,9 +5,11 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../core/api-config';
 import { WebauthnStepUpProof } from './webauthn.service';
 
-/** "current" e provizionat automat la înregistrare — celelalte 3 se deschid manual, vezi CreatableAccountType. */
-export type AccountType = 'current' | 'savings' | 'deposit' | 'student';
-export type CreatableAccountType = 'savings' | 'deposit' | 'student';
+/** "current" e provizionat automat la înregistrare — restul se deschid manual, vezi CreatableAccountType.
+ * eur/usd/gbp sunt conturi REALE pe valuta respectivă (nu RON afișat altfel) — necesare ca
+ * schimbul valutar (Exchange) să aibă unde să crediteze/debiteze efectiv. */
+export type AccountType = 'current' | 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
+export type CreatableAccountType = 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
 
 export interface AccountView {
   id: string;

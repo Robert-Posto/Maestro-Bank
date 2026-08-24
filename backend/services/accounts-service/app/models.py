@@ -14,9 +14,12 @@ CardType = Literal["virtual", "physical"]
 
 # "current" e contul unic, provizionat automat la înregistrare (vezi
 # service.py::provision_account) — NU poate fi creat manual, de-aia
-# AccountCreateRequest de mai jos restricționează la celelalte 3 tipuri.
-AccountType = Literal["current", "savings", "deposit", "student"]
-CreatableAccountType = Literal["savings", "deposit", "student"]
+# AccountCreateRequest de mai jos restricționează la celelalte tipuri.
+# eur/usd/gbp sunt conturi REALE pe valuta respectivă (nu doar RON convertit
+# vizual) — necesare ca schimbul valutar (exchange-service) să aibă unde să
+# crediteze/debiteze efectiv, vezi apply_internal_exchange mai jos.
+AccountType = Literal["current", "savings", "deposit", "student", "eur", "usd", "gbp"]
+CreatableAccountType = Literal["savings", "deposit", "student", "eur", "usd", "gbp"]
 
 # --- Core banking --------------------------------------------------------
 
@@ -309,6 +312,26 @@ class InternalTransferRequest(BaseModel):
 
 
 class InternalTransferResponse(BaseModel):
+    from_balance_minor: int
+    to_balance_minor: int
+
+
+class InternalExchangeRequest(BaseModel):
+    """Apelat de exchange-service, DUPĂ ce a calculat deja cursul (compute_quote)
+    — spre deosebire de InternalTransferRequest (aceeași sumă pe ambele
+    conturi), aici debit_minor și credit_minor DIFERĂ (curs aplicat +
+    comision). Conturile sunt rezolvate după user_id + account_type, nu
+    account_id — exchange-service nu are (și n-are nevoie să aibă) ID-urile
+    interne de cont ale userului."""
+
+    user_id: str
+    from_account_type: str
+    to_account_type: str
+    debit_minor: int = Field(gt=0)
+    credit_minor: int = Field(gt=0)
+
+
+class InternalExchangeResponse(BaseModel):
     from_balance_minor: int
     to_balance_minor: int
 

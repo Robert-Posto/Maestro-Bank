@@ -50,15 +50,15 @@
   height: 34px;
   margin-top: 2px;
   border-radius: 10px;
-  color: #fff;
-  background: linear-gradient(145deg, var(--mb-navy-800), var(--mb-navy-950));
-  box-shadow: 0 5px 12px rgba(10, 18, 38, 0.16);
+  border: 1px solid var(--mb-border);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface);
 }
 
 .support-chat__message-avatar--user {
   color: var(--mb-blue-600);
   background: var(--mb-blue-50);
-  box-shadow: none;
+  border-color: transparent;
   order: 2;
 }
 

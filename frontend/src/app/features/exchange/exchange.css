@@ -110,57 +110,35 @@
 }
 
 .fx-currency-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0.3rem 0.6rem 0.3rem 0.3rem;
-  border-radius: var(--mb-radius-pill);
-  background: var(--mb-surface-muted);
-  color: var(--mb-text-secondary);
-  cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--mb-transition-fast);
-}
-
-.fx-currency-select:hover {
-  background: var(--mb-border);
-}
-
-.fx-currency-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 22px;
-  border-radius: var(--mb-radius-pill);
-  font-size: 0.64rem;
-  font-weight: var(--mb-font-weight-bold);
-  letter-spacing: -0.02em;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.fx-currency-select select {
-  appearance: none;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-semibold);
-  color: var(--mb-text-primary);
-  cursor: pointer;
-  padding: 0;
-  outline: none;
-}
-
-.fx-currency-select app-icon {
-  color: var(--mb-text-tertiary);
-  flex-shrink: 0;
+  width: 112px;
 }
 
 .fx-hint {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
+}
+
+.fx-hint--warning {
+  color: var(--mb-warning);
+}
+
+.fx-missing-account {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border-radius: var(--mb-radius-md);
+  flex-wrap: wrap;
+}
+
+.fx-missing-account span {
+  flex: 1;
+  min-width: 180px;
 }
 
 .fx-swap {

@@ -89,11 +89,7 @@
 
         <label class="transfer-field">
           <span>Categorie</span>
-          <select [ngModel]="category()" (ngModelChange)="category.set($event)" name="category">
-            @for (cat of categories; track cat.value) {
-              <option [value]="cat.value">{{ cat.label }}</option>
-            }
-          </select>
+          <app-select [options]="categoryOptions" [value]="category()" (changed)="category.set($event)" />
         </label>
       </div>
 
@@ -151,7 +147,7 @@
     </aside>
   </div>
 } @else if (step() === 'review') {
-  <div class="transfer-wrap">
+  <div class="transfer-layout">
     <div class="transfer-card transfer-card--review">
       <h2 class="transfer-review-title">Verifică transferul</h2>
 
@@ -195,6 +191,39 @@
         <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">Confirmă transferul</app-action-button>
       </div>
     </div>
+
+    <aside class="transfer-side">
+      <div class="transfer-mini-card">
+        <div class="transfer-mini-card__top">
+          <span class="transfer-mini-card__brand">MaestroBank</span>
+          <span class="transfer-mini-card__type">Cont curent</span>
+        </div>
+        <span class="transfer-mini-card__chip" aria-hidden="true"></span>
+        <p class="transfer-mini-card__iban">{{ account()?.iban ?? '—' }}</p>
+        <div class="transfer-mini-card__bottom">
+          <div>
+            <span class="transfer-mini-card__label">Sold disponibil</span>
+            <span class="transfer-mini-card__value">{{ account()?.balance_minor ?? 0 | money: account()?.currency }}</span>
+          </div>
+          <div>
+            <span class="transfer-mini-card__label">Monedă</span>
+            <span class="transfer-mini-card__value">{{ account()?.currency ?? 'RON' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="transfer-side-card">
+        <div class="transfer-side-card__header">
+          <app-icon name="shield" [size]="16" />
+          <strong>Transfer sigur</strong>
+        </div>
+        <ul class="transfer-explain-list">
+          <li>Verificăm IBAN-ul destinație înainte să confirmi transferul.</li>
+          <li>Poți renunța oricând, până la apăsarea butonului de confirmare.</li>
+          <li>Transferul apare instant în soldul tău și în istoricul tranzacțiilor.</li>
+        </ul>
+      </div>
+    </aside>
   </div>
 } @else if (step() === 'success' && completedTransaction(); as tx) {
   <div class="transfer-wrap">

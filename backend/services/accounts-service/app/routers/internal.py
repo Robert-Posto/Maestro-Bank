@@ -17,6 +17,8 @@ from app import service
 from app.models import (
     FraudHoldingAccountView,
     InternalAccountView,
+    InternalExchangeRequest,
+    InternalExchangeResponse,
     InternalTransferRequest,
     InternalTransferResponse,
     ProvisionRequest,
@@ -50,3 +52,10 @@ async def get_account_by_iban(iban: str):
 @router.post("/transfer", response_model=InternalTransferResponse)
 async def apply_internal_transfer(payload: InternalTransferRequest):
     return await service.apply_internal_transfer(payload.from_account_id, payload.to_account_id, payload.amount_minor)
+
+
+@router.post("/exchange", response_model=InternalExchangeResponse)
+async def apply_internal_exchange(payload: InternalExchangeRequest):
+    return await service.apply_internal_exchange(
+        payload.user_id, payload.from_account_type, payload.to_account_type, payload.debit_minor, payload.credit_minor
+    )

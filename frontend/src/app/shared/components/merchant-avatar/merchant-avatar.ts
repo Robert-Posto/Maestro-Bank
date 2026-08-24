@@ -78,7 +78,7 @@ export class MerchantAvatar {
     const badge = this.badge();
     if (badge) return badge.bg;
     if (this.isPerson()) return 'var(--mb-navy-900)';
-    return `color-mix(in srgb, var(${categoryColorVar(this.category())}) 16%, white)`;
+    return `color-mix(in srgb, var(${categoryColorVar(this.category())}) 16%, var(--mb-surface))`;
   });
 
   protected readonly foreground = computed(() => {

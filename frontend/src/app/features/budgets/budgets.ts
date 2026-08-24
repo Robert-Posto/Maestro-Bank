@@ -13,6 +13,7 @@ import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loadin
 import { Modal } from '../../shared/components/modal/modal';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { TRANSACTION_CATEGORIES, categoryColorVar, categoryLabel } from '../../shared/categories';
+import { Select, SelectOption } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { daysRemainingLabel, daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
@@ -43,7 +44,7 @@ interface SubscriptionsSummary {
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog, MerchantAvatar],
+  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog, MerchantAvatar, Select],
   templateUrl: './budgets.html',
   styleUrl: './budgets.css',
 })
@@ -53,6 +54,11 @@ export class Budgets implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
+  protected readonly categoryOptions: SelectOption[] = TRANSACTION_CATEGORIES.map((c) => ({
+    value: c.value,
+    label: c.label,
+    colorVar: c.colorVar,
+  }));
   protected readonly categoryLabel = categoryLabel;
   protected readonly categoryColorVar = categoryColorVar;
   protected readonly daysUntilBilling = daysUntilBilling;

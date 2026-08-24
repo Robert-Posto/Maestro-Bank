@@ -552,7 +552,7 @@
   text-align: center;
   background:
     radial-gradient(circle at 50% -20%, rgba(47, 111, 237, 0.15), transparent 18rem),
-    linear-gradient(145deg, #fff, #f9fbff);
+    linear-gradient(145deg, var(--mb-surface), var(--mb-surface-muted));
   box-shadow: 0 8px 28px rgba(16, 24, 48, 0.06);
 }
 
@@ -599,7 +599,7 @@
 }
 
 .copilot-welcome h2 {
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   font-size: clamp(1.4rem, 3vw, 1.75rem);
   letter-spacing: -0.025em;
 }
@@ -629,8 +629,8 @@
   gap: var(--mb-space-3);
   padding: 0.75rem var(--mb-space-4);
   border-radius: 12px;
-  color: var(--mb-navy-900);
-  background: rgba(255, 255, 255, 0.9);
+  color: var(--mb-text-primary);
+  background: var(--mb-surface);
   box-shadow: 0 2px 7px rgba(16, 24, 48, 0.04);
 }
 
@@ -657,7 +657,7 @@
   padding: var(--mb-space-5);
   border-radius: var(--mb-radius-md);
   text-align: center;
-  background: linear-gradient(145deg, var(--mb-surface-muted), #fff);
+  background: linear-gradient(145deg, var(--mb-surface-muted), var(--mb-surface));
 }
 
 .copilot-context-empty > span {
@@ -672,7 +672,7 @@
 }
 
 .copilot-context-empty strong {
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   font-size: var(--mb-font-size-sm);
 }
 
@@ -760,8 +760,8 @@
 .copilot-bubble--user {
   padding: 0.8rem 1rem;
   border-radius: 14px 14px 4px 14px;
-  background: linear-gradient(135deg, var(--mb-blue-50), #e8f0ff);
-  color: var(--mb-navy-900);
+  background: linear-gradient(135deg, var(--mb-blue-50), var(--mb-blue-100));
+  color: var(--mb-text-primary);
   box-shadow: none;
 }
 
@@ -779,18 +779,18 @@
   min-width: 0;
   padding: var(--mb-space-4);
   border-color: var(--mb-border);
-  background: linear-gradient(145deg, #fff, #fcfdff);
+  background: linear-gradient(145deg, var(--mb-surface), var(--mb-surface-muted));
   box-shadow: var(--mb-shadow-xs);
 }
 
 .copilot-card--positive {
-  border-color: #ccebd7;
-  background: linear-gradient(145deg, #fff, #f8fdf9);
+  border-color: color-mix(in srgb, var(--mb-positive) 35%, transparent);
+  background: linear-gradient(145deg, var(--mb-surface), var(--mb-positive-bg));
 }
 
 .copilot-card--negative {
-  border-color: #f4cccc;
-  background: linear-gradient(145deg, #fff, #fff9f9);
+  border-color: color-mix(in srgb, var(--mb-negative) 35%, transparent);
+  background: linear-gradient(145deg, var(--mb-surface), var(--mb-negative-bg));
 }
 
 .copilot-card__header {
@@ -827,8 +827,8 @@
 
 .copilot-recommendation {
   padding: var(--mb-space-4);
-  border: 1px solid #ccebd7;
-  background: linear-gradient(100deg, var(--mb-positive-bg), #f8fdf9);
+  border: 1px solid color-mix(in srgb, var(--mb-positive) 35%, transparent);
+  background: linear-gradient(100deg, var(--mb-positive-bg), var(--mb-surface));
   font-weight: var(--mb-font-weight-medium);
 }
 
@@ -906,7 +906,7 @@
   height: 40px;
   border-radius: 12px;
   color: #7c3aed;
-  background: #f3efff;
+  background: color-mix(in srgb, #7c3aed 14%, var(--mb-surface));
 }
 
 @media (max-width: 1100px) {

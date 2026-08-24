@@ -266,6 +266,17 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
             f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
         )
 
+        # Destinatarul primea bani fără NICIO notificare — doar expeditorul
+        # era anunțat mai sus. Excepție: transfer între propriile conturi
+        # (destination["user_id"] == user_id) — notificarea de mai sus e
+        # deja suficientă, a doua ar fi doar zgomot ("ai primit de la tine").
+        if destination["user_id"] != user_id:
+            await _notify_user(
+                destination["user_id"],
+                "transfer_received",
+                f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+            )
+
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
         # actualizează DOAR la transferuri efectiv "completed" — vezi
         # app/fraud/profile.py. Best-effort, la fel ca _notify_user: un

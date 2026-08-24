@@ -21,6 +21,7 @@ import {
 } from '../../shared/components/transaction-details-panel/transaction-details-panel';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { Select, SelectOption } from '../../shared/components/select/select';
 
 const PAGE_SIZE = 8;
 
@@ -39,6 +40,7 @@ const PAGE_SIZE = 8;
     MoneyPipe,
     MerchantAvatar,
     TransactionDetailsPanel,
+    Select,
   ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.css',
@@ -52,6 +54,18 @@ export class Transactions implements OnInit {
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
   protected readonly displayName = transactionDisplayName;
+
+  /** "Toate categoriile" e opțiunea implicită (value: '') — nu un filtru real. */
+  protected readonly categoryOptions: SelectOption[] = [
+    { value: '', label: 'Toate categoriile' },
+    ...TRANSACTION_CATEGORIES.map((c) => ({ value: c.value, label: c.label, colorVar: c.colorVar })),
+  ];
+
+  protected readonly directionOptions: SelectOption[] = [
+    { value: '', label: 'Toate' },
+    { value: 'incoming', label: 'Încasări' },
+    { value: 'outgoing', label: 'Plăți' },
+  ];
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -117,6 +131,15 @@ export class Transactions implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  /** Spre deosebire de restul filtrelor (grupate în "Filtre avansate",
+   * aplicate DOAR la apăsarea explicită a butonului) — categoria stă în
+   * bara principală, ca search-ul, deci se aplică imediat la selecție,
+   * nu doar la un pas separat pe care userul ar trebui să-l descopere. */
+  protected onCategoryChange(value: string): void {
+    this.category.set(value);
+    this.applyFilters();
   }
 
   protected toggleFilters(): void {
