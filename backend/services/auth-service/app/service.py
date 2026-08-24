@@ -6,8 +6,10 @@ DTO-urile). Acest modul e singurul care atinge `db.users` direct și
 singurul care cheamă alte servicii (accounts-service, la provisioning).
 """
 
+import asyncio
 import logging
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from bson import ObjectId
@@ -16,6 +18,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.database import get_database
+from app.email_service import send_verification_email
 from app.models import ChangePasswordRequest, UserLogin, UserRegister
 from app.security import create_access_token, decode_access_token, hash_password, verify_password
 
@@ -50,6 +53,12 @@ async def _provision_bank_account(user_id: str) -> None:
         )
 
 
+def _generate_verification_code() -> str:
+    """Cod numeric de 6 cifre — `secrets.randbelow`, nu `random`, fiindcă
+    ajunge într-un flux de securitate (verificare identitate cont)."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
 async def register_user(payload: UserRegister) -> dict:
     db = get_database()
 
@@ -71,14 +80,110 @@ async def register_user(payload: UserRegister) -> dict:
         # cere rolul "staff" prin înregistrare publică. Singura cale spre
         # role="staff" e scripts/create_staff_user.py, direct în Mongo.
         "role": "customer",
+        # Onboarding: userul pornește neverificat pe ambele fronturi —
+        # vezi send_verification_code / verify_email_code mai jos și
+        # mark_identity_verified (apelat de verification-service).
+        "email_verified": False,
+        "identity_verified": False,
+        "email_verification_code": None,
+        "email_verification_expires_at": None,
     }
     result = await db.users.insert_one(user_doc)
     user_id = str(result.inserted_id)
     logger.info("auth-service: cont nou creat (user_id=%s)", user_id)
 
     await _provision_bank_account(user_id)
+    await send_verification_code(user_id)
 
     return await db.users.find_one({"_id": result.inserted_id})
+
+
+def _send_verification_email_background(email: str, first_name: str, code: str) -> None:
+    """Trimite emailul FĂRĂ să blocheze cererea curentă (nici event loop-ul
+    pentru alte cereri) — SMTP-ul e o bibliotecă sincronă (smtplib), iar un
+    server lent/inaccesibil (ex. blocat de un firewall de rețea) poate să
+    dureze mult peste orice timeout rezonabil de cerere HTTP. `create_task`
+    pornește trimiterea într-un thread separat și NU e niciodată așteptat —
+    register/resend răspund imediat, indiferent cât durează SMTP-ul.
+    Excepțiile sunt deja prinse în email_service.py, nu ajung aici."""
+    asyncio.create_task(asyncio.to_thread(send_verification_email, email, first_name, code))
+
+
+async def send_verification_code(user_id: str) -> None:
+    """Generează un cod nou de verificare email și îl trimite (sau îl
+    logează, în development — vezi email_service.py). Apelat la register
+    ȘI la reîncercare explicită din UI ("Retrimite codul")."""
+    db = get_database()
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+
+    code = _generate_verification_code()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.email_verification_code_ttl_minutes)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"email_verification_code": code, "email_verification_expires_at": expires_at}},
+    )
+    _send_verification_email_background(user["email"], user["first_name"], code)
+
+
+async def verify_email_code(user_id: str, code: str) -> None:
+    db = get_database()
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+
+    if user.get("email_verified"):
+        return
+
+    stored_code = user.get("email_verification_code")
+    expires_at = user.get("email_verification_expires_at")
+    if not stored_code or not expires_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cere mai întâi un cod de verificare.")
+
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codul a expirat. Cere unul nou.")
+
+    if not secrets.compare_digest(stored_code, code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cod incorect.")
+
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"email_verified": True, "email_verification_code": None, "email_verification_expires_at": None}},
+    )
+    logger.info("auth-service: email verificat pentru user_id=%s", user_id)
+
+
+async def backfill_verification_flags() -> None:
+    """Userii creați ÎNAINTE de acest feature nu pot fi puși retroactiv să
+    treacă prin verificare cu buletin — le considerăm deja verificați
+    (grandfathering). Doar userii înregistrați DE ACUM ÎNAINTE trec prin
+    fluxul de onboarding complet. Idempotent, rulat o dată la boot — vezi
+    accounts-service::backfill_missing_account_types pentru același pattern."""
+    db = get_database()
+    result = await db.users.update_many(
+        {"email_verified": {"$exists": False}},
+        {"$set": {"email_verified": True, "identity_verified": True, "email_verification_code": None, "email_verification_expires_at": None}},
+    )
+    if result.modified_count:
+        logger.info("auth-service: %d useri existenți marcați ca deja verificați (grandfathering)", result.modified_count)
+
+
+async def mark_identity_verified(user_id: str) -> None:
+    """Apelat DOAR de verification-service, după un match facial reușit
+    (buletin vs. selfie) — vezi routers/internal.py."""
+    db = get_database()
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+
+    result = await db.users.update_one({"_id": object_id}, {"$set": {"identity_verified": True}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+    logger.info("auth-service: identitate verificată pentru user_id=%s", user_id)
 
 
 async def authenticate_user(payload: UserLogin) -> str:

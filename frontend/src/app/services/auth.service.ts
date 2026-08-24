@@ -31,6 +31,8 @@ export interface AuthUser {
   // (require_staff). phone_number e fictiv, neverificat — vezi backend.
   role?: 'customer' | 'staff';
   phone_number?: string | null;
+  email_verified?: boolean;
+  identity_verified?: boolean;
 }
 
 export interface TokenResponse {
@@ -74,6 +76,14 @@ export class AuthService {
 
   changePassword(payload: ChangePasswordPayload): Observable<void> {
     return this.http.post<void>(`${API_BASE_URL}/auth/change-password`, payload);
+  }
+
+  verifyEmail(code: string): Observable<void> {
+    return this.http.post<void>(`${API_BASE_URL}/auth/verify-email`, { code });
+  }
+
+  resendVerificationEmail(): Observable<void> {
+    return this.http.post<void>(`${API_BASE_URL}/auth/resend-verification-email`, {});
   }
 
   logout(): void {

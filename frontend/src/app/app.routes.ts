@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth.guard';
 import { staffGuard } from './core/staff.guard';
+import { authGuard, guestGuard, onboardingAuthGuard, onboardingIdentityGuard } from './core/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
@@ -14,6 +14,28 @@ export const routes: Routes = [
     path: 'register',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
+  },
+  {
+    path: 'onboarding',
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'verify-email' },
+      {
+        path: 'verify-email',
+        canActivate: [onboardingAuthGuard],
+        loadComponent: () => import('./features/onboarding/verify-email/verify-email').then((m) => m.VerifyEmail),
+      },
+      {
+        path: 'verify-identity',
+        canActivate: [onboardingIdentityGuard],
+        loadComponent: () =>
+          import('./features/onboarding/verify-identity/verify-identity').then((m) => m.VerifyIdentity),
+      },
+      {
+        path: 'welcome',
+        canActivate: [onboardingAuthGuard],
+        loadComponent: () => import('./features/onboarding/welcome/welcome').then((m) => m.Welcome),
+      },
+    ],
   },
   {
     path: 'app',

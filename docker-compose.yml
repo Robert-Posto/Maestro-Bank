@@ -54,6 +54,15 @@ services:
       - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME:-MaestroBank}
       - WEBAUTHN_ORIGINS=${WEBAUTHN_ORIGINS:-http://localhost:4200}
       - WEBAUTHN_CHALLENGE_TTL_SECONDS=${WEBAUTHN_CHALLENGE_TTL_SECONDS:-120}
+      # Verificare email la onboarding — dacă SMTP_HOST lipsește, codul e
+      # doar logat (docker logs auth-service), nu trimis efectiv. Vezi
+      # .env.example pentru cum pui un cont SMTP real.
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-no-reply@maestrobank.local}
+      - EMAIL_VERIFICATION_CODE_TTL_MINUTES=${EMAIL_VERIFICATION_CODE_TTL_MINUTES:-15}
     volumes:
       - ./backend/services/auth-service/app:/app/app
       - ./backend/services/auth-service/tests:/app/tests
@@ -215,6 +224,96 @@ services:
     networks:
       - maestrobank-network
 
+  # --- Verificare identitate (KYC demo) -----------------------------------
+  # STATELESS — fără MONGO_URL, nu are bază proprie (vezi app/main.py).
+  # Compară buletin vs. selfie cu DeepFace, apoi marchează userul verificat
+  # printr-un apel intern către auth-service. Build MULT mai lent decât la
+  # celelalte servicii (DeepFace -> TensorFlow) — normal, o singură dată.
+
+  verification-service:
+    build:
+      context: ./backend/services/verification-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-verification-service
+    restart: unless-stopped
+    ports:
+      - "8007:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - AUTH_SERVICE_URL=http://auth-service:8000
+    volumes:
+      - ./backend/services/verification-service/app:/app/app
+      - ./backend/services/verification-service/tests:/app/tests
+      - ./backend/services/verification-service/pytest.ini:/app/pytest.ini
+      # Modelul DeepFace (~580MB) se descarcă o singură dată, la boot —
+      # volum dedicat ca să NU se piardă (și redescarce) la fiecare
+      # recreare a containerului (ex. după un rebuild de imagine).
+      - verification_models:/root/.deepface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      # Modelul se încarcă în memorie la boot (lifespan, main.py) — /health
+      # nu răspunde până nu termină, exact ca să Gateway-ul (depends_on mai
+      # jos) nu înceapă să rutească cereri către un serviciu nepregătit.
+      # 90s acoperă și cazul cel mai lent (descărcare model dacă volumul
+      # e gol + încărcare în memorie).
+      start_period: 90s
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
+  ai-orchestrator-service:
+    build:
+      context: ./backend/services/ai-orchestrator-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-ai-orchestrator-service
+    restart: unless-stopped
+    ports:
+      # Expus doar pentru debugging direct în development. Port diferit de
+      # verification-service (8007) — nu pot împărți același port de host.
+      - "8008:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      # Agentul NU accesează MongoDB — vorbește STRICT prin Gateway,
+      # exact ca un client extern (Angular), propagând JWT-ul userului.
+      - GATEWAY_URL=http://gateway:8000
+      # Azure OpenAI (GPT-5-mini) — vezi .env.example. Fără credențiale
+      # setate, serviciul tot pornește (health check trece), dar orice
+      # cerere de chat întoarce 503 până sunt configurate.
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-5-mini}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-10-21}
+      # Embeddings pentru RAG (vezi app/rag/retriever.py) — OPȚIONALE: dacă
+      # lipsesc, cad automat pe AZURE_OPENAI_ENDPOINT/API_KEY de mai sus
+      # (de obicei aceeași resursă Azure); dacă TOT lipsesc, RAG-ul
+      # funcționează pe fallback local TF-IDF, fără nicio eroare.
+      - AZURE_OPENAI_EMBEDDING_ENDPOINT=${AZURE_OPENAI_EMBEDDING_ENDPOINT:-}
+      - AZURE_OPENAI_EMBEDDING_API_KEY=${AZURE_OPENAI_EMBEDDING_API_KEY:-}
+      - AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-3-small}
+      - AZURE_OPENAI_REQUEST_TIMEOUT_SECONDS=${AZURE_OPENAI_REQUEST_TIMEOUT_SECONDS:-45.0}
+    volumes:
+      - ./backend/services/ai-orchestrator-service/app:/app/app
+      - ./backend/services/ai-orchestrator-service/tests:/app/tests
+      - ./backend/services/ai-orchestrator-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    # Tool-urile lui apelează accounts/transactions/budgets prin Gateway,
+    # dar Gateway-ul însuși e cel care depinde de acest serviciu (mai jos),
+    # nu invers — fără depends_on aici, ca să nu creăm un ciclu.
+    networks:
+      - maestrobank-network
+
   # --- API Gateway ------------------------------------------------------
   # Singurul serviciu backend pe care Angular (prin Nginx) îl apelează
   # direct. Rutează /api/{service}/* către microserviciul corespunzător.
@@ -237,6 +336,8 @@ services:
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
       - SUPPORT_SERVICE_URL=http://support-service:8000
       - EXCHANGE_SERVICE_URL=http://exchange-service:8000
+      - VERIFICATION_SERVICE_URL=http://verification-service:8000
+      - AI_SERVICE_URL=http://ai-orchestrator-service:8000
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8080}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-300}
       - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
@@ -260,6 +361,10 @@ services:
       support-service:
         condition: service_healthy
       exchange-service:
+        condition: service_healthy
+      verification-service:
+        condition: service_healthy
+      ai-orchestrator-service:
         condition: service_healthy
     networks:
       - maestrobank-network
@@ -314,3 +419,4 @@ networks:
 
 volumes:
   mongodb_data:
+  verification_models:

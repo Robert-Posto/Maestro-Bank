@@ -17,6 +17,8 @@ class Settings:
     budgets_service_url: str = os.getenv("BUDGETS_SERVICE_URL", "http://budgets-service:8000")
     support_service_url: str = os.getenv("SUPPORT_SERVICE_URL", "http://support-service:8000")
     exchange_service_url: str = os.getenv("EXCHANGE_SERVICE_URL", "http://exchange-service:8000")
+    verification_service_url: str = os.getenv("VERIFICATION_SERVICE_URL", "http://verification-service:8000")
+    ai_service_url: str = os.getenv("AI_SERVICE_URL", "http://ai-orchestrator-service:8000")
 
     cors_allowed_origins: list[str] = [
         origin.strip()

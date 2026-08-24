@@ -26,5 +26,18 @@ class Settings:
     ]
     webauthn_challenge_ttl_seconds: int = int(os.getenv("WEBAUTHN_CHALLENGE_TTL_SECONDS", "120"))
 
+    # --- Verificare email -----------------------------------------------
+    # Cod de 6 cifre, trimis prin SMTP. Dacă SMTP_HOST lipsește (cazul
+    # implicit, development), NU eșuează — codul e doar logat în consola
+    # serviciului (vezi email_service.py), suficient ca să testezi fluxul
+    # fără cont de email real. Pune un SMTP_HOST real (ex. Gmail cu parolă
+    # de aplicație) în .env ca să primești coduri pe mail cu adevărat.
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "no-reply@maestrobank.local")
+    email_verification_code_ttl_minutes: int = int(os.getenv("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "15"))
+
 
 settings = Settings()

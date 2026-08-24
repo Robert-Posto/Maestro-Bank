@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import webauthn_service
+from app import service, webauthn_service
 from app.database import close_database_connection, ping_database
 from app.routers.auth import router as auth_router
 from app.routers.internal import router as internal_router
@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
     # nu SQL), vezi accounts-service::backfill_missing_account_types
     # pentru același pattern.
     await webauthn_service.ensure_webauthn_indexes()
+    await service.backfill_verification_flags()
     yield
     await close_database_connection()
 

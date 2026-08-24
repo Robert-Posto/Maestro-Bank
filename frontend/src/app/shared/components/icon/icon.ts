@@ -232,6 +232,15 @@ import { Component, input } from '@angular/core';
           <path d="M4.5 12L20 4l-6.5 16-2.7-6.8L4.5 12z" />
           <path d="M10.8 13.2L20 4" />
         }
+        @case ('camera') {
+          <path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+          <circle cx="12" cy="13.5" r="3.5" />
+        }
+        @case ('upload') {
+          <path d="M12 16V4" />
+          <path d="M7 9l5-5 5 5" />
+          <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+        }
       }
     </svg>
   `,

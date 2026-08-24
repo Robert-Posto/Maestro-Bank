@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+from fastapi import Header, HTTPException, status
 
 from app.config import settings
 
@@ -35,3 +36,24 @@ def create_access_token(user_id: str, email: str, role: str = "customer") -> str
 def decode_access_token(token: str) -> dict:
     """Aruncă jwt.PyJWTError dacă tokenul e invalid sau expirat."""
     return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+
+def get_current_user_id_from_header(authorization: str | None = Header(default=None)) -> str:
+    """Ca accounts-service::get_current_user_id — doar extrage user_id din
+    JWT, fără căutare în bază (folosit de rutele care nu au nevoie de tot
+    documentul userului, ex. verify-email)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Lipsește header-ul Authorization: Bearer <token>.",
+        )
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = decode_access_token(token)
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid sau expirat.") from exc
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
+    return user_id

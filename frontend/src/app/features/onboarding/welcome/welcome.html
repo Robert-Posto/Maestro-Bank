@@ -1,0 +1,42 @@
+<div class="auth-screen">
+  <main class="auth-layout">
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-brand">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="auth-visual__content">
+        <p class="auth-visual__eyebrow">Pasul 3 din 3</p>
+        <h2 class="auth-visual__title">Bine ai venit în MaestroBank!</h2>
+        <p class="auth-visual__text">Contul tău e verificat și gata de folosit — chiar de la primul transfer.</p>
+      </div>
+
+      <p class="auth-visual__security">Cont complet verificat</p>
+    </aside>
+
+    <section class="auth-card welcome-card">
+      <div class="auth-brand auth-brand--mobile">
+        <p class="auth-brand__name">MaestroBank</p>
+        <p class="auth-brand__tagline">maestrul tău în banking</p>
+      </div>
+
+      <div class="welcome-badge"><app-icon name="check" [size]="28" /></div>
+
+      <h1 class="auth-title">Gata, {{ firstName }}!</h1>
+      <p class="auth-subtitle">Emailul și identitatea ta sunt confirmate. Contul tău e complet activ.</p>
+
+      @if (!loading() && account()) {
+        <div class="welcome-bonus">
+          <span class="welcome-bonus__label">Bonus de bun venit</span>
+          <strong class="welcome-bonus__amount">+{{ bonusAmountMinor | money: account()!.currency }}</strong>
+          <span class="welcome-bonus__hint">Sold curent: {{ account()!.balance_minor | money: account()!.currency }}</span>
+        </div>
+      }
+
+      <button type="button" class="auth-submit" [disabled]="loading()" (click)="enterApp()">
+        {{ loading() ? 'Se pregătește contul...' : 'Intră în cont' }}
+      </button>
+    </section>
+  </main>
+</div>
