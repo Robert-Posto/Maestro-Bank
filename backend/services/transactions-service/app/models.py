@@ -203,6 +203,7 @@ class StaffHoldCustomerContact(BaseModel):
 
 class StaffHoldOut(BaseModel):
     id: str
+    user_id: str | None = None
     from_iban: str
     to_iban: str
     from_name: str | None = None

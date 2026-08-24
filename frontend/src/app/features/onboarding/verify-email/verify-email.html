@@ -21,6 +21,10 @@
         <p class="auth-brand__tagline">maestrul tău în banking</p>
       </div>
 
+      <button type="button" class="auth-back auth-back--icon" aria-label="Renunță și ieși" (click)="back()">
+        <app-icon name="chevron-left" [size]="18" />
+      </button>
+
       <h1 class="auth-title">Verifică-ți emailul</h1>
       <p class="auth-subtitle">Am trimis un cod de 6 cifre către <strong>{{ email }}</strong>.</p>
 

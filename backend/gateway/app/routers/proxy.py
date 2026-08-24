@@ -35,7 +35,14 @@ SERVICES: dict[str, dict[str, str | float]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
-    "verification": {"base_url": settings.verification_service_url, "internal_prefix": ""},
+    # timeout mai mare decât restul — DeepFace (VGG-Face + detector
+    # retinaface, alese pentru acuratețe pe poze reale de buletin, nu
+    # pentru viteză — vezi verification-service/app/config.py) rulează pe
+    # CPU și poate depăși ușor cele 10s implicite, mai ales la o cerere
+    # "rece" după un restart de container. 30s acoperă confortabil un
+    # verify-identity real, fără să lase userul agățat la infinit dacă
+    # ceva chiar e blocat.
+    "verification": {"base_url": settings.verification_service_url, "internal_prefix": "", "timeout_seconds": 30.0},
     # timeout mai mare decât restul — răspunsul implică 1+ apeluri GPT
     # (tool-calling), semnificativ mai lente decât un query Mongo obișnuit.
     # 100s — acoperă confortabil 2 runde de tool-calling la 45s/apel

@@ -1,0 +1,45 @@
+<app-page-header title="Contul clientului" subtitle="Vedere read-only, deschisă din revizuirea unei rețineri de fraudă.">
+  <app-action-button variant="secondary" (pressed)="back()">
+    <app-icon name="chevron-left" [size]="16" /> Înapoi la rețineri
+  </app-action-button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="60" [gap]="14" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca datele clientului" [description]="error()!" />
+} @else {
+  <div class="staff-customer">
+    <section class="staff-customer__panel">
+      <h2 class="staff-customer__title">
+        <app-icon name="accounts" [size]="18" /> Conturi
+        <span class="staff-customer__count">{{ accountRows().length }}</span>
+      </h2>
+      @if (accountRows().length === 0) {
+        <app-empty-state icon="wallet" title="Niciun cont" description="Acest client nu are conturi active." />
+      } @else {
+        <div class="staff-customer__list">
+          @for (account of accountRows(); track account.id) {
+            <app-account-card [account]="account" [showChevron]="false" />
+          }
+        </div>
+      }
+    </section>
+
+    <section class="staff-customer__panel">
+      <h2 class="staff-customer__title">
+        <app-icon name="transactions" [size]="18" /> Tranzacții recente
+        <span class="staff-customer__count">{{ transactionRows().length }}</span>
+      </h2>
+      @if (transactionRows().length === 0) {
+        <app-empty-state icon="receipt" title="Nicio tranzacție" description="Nu există tranzacții înregistrate pentru acest client." />
+      } @else {
+        <div class="staff-customer__list">
+          @for (tx of transactionRows(); track tx.id) {
+            <app-transaction-row [transaction]="tx" />
+          }
+        </div>
+      }
+    </section>
+  </div>
+}

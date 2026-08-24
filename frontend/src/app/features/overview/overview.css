@@ -20,6 +20,15 @@
   padding: var(--mb-space-5);
   background: var(--mb-surface);
   animation: stat-card-in 420ms ease backwards;
+  transition: background var(--mb-transition-fast);
+}
+
+.overview-stat-card:hover {
+  background: var(--mb-surface-muted);
+}
+
+.overview-stat-card:hover .overview-stat-card__icon {
+  transform: scale(1.08) rotate(-4deg);
 }
 
 .overview-stat-card:nth-child(1) { animation-delay: 0ms; }
@@ -38,9 +47,33 @@
   }
 }
 
+.overview-insight,
+.overview-grid > .overview-panel,
+.overview-lower-grid > .overview-panel {
+  animation: stat-card-in 420ms ease backwards;
+}
+
+.overview-insight { animation-delay: 260ms; }
+.overview-grid > .overview-panel:nth-of-type(1) { animation-delay: 300ms; }
+.overview-grid > .overview-panel:nth-of-type(2) { animation-delay: 360ms; }
+.overview-grid > .overview-panel:nth-of-type(3) { animation-delay: 420ms; }
+.overview-lower-grid > .overview-panel:nth-of-type(1) { animation-delay: 470ms; }
+.overview-lower-grid > .overview-panel:nth-of-type(2) { animation-delay: 520ms; }
+
 @media (prefers-reduced-motion: reduce) {
-  .overview-stat-card {
+  .overview-stat-card,
+  .overview-stat-card__icon,
+  .overview-action app-icon,
+  .overview-action::after,
+  .overview-insight,
+  .overview-grid > .overview-panel,
+  .overview-lower-grid > .overview-panel {
     animation: none;
+    transition: none;
+  }
+  .overview-stat-card:hover .overview-stat-card__icon,
+  .overview-action:hover app-icon {
+    transform: none;
   }
 }
 
@@ -89,6 +122,7 @@
   width: 44px;
   height: 44px;
   border-radius: 14px;
+  transition: transform var(--mb-transition-base);
 }
 
 .overview-stat-card__icon--blue { color: var(--mb-blue-600); background: var(--mb-blue-50); }
@@ -260,6 +294,7 @@
   right: var(--mb-space-1);
   color: var(--mb-text-tertiary);
   font-size: 1.25rem;
+  transition: transform var(--mb-transition-fast);
 }
 
 .overview-action app-icon {
@@ -270,11 +305,21 @@
   border-radius: 10px;
   color: var(--mb-blue-600);
   background: var(--mb-blue-50);
+  transition: transform var(--mb-transition-base), background var(--mb-transition-fast);
 }
 
 .overview-action:hover {
   background: var(--mb-surface-muted);
   color: var(--mb-blue-600);
+}
+
+.overview-action:hover::after {
+  transform: translateX(3px);
+}
+
+.overview-action:hover app-icon {
+  transform: scale(1.08) rotate(-4deg);
+  background: var(--mb-blue-100);
 }
 
 .overview-subscription {

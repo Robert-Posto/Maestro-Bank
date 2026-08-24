@@ -383,6 +383,15 @@ async def create_demo_user(db_auth, db_accounts, spec: dict, password_hash: str,
         "is_active": True,
         "is_demo": True,
         "role": "customer",
+        # Conturile demo NU trec prin register public, deci n-au cum să
+        # capete codul de verificare/selfie-ul din onboarding — le marcăm
+        # direct verificate, altfel backfill_verification_flags() de la
+        # boot-ul auth-service (rulează O SINGURĂ DATĂ, la pornire) le-ar
+        # prinde doar dacă userul deja exista ÎNAINTE de acel boot; create
+        # DUPĂ boot -> câmpul lipsește -> UserMeOut cade pe False -> userul
+        # e împins în onboarding la fiecare login, deși nu are cum să-l termine.
+        "email_verified": True,
+        "identity_verified": True,
     }
     result = await db_auth.users.insert_one(user_doc)
     user_id = str(result.inserted_id)

@@ -162,6 +162,11 @@ async def create_scenario_user(db_auth, db_accounts, key: str, first_name: str, 
         "is_demo": True,
         "is_fraud_sim": True,
         "role": "customer",
+        # Userii fraud-sim NU trec prin register public — la fel ca-n
+        # seed_demo_data.py::create_demo_user, îi marcăm direct verificați,
+        # altfel authGuard din frontend i-ar bloca în onboarding la login.
+        "email_verified": True,
+        "identity_verified": True,
     }
     result = await db_auth.users.insert_one(user_doc)
     user_id = str(result.inserted_id)

@@ -38,6 +38,12 @@ class Settings:
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_from: str = os.getenv("SMTP_FROM", "no-reply@maestrobank.local")
     email_verification_code_ttl_minutes: int = int(os.getenv("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "15"))
+    # Cod universal, valabil pentru ORICE înregistrare — ca să nu mai fie
+    # nevoie să cauți codul real în docker logs de fiecare dată cât testezi
+    # fluxul de onboarding. Activ implicit în development (vezi și
+    # smtp_host mai sus, același spirit); pune EMAIL_VERIFICATION_TEST_CODE=""
+    # ca să-l dezactivezi complet.
+    email_verification_test_code: str = os.getenv("EMAIL_VERIFICATION_TEST_CODE", "123456")
 
 
 settings = Settings()

@@ -1,7 +1,6 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
-import { AuthService } from '../../../services/auth.service';
 import { Icon } from '../icon/icon';
 
 interface NavItem {
@@ -58,9 +57,11 @@ const NAV_GROUPS: NavGroup[] = [
   // Profil & Securitate și Ieși din cont NU sunt aici — trăiesc doar în
   // dropdown-ul de profil din topbar, ca sidebar-ul să nu fie aglomerat
   // cu ceva ce ține de cont, nu de navigare între secțiuni.
+  //
+  // Zona de personal (rețineri fraud) NU e aici — trăiește separat, sub
+  // /admin (vezi AdminShell + app.routes.ts), nu ca o intrare în plus în
+  // navigarea obișnuită a unui cont de client.
 ];
-
-const STAFF_NAV_ITEM: NavItem = { label: 'Personal — Rețineri', route: '/app/staff-holds', icon: 'shield' };
 
 /** Sidebar bleumarin — vezi UI reference/*.png. Comun tuturor paginilor /app/*. */
 @Component({
@@ -71,15 +72,5 @@ const STAFF_NAV_ITEM: NavItem = { label: 'Personal — Rețineri', route: '/app/
   styleUrl: './sidebar.css',
 })
 export class Sidebar {
-  private readonly auth = inject(AuthService);
-
-  // currentUser e populat de AppShell la intrarea în /app/* (vezi
-  // app-shell.ts) — până se rezolvă, role e undefined și grupul de
-  // personal rămâne ascuns (fail-safe: mai bine ascuns o clipă în plus
-  // decât arătat cuiva care nu e staff). Server-side, require_staff tot
-  // ar bloca oricum orice apel real — asta e DOAR un indiciu de UI.
-  protected readonly navGroups = computed<NavGroup[]>(() => {
-    const isStaff = this.auth.currentUser()?.role === 'staff';
-    return isStaff ? [...NAV_GROUPS, { label: 'Personal', items: [STAFF_NAV_ITEM] }] : NAV_GROUPS;
-  });
+  protected readonly navGroups = NAV_GROUPS;
 }

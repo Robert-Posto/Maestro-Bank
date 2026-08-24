@@ -9,7 +9,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-5);
+  margin-bottom: var(--mb-space-4);
 }
 
 .identity-slot {
@@ -34,7 +34,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--mb-space-2);
-  height: 220px;
+  height: 160px;
   border: 1.5px dashed var(--mb-border-strong);
   border-radius: var(--mb-radius-md);
   background: var(--mb-surface-muted);
@@ -52,7 +52,7 @@
 
 .identity-slot__preview {
   width: 100%;
-  height: 220px;
+  height: 160px;
   object-fit: cover;
   border-radius: var(--mb-radius-md);
   background: var(--mb-surface-muted);
@@ -78,7 +78,7 @@
 
 .identity-camera {
   position: relative;
-  height: 220px;
+  height: 160px;
   border-radius: var(--mb-radius-md);
   overflow: hidden;
   background: #000;

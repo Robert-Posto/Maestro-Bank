@@ -41,6 +41,15 @@ export class VerifyIdentity implements OnDestroy {
     this.stopCamera();
   }
 
+  /** Spre deosebire de verify-email (unde nu există un pas anterior real),
+   * aici pasul anterior chiar există — emailul rămâne verificat, deci
+   * revenirea la el nu strică nimic (onboardingAuthGuard nu cere altceva
+   * decât autentificare pe acea rută). */
+  protected back(): void {
+    this.stopCamera();
+    this.router.navigate(['/onboarding/verify-email']);
+  }
+
   protected onIdDocumentSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];

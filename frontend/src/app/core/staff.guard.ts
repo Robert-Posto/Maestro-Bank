@@ -5,8 +5,9 @@ import { AuthService } from '../services/auth.service';
 import { decodeJwtPayload } from '../shared/jwt-utils';
 
 /**
- * Protejează /app/staff/* — SUPLIMENTAR față de authGuard de pe părintele
- * /app (care rulează oricum întâi). Decodează JWT-ul DOAR ca indiciu de UI
+ * Protejează /admin/* — rută separată deliberat de /app/* (vezi AdminShell
+ * + app.routes.ts), nu doar o pagină ascunsă în navigarea obișnuită.
+ * Decodează JWT-ul DOAR ca indiciu de UI
  * (la fel ca restul decodărilor din jwt-utils.ts) — un client cu un rol
  * modificat manual în token tot ar primi 403 de la require_staff pe orice
  * apel real către backend (transactions-service/app/security.py), deci

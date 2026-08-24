@@ -43,9 +43,13 @@
       <p class="profile-passkey-unsupported">Browserul tău nu suportă passkey-uri — poți folosi în continuare parola.</p>
     } @else {
       @if (passkeysLoading()) {
-        <p class="profile-passkey-empty">Se încarcă...</p>
+        <app-loading-skeleton [rows]="2" [height]="50" />
       } @else if (passkeys().length === 0) {
-        <p class="profile-passkey-empty">Niciun passkey înregistrat încă.</p>
+        <app-empty-state
+          icon="fingerprint"
+          title="Niciun passkey înregistrat"
+          description="Adaugă unul pentru autentificare rapidă cu Face ID, Touch ID sau Windows Hello, fără parolă."
+        />
       } @else {
         <ul class="profile-passkey-list">
           @for (p of passkeys(); track p.id) {

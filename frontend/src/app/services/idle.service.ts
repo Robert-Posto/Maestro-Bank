@@ -5,7 +5,7 @@ import { AuthService } from './auth.service';
 
 /** Cât timp fără nicio activitate (mouse/tastatură/scroll/atingere)
  * înainte de deconectare automată. */
-export const IDLE_TIMEOUT_MS = 60_000;
+export const IDLE_TIMEOUT_MS = 5 * 60_000;
 
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'] as const;
 

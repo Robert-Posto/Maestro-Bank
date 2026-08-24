@@ -12,6 +12,7 @@ from fastapi import APIRouter, status
 
 from app import service, webauthn_service
 from app.models import (
+    InternalMarkIdentityVerifiedRequest,
     InternalPasswordVerifyRequest,
     InternalPasswordVerifyResponse,
     InternalUserContactView,

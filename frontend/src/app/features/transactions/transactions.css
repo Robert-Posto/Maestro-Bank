@@ -255,9 +255,11 @@
 }
 
 .tx-table__account app-icon {
-  display: inline-block;
+  /* vertical-align: middle, NU un offset fix în px — acela era calibrat
+     manual pentru vechiul bug de centrare al <app-icon> (vezi icon.ts);
+     acum că e reparat la sursă, un offset "magic" ar fi din nou greșit. */
+  vertical-align: middle;
   margin-right: var(--mb-space-2);
-  vertical-align: -3px;
 }
 
 .tx-table__chevron {

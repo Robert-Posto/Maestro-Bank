@@ -21,11 +21,12 @@
   display: flex;
   align-items: center;
   gap: var(--mb-space-2);
-  /* "Adâncită" în bara albă (fundal mat, fără bordură) — contrast garantat
-     indiferent de nuanțele exacte de token, nu doar o bordură subtilă pe
-     un fundal aproape identic. */
-  background: var(--mb-surface-muted);
-  border: 1px solid transparent;
+  /* --mb-surface-muted (#fafbfd) era practic identic cu --mb-surface
+     (#ffffff) — sub 1% diferență de luminozitate, invizibilă pe multe
+     monitoare. O nuanță de albastru (nu doar gri) garantează contrast
+     real, indiferent de calibrarea ecranului. */
+  background: var(--mb-blue-50);
+  border: 1px solid var(--mb-blue-100);
   border-radius: var(--mb-radius-md);
   padding: 0.65rem var(--mb-space-4);
   color: var(--mb-text-tertiary);
@@ -34,7 +35,7 @@
 }
 
 .topbar__search:hover {
-  background: var(--mb-border);
+  border-color: var(--mb-blue-500);
 }
 
 .topbar__search:focus-within {

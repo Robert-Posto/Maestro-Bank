@@ -4,11 +4,12 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { Icon } from '../../../shared/components/icon/icon';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, Icon],
   templateUrl: './register.html',
   styleUrl: './register.css',
 })

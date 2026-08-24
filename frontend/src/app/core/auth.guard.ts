@@ -17,12 +17,21 @@ async function resolveCurrentUser(auth: AuthService): Promise<AuthUser | null> {
   }
 }
 
+/** "Acasă" diferă după rol — personalul NU are cont de client (e emis
+ * direct de bancă, doar pentru revizuit rețineri), deci nu are sens să
+ * ajungă vreodată pe /app/*, nici măcar tranzitoriu. */
+function homeRouteFor(user: AuthUser): string[] {
+  return user.role === 'staff' ? ['/admin'] : ['/app/overview'];
+}
+
 /**
  * Protejează rutele /app/* — redirecționează la /login dacă userul nu are
- * un JWT valid în sessionStorage, ȘI la pasul de onboarding corespunzător
- * dacă nu a terminat verificarea email/identitate (vezi routes 'onboarding'
- * din app.routes.ts). Vezi AuthService pentru nota despre limitările
- * abordării curente cu tokenul (dev-only, nu arhitectură de producție).
+ * un JWT valid în sessionStorage, la /admin dacă e personal (NU are cont
+ * de client, deci /app/* nu e niciodată destinația lui — vezi AdminShell),
+ * ȘI la pasul de onboarding corespunzător dacă un client nu a terminat
+ * verificarea email/identitate (vezi routes 'onboarding' din app.routes.ts).
+ * Vezi AuthService pentru nota despre limitările abordării curente cu
+ * tokenul (dev-only, nu arhitectură de producție).
  */
 export const authGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
@@ -36,6 +45,9 @@ export const authGuard: CanActivateFn = async () => {
   if (!user) {
     return router.createUrlTree(['/login']);
   }
+  if (user.role === 'staff') {
+    return router.createUrlTree(['/admin']);
+  }
   if (!user.email_verified) {
     return router.createUrlTree(['/onboarding/verify-email']);
   }
@@ -46,8 +58,9 @@ export const authGuard: CanActivateFn = async () => {
   return true;
 };
 
-/** Invers — /login și /register redirecționează la /app/overview dacă userul e deja autentificat. */
-export const guestGuard: CanActivateFn = () => {
+/** Invers — /login și /register redirecționează "acasă" (diferit după
+ * rol — vezi homeRouteFor) dacă userul e deja autentificat. */
+export const guestGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
@@ -55,7 +68,12 @@ export const guestGuard: CanActivateFn = () => {
     return true;
   }
 
-  return router.createUrlTree(['/app/overview']);
+  const user = await resolveCurrentUser(auth);
+  if (!user) {
+    return true;
+  }
+
+  return router.createUrlTree(homeRouteFor(user));
 };
 
 /** Ecranele de onboarding cer doar autentificare — userul poate fi
@@ -90,7 +108,7 @@ export const onboardingIdentityGuard: CanActivateFn = async () => {
     return router.createUrlTree(['/onboarding/verify-email']);
   }
   if (user.identity_verified) {
-    return router.createUrlTree(['/app/overview']);
+    return router.createUrlTree(homeRouteFor(user));
   }
 
   return true;
