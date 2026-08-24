@@ -12,7 +12,7 @@
           <p>Echipa de suport MaestroBank</p>
         </div>
       </div>
-      <span class="support-chat__status">Chat demonstrativ</span>
+      <span class="support-chat__status"><span class="support-chat__status-dot"></span>Online</span>
     </header>
 
     <div class="support-chat__messages" #messagesEl aria-live="polite">
@@ -22,9 +22,57 @@
             <div class="support-chat__message-avatar">M</div>
           }
           <div class="support-chat__message-col">
-            <div class="support-chat__bubble" [class.support-chat__bubble--user]="chatMessage.role === 'user'">
-              {{ chatMessage.text }}
-            </div>
+            <div
+              class="support-chat__bubble"
+              [class.support-chat__bubble--user]="chatMessage.role === 'user'"
+              [innerHTML]="formatChatText(chatMessage.text)"
+            ></div>
+
+            @if (chatMessage.context?.transactions; as transactions) {
+              <div class="support-chat__context-card">
+                @for (t of transactions; track t.id) {
+                  <app-transaction-row [transaction]="t" />
+                }
+              </div>
+            }
+            @if (chatMessage.context?.transaction; as transaction) {
+              <div class="support-chat__context-card">
+                <app-transaction-row [transaction]="transaction" />
+              </div>
+            }
+            @if (chatMessage.context?.account; as account) {
+              <div class="support-chat__context-account">
+                <span class="support-chat__context-account-iban">{{ account.iban }}</span>
+                <span class="support-chat__context-account-balance">{{ account.balance_minor | money: account.currency }}</span>
+              </div>
+            }
+            @if (chatMessage.context?.card; as card) {
+              <div class="support-chat__context-card-status">
+                <div class="support-chat__context-card-status-header">
+                  <span>Card •••• {{ card.last_four }}</span>
+                  <app-status-badge [status]="card.is_frozen ? 'frozen' : card.status" />
+                </div>
+                <div class="support-chat__context-card-features">
+                  @for (f of cardFeatures(card); track f.label) {
+                    <span class="support-chat__context-feature" [class.support-chat__context-feature--off]="!f.enabled">
+                      <app-icon [name]="f.enabled ? 'check' : 'close'" [size]="13" />
+                      {{ f.label }}
+                    </span>
+                  }
+                </div>
+              </div>
+            }
+            @if (chatMessage.context?.tickets; as ticketsList) {
+              <div class="support-chat__context-card">
+                @for (t of ticketsList; track t.id) {
+                  <div class="support-chat__context-ticket">
+                    <span>{{ t.subject }}</span>
+                    <app-status-badge [status]="t.status" />
+                  </div>
+                }
+              </div>
+            }
+
             <span class="support-chat__time" [class.support-chat__time--user]="chatMessage.role === 'user'">{{ chatMessage.time }}</span>
           </div>
         </div>
@@ -61,7 +109,7 @@
         <app-icon name="send" [size]="19" />
       </button>
     </form>
-    <p class="support-chat__notice">Chat demonstrativ — mesajele nu sunt trimise încă unei echipe de suport. Nu include parole, PIN-uri sau date complete ale cardului.</p>
+    <p class="support-chat__notice">Răspunsurile sunt generate automat de MaestroBank Suport și pot conține greșeli. Nu include parole, PIN-uri sau date complete ale cardului.</p>
   </section>
 
   <aside class="support-sidebar">
