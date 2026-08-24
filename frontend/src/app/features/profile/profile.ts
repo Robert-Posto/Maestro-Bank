@@ -8,7 +8,9 @@ import { PasskeyCredential, WebauthnService } from '../../services/webauthn.serv
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
+import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Icon } from '../../shared/components/icon/icon';
+import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { decodeJwtPayload } from '../../shared/jwt-utils';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
@@ -17,7 +19,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule, DatePipe, PageHeader, ActionButton, ConfirmDialog, Icon],
+  imports: [FormsModule, DatePipe, PageHeader, ActionButton, ConfirmDialog, EmptyState, Icon, LoadingSkeleton],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })

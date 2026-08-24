@@ -136,6 +136,16 @@ async def verify_email_code(user_id: str, code: str) -> None:
     if user.get("email_verified"):
         return
 
+    if settings.email_verification_test_code and secrets.compare_digest(
+        code, settings.email_verification_test_code
+    ):
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"email_verified": True, "email_verification_code": None, "email_verification_expires_at": None}},
+        )
+        logger.info("auth-service: email verificat cu codul de test (user_id=%s)", user_id)
+        return
+
     stored_code = user.get("email_verification_code")
     expires_at = user.get("email_verification_expires_at")
     if not stored_code or not expires_at:

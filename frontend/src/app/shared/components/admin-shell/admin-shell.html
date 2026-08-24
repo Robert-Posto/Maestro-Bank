@@ -1,0 +1,24 @@
+<div class="admin-shell">
+  <header class="admin-topbar">
+    <div class="admin-topbar__brand">
+      <span class="admin-topbar__icon"><app-icon name="shield" [size]="18" /></span>
+      <div>
+        <p class="admin-topbar__title">MaestroBank <span>Personal</span></p>
+        <p class="admin-topbar__subtitle">Zonă restricționată — vizibilă doar personalului</p>
+      </div>
+    </div>
+
+    <div class="admin-topbar__right">
+      <span class="admin-topbar__user">{{ staffName }}</span>
+      <button type="button" class="admin-topbar__action" (click)="logout()">
+        <app-icon name="logout" [size]="16" />
+        Ieși din cont
+      </button>
+    </div>
+  </header>
+
+  <main class="admin-content">
+    <router-outlet />
+  </main>
+</div>
+<app-toast-container />

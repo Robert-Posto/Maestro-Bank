@@ -35,6 +35,46 @@
   margin-top: 2px;
 }
 
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: var(--mb-space-4);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  font-family: inherit;
+  text-decoration: none;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color var(--mb-transition-fast), transform var(--mb-transition-fast);
+}
+
+.auth-back:hover {
+  color: var(--mb-blue-600);
+  transform: translateX(-2px);
+}
+
+/* Variantă doar-iconiță — cerc mic, fără etichetă text, ca să nu mai
+   adauge o linie întreagă de text pe ecrane scunde (vezi și padding-ul
+   redus pe .auth-card mai jos — amândouă țintesc "fără scroll deloc"). */
+.auth-back--icon {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mb-surface-muted);
+  gap: 0;
+}
+
+.auth-back--icon:hover {
+  background: var(--mb-blue-50);
+  transform: none;
+}
+
 .auth-title {
   font-size: var(--mb-font-size-xl);
   margin-bottom: var(--mb-space-1);
@@ -215,7 +255,6 @@
 
 .auth-layout {
   width: min(100%, 1020px);
-  min-height: 620px;
   display: grid;
   grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.1fr);
   position: relative;
@@ -346,8 +385,15 @@
   flex-direction: column;
   justify-content: center;
   border-radius: 0;
-  padding: clamp(2rem, 5vw, 4.25rem);
+  padding: clamp(1.5rem, 3.5vw, 2.75rem);
   box-shadow: none;
+  /* Plasă de siguranță, nu strategia principală — cardul e făcut destul
+     de compact (padding + gap-uri reduse pe fiecare pagină) ca să încapă
+     fără scroll pe un viewport obișnuit de desktop; asta doar evită să
+     "dispară" conținutul (tăiat de overflow:hidden pe .auth-layout) pe un
+     viewport neobișnuit de scund. */
+  max-height: calc(100vh - clamp(2rem, 8vw, 6rem));
+  overflow-y: auto;
 }
 
 .auth-brand--mobile {
@@ -359,12 +405,12 @@
 }
 
 .auth-subtitle {
-  margin-top: 0.6rem;
-  margin-bottom: var(--mb-space-8);
+  margin-top: 0.4rem;
+  margin-bottom: var(--mb-space-5);
 }
 
 .auth-form {
-  gap: var(--mb-space-5);
+  gap: var(--mb-space-4);
 }
 
 .auth-form-row {
@@ -451,7 +497,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .auth-field input,
-  .auth-submit {
+  .auth-submit,
+  .auth-back {
     transition: none;
+  }
+  .auth-back:hover {
+    transform: none;
   }
 }

@@ -3,13 +3,14 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../core/api-config';
+import { AccountView, TransactionView } from './banking.service';
 
 /**
  * Tot ce ține de /api/transactions/staff — accesibil DOAR unui JWT cu
  * role="staff" (vezi backend transactions-service/app/security.py
  * ::require_staff). Rutele oricum verifică rolul server-side; ghidul de
  * UI (staffGuard) există doar ca să nu arate un ecran gol/eroare unui
- * client obișnuit care ar naviga direct la /app/staff-holds.
+ * client obișnuit care ar naviga direct la /admin/holds.
  */
 
 export interface StaffHoldCustomerContact {
@@ -21,6 +22,7 @@ export interface StaffHoldCustomerContact {
 
 export interface StaffHoldView {
   id: string;
+  user_id: string | null;
   from_iban: string;
   to_iban: string;
   from_name: string | null;
@@ -88,5 +90,20 @@ export class StaffService {
     if (params.reviewed !== undefined) query.set('reviewed', String(params.reviewed));
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<FraudEvaluationView[]>(`${API_BASE_URL}/transactions/staff/fraud-evaluations${suffix}`);
+  }
+
+  /** READ-ONLY — contul/istoricul unui client oarecare, pentru revizuirea
+   * unei rețineri (vezi accounts-service și transactions-service,
+   * routers/staff.py::get_customer_accounts / get_customer_transactions).
+   * Niciun endpoint de scriere aici — personalul nu poate face transferuri
+   * sau modifica nimic din contul clientului, doar vede. */
+  getCustomerAccounts(userId: string): Observable<AccountView[]> {
+    return this.http.get<AccountView[]>(`${API_BASE_URL}/accounts/staff/customers/${userId}/accounts`);
+  }
+
+  getCustomerTransactions(userId: string, limit = 20, skip = 0): Observable<TransactionView[]> {
+    return this.http.get<TransactionView[]>(
+      `${API_BASE_URL}/transactions/staff/customers/${userId}/transactions?limit=${limit}&skip=${skip}`,
+    );
   }
 }

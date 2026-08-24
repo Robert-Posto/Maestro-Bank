@@ -17,6 +17,7 @@ from app.routers.beneficiaries import router as beneficiaries_router
 from app.routers.cards import router as cards_router
 from app.routers.internal import router as internal_router
 from app.routers.pockets import router as pockets_router
+from app.routers.staff import router as staff_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [accounts-service] %(levelname)s %(message)s")
 
@@ -53,5 +54,6 @@ async def health_check():
 app.include_router(cards_router)
 app.include_router(beneficiaries_router)
 app.include_router(pockets_router)
+app.include_router(staff_router)
 app.include_router(accounts_router)
 app.include_router(internal_router)

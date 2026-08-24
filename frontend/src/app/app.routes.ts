@@ -88,10 +88,24 @@ export const routes: Routes = [
         path: 'profile',
         loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
       },
+    ],
+  },
+  {
+    // Zonă separată, deliberat NU sub /app — vezi AdminShell. Un customer
+    // normal nu ajunge niciodată aici (staffGuard), dar și vizual/structural
+    // e altă rută, nu doar o pagină ascunsă în sidebar-ul obișnuit.
+    path: 'admin',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./shared/components/admin-shell/admin-shell').then((m) => m.AdminShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'holds' },
       {
-        path: 'staff-holds',
-        canActivate: [staffGuard],
+        path: 'holds',
         loadComponent: () => import('./features/staff-holds/staff-holds').then((m) => m.StaffHolds),
+      },
+      {
+        path: 'customers/:userId',
+        loadComponent: () => import('./features/staff-customer/staff-customer').then((m) => m.StaffCustomer),
       },
     ],
   },

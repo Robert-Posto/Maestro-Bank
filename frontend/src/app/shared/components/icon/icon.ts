@@ -9,6 +9,21 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon',
   standalone: true,
+  // Fără asta, <app-icon> rămâne cu display:inline implicit al browserului
+  // (element custom necunoscut) — un <svg> inline stă pe linia de bază a
+  // textului și lasă un mic gol de "descendent" dedesubt, exact ca literele
+  // cu coadă (g, y, p) — de-asta iconițele arătau ușor necentrate în orice
+  // cerc/pătrat din aplicație (butoane, badge-uri, avatare), sistematic,
+  // peste tot unde apare <app-icon>, nu doar într-un loc anume.
+  //
+  // IMPORTANT: `:host { display }` ca regulă CSS normală, NU `host: { style }`
+  // (care ar deveni style="..." inline — și un stil inline câștigă mereu în
+  // fața oricărei reguli externe, indiferent de specificitate). Unele pagini
+  // (ex. overview.css::.overview-action app-icon) suprascriu INTENȚIONAT
+  // display-ul direct pe <app-icon>, ca să-l facă ele însele un cerc/pătrat
+  // colorat cu grid+place-items — cu un stil inline, acel override n-ar mai
+  // putea câștiga niciodată, exact bug-ul care a apărut la prima variantă.
+  styles: [':host { display: inline-flex; } :host svg { display: block; }'],
   template: `
     <svg
       [attr.width]="size()"
@@ -240,6 +255,12 @@ import { Component, input } from '@angular/core';
           <path d="M12 16V4" />
           <path d="M7 9l5-5 5 5" />
           <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+        }
+        @case ('reload') {
+          <path d="M4 12a8 8 0 0 1 14-5.3L20 8" />
+          <path d="M20 3v5h-5" />
+          <path d="M20 12a8 8 0 0 1-14 5.3L4 16" />
+          <path d="M4 21v-5h5" />
         }
       }
     </svg>

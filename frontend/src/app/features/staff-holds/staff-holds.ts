@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 
 import { StaffHoldView, StaffService } from '../../services/staff.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
@@ -32,6 +33,7 @@ type PendingAction = { hold: StaffHoldView; kind: 'approve' | 'reject' };
 export class StaffHolds implements OnInit {
   private readonly staffApi = inject(StaffService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -71,6 +73,11 @@ export class StaffHolds implements OnInit {
     if (minutes < 60) return `acum ${minutes} min`;
     const hours = Math.round(minutes / 60);
     return `acum ${hours} ${hours === 1 ? 'oră' : 'ore'}`;
+  }
+
+  protected viewCustomer(hold: StaffHoldView): void {
+    if (!hold.user_id) return;
+    this.router.navigate(['/admin/customers', hold.user_id]);
   }
 
   protected askApprove(hold: StaffHoldView): void {
