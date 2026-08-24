@@ -26,9 +26,9 @@ export interface AuthUser {
   last_name: string;
   email: string;
   // Absent pe /auth/register (UserOut) — prezent DOAR pe /auth/me
-  // (UserMeOut). role gatează /app/staff/* (vezi core/staff.guard.ts) —
-  // DOAR ca indiciu de UI, autorizarea reală rămâne server-side
-  // (require_staff). phone_number e fictiv, neverificat — vezi backend.
+  // (UserMeOut). role gatează /admin/* (vezi core/staff.guard.ts) — DOAR
+  // ca indiciu de UI, autorizarea reală rămâne server-side (require_staff).
+  // phone_number e fictiv, neverificat — vezi backend.
   role?: 'customer' | 'staff';
   phone_number?: string | null;
   email_verified?: boolean;

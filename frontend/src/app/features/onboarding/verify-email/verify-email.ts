@@ -4,12 +4,13 @@ import { Router } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { Icon } from '../../../shared/components/icon/icon';
 
 /** Pasul 1/3 din onboarding — cod de 6 cifre trimis pe email la register. */
 @Component({
   selector: 'app-verify-email',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   templateUrl: './verify-email.html',
   styleUrl: './verify-email.css',
 })
@@ -56,6 +57,14 @@ export class VerifyEmail {
         this.error.set(extractErrorMessage(err, 'Cod incorect. Încearcă din nou.'));
       },
     });
+  }
+
+  /** Nu există un "pas anterior" real odată ce contul e creat — "back"
+   * aici înseamnă abandonarea onboarding-ului, nu revenirea la register
+   * (care oricum ar respinge emailul ca fiind deja folosit). */
+  back(): void {
+    this.auth.logout();
+    this.router.navigate(['/login']);
   }
 
   resendCode(): void {

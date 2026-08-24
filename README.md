@@ -13,17 +13,20 @@ Angular (4200)
      ▼
 API Gateway (8000)  — routing, JWT, CORS, rate limiting
      │
-     ├──────────────┬──────────────────┬────────────────┬───────────────┬──────────────────┐
-     ▼              ▼                  ▼                ▼               ▼                  ▼
-auth-service   accounts-service  transactions-service  budgets-service  support-service  exchange-service
-  (8001)            (8002)             (8003)              (8004)          (8005)            (8006)
-     │              │                  │                │               │                  │
-     ▼              ▼                  ▼                ▼               ▼                  ▼
-  auth_db       accounts_db          tx_db           budgets_db      support_db        exchange_db
-                                                    (aceeași instanță MongoDB, 27017)
+     ├────────┬──────────┬──────────┬─────────┬──────────┬──────────────┬──────────────┐
+     ▼        ▼          ▼          ▼         ▼          ▼              ▼              ▼
+  auth      accounts  transactions budgets  support   exchange     verification    ai-orchestrator
+ (8001)      (8002)      (8003)    (8004)    (8005)     (8006)         (8007)          (8008)
+     │        │          │          │         │          │               │              │
+     ▼        ▼          ▼          ▼         ▼          ▼          (fără bază proprie)  (fără bază proprie)
+  auth_db  accounts_db  tx_db   budgets_db support_db exchange_db   compară imagini,   vorbește DOAR prin
+                                                                     nu le persistă     Gateway (ca un
+                              (aceeași instanță MongoDB, 27017)                          client extern)
 ```
 
 Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceeași instanță MongoDB**, fiecare cu propria bază de date. Niciun microserviciu nu citește direct baza altui microserviciu — comunicarea între ele se face doar prin API (ex. `transactions-service` nu citește `accounts_db`, cere datele prin API-ul intern al `accounts-service`; la fel, pentru forecast, `transactions-service` cere abonamentele active prin API-ul intern al `budgets-service`, nu citește `budgets_db` direct).
+
+`verification-service` și `ai-orchestrator-service` sunt STATELESS — n-au bază proprie. Primul compară două imagini (buletin + selfie) și le șterge imediat după; al doilea nu atinge MongoDB deloc, ci apelează celelalte servicii prin Gateway, exact ca un client extern (Angular), propagând JWT-ul userului curent.
 
 ### Responsabilitatea fiecărui serviciu
 
@@ -32,17 +35,17 @@ Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceea�
 | **frontend** | UI Angular (design MaestroBank — vezi `UI reference/`) | — | 4200 |
 | **nginx** | reverse proxy către Gateway | — | 8080 (expus) |
 | **gateway** | routing `/api/*` → microservicii, JWT, CORS, rate limiting, status agregat | — (doar ping) | 8000 (expus) |
-| **auth-service** | users, autentificare, JWT, hash parole (bcrypt), schimbare parolă, provizionare automată cont bancar | `auth_db` | 8001 |
-| **accounts-service** | conturi RON, IBAN demo, carduri virtuale demo + control card (freeze/settings/limite), beneficiari, solduri | `accounts_db` | 8002 |
-| **transactions-service** | transferuri, istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
+| **auth-service** | users, autentificare, JWT, hash parole (bcrypt), schimbare parolă, passkeys (WebAuthn), verificare email la onboarding, provizionare automată cont bancar | `auth_db` | 8001 |
+| **accounts-service** | conturi (curent + economii/depozit/student), IBAN demo, carduri virtuale demo + control card (freeze/settings/limite), beneficiari, pockets (obiective de economisire) | `accounts_db` | 8002 |
+| **transactions-service** | transferuri (inclusiv programate/recurente), istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
 | **budgets-service** | bugete pe categorie + abonamente/plăți recurente (CRUD complet) | `budgets_db` | 8004 |
-| **support-service** | tichete de suport utilizator (fără AI) | `support_db` | 8005 |
+| **support-service** | tichete de suport + notificări persistente per user | `support_db` | 8005 |
 | **exchange-service** | motor de schimb valutar **DEMO** (curs/spread/comision simulate — NU integrare FX reală) | `exchange_db` | 8006 |
-| **mongodb** | baza de date, comună tuturor serviciilor de mai sus | — | 27018 (host) → 27017 (container) |
+| **verification-service** | verificare identitate la onboarding — compară poza buletinului cu un selfie live (DeepFace), apoi marchează userul verificat printr-un apel intern la `auth-service` | — (stateless) | 8007 |
+| **ai-orchestrator-service** | agentul "MaestroAgent" (Spending + Forecast) — chat peste Azure OpenAI (GPT-5-mini), cu tool-calling către celelalte servicii prin Gateway și un strat RAG (fallback local TF-IDF dacă nu sunt embeddings configurate) | — (stateless) | 8008 |
+| **mongodb** | baza de date, comună serviciilor cu stare | — | 27018 (host) → 27017 (container) |
 
 Angular **nu** vorbește niciodată direct cu un microserviciu — trece mereu prin Nginx → Gateway.
-
-`future-service-1` / `future-service-2` din planul inițial nu au fost (re)introduse — rezervă de nume pentru servicii viitoare (ex. `ai-orchestrator-service`), fără cod încă.
 
 ### Structura internă a unui serviciu
 
@@ -52,37 +55,51 @@ Toate serviciile respectă aceeași separare:
 app/
 ├── main.py      # app factory FastAPI, health check, includerea router-elor
 ├── config.py    # settings din variabile de mediu (pydantic-settings)
-├── database.py  # conexiunea Motor la MongoDB
+├── database.py  # conexiunea Motor la MongoDB (LIPSEȘTE la verification-service/ai-orchestrator-service — stateless)
 ├── models.py    # documente Mongo + DTO-uri Pydantic (request/response)
 ├── security.py  # dependency de validare JWT (get_current_user_id)
 ├── routers/     # DOAR HTTP: validare input, apel service.py, returnare
 └── service.py   # TOATĂ logica de business + acces la bază de date
 ```
 
-Regula: `routers/*.py` nu atinge niciodată direct baza de date — doar validează și deleagă către `service.py`. Rutele `/internal/*` (provisioning, transfer, subscriptions-by-user) sunt DOAR pentru comunicare service-to-service — Gateway le blochează explicit, nu sunt accesibile din browser.
+Regula: `routers/*.py` nu atinge niciodată direct baza de date — doar validează și deleagă către `service.py`. Rutele `/internal/*` (provisioning, transfer, subscriptions-by-user, mark-identity-verified) sunt DOAR pentru comunicare service-to-service — Gateway le blochează explicit, nu sunt accesibile din browser.
 
 ## Fluxul Core Banking
 
 ```text
-Register  →  Login  →  JWT
+Register  →  Login automat  →  JWT
     │
     ▼ (automat, sincron, la register)
 Creare cont RON  →  IBAN demo  →  Card virtual demo
     │
     ▼
-Alimentare demo (dev-only)  →  Sold
+Onboarding: verificare email (cod) → verificare identitate (buletin + selfie) → bonus de bun venit
     │
     ▼
 Transfer către alt IBAN  →  Actualizare solduri (debit + credit)  →  Istoric tranzacții
 ```
 
-La `POST /api/auth/register`, `auth-service` creează userul și apoi cere automat lui `accounts-service` (intern, sincron) să provizioneze un cont curent RON (`balance_minor=0`) cu un IBAN demo unic și un card virtual demo. Dacă `accounts-service` nu răspunde, userul tot rămâne creat (nu depinde de banking pentru autentificare), dar nu va avea cont bancar — vezi limitarea documentată mai jos.
+La `POST /api/auth/register`, `auth-service` creează userul, cere automat lui `accounts-service` (intern, sincron) să provizioneze un cont curent RON (`balance_minor=0`) cu un IBAN demo unic și un card virtual demo, apoi generează și trimite (sau doar logează, vezi mai jos) un cod de verificare email. Dacă `accounts-service` nu răspunde, userul tot rămâne creat (nu depinde de banking pentru autentificare), dar nu va avea cont bancar — vezi limitarea documentată mai jos. Userii creați ÎNAINTE de acest feature sunt marcați automat ca deja verificați la boot (`auth-service::backfill_verification_flags`) — nu sunt puși retroactiv să treacă prin verificare cu buletin.
+
+## Onboarding: verificare email + identitate
+
+După register, userul trece prin 3 ecrane (`/onboarding/verify-email` → `/onboarding/verify-identity` → `/onboarding/welcome`) înainte să ajungă în `/app/*` — impus printr-un route guard (`frontend/src/app/core/auth.guard.ts`), nu doar o convenție de UI.
+
+- **Verificare email**: cod de 6 cifre, generat de `auth-service`, trimis prin SMTP (stdlib `smtplib`, fără dependință nouă). Dacă `SMTP_HOST` nu e configurat (implicit), codul apare doar în `docker logs maestrobank-auth-service` — suficient pentru testare locală fără cont de email real. Vezi `.env.example`, secțiunea SMTP, pentru cum pui credențiale reale (recomandat: Mailtrap "Email Testing" — inbox partajat de toată echipa, nu trimite pe adrese reale).
+- **Verificare identitate**: userul încarcă o poză (buletin sau orice poză clară cu fața lui) + un selfie live (cameră din browser). `verification-service` compară cele două fețe cu **DeepFace** (model `VGG-Face`, detector `retinaface`) — imaginile sunt scrise temporar pe disc doar cât durează comparația, apoi șterse necondiționat; NU sunt persistate niciunde. Rezultatul (`identity_verified: true/false`) e singurul lucru care ajunge să fie salvat, ca flag pe userul din `auth_db`.
+- **Bonus de bun venit**: la finalul flow-ului, contul primește automat 500 lei demo (reutilizează endpoint-ul existent `dev/fund`), ca userul să aibă ceva de explorat din prima secundă.
+
+Modelele DeepFace (~600MB total) se descarcă o singură dată, la pornirea containerului `verification-service` (`lifespan` din `main.py`, nu la prima cerere reală) — persistate într-un volum Docker dedicat (`verification_models`), ca să nu se redescarce la fiecare recreare a containerului.
+
+## MaestroAgent (AI Copilot)
+
+`/app/copilot` — chat funcțional peste Azure OpenAI (deployment GPT-5-mini), specializat pe analiza cheltuielilor și forecast (`ai-orchestrator-service`). Agentul are tool-calling către `accounts`/`transactions`/`budgets` (prin Gateway, cu JWT-ul userului propagat — nu primește niciodată un `user_id` arbitrar) și un strat RAG minimal peste câteva fișiere de cunoștințe (`app/rag/knowledge/*.md`), cu fallback local (TF-IDF) dacă nu sunt configurate embeddings Azure. Fără credențiale Azure OpenAI setate, serviciul tot pornește (health check trece), dar orice cerere de chat întoarce `503`.
 
 ## JWT
 
 * `auth-service` emite JWT-ul la login (`POST /api/auth/login`), semnat cu `JWT_SECRET`/`JWT_ALGORITHM` (variabile de mediu, identice pe toate serviciile care validează token-uri).
-* **Rute publice**: `POST /api/auth/register`, `POST /api/auth/login`, `GET /health`, `GET /api/system/health`.
-* **Rute protejate JWT** (validate la nivel de Gateway, ÎNAINTE de orice forwarding — vezi `backend/gateway/app/routers/proxy.py::_is_protected`): `GET/POST /api/auth/me`, `/api/auth/change-password`, TOT sub `/api/accounts/*` (cont, carduri + control card, beneficiari), TOT sub `/api/transactions/*` (transferuri, listă/filtre, export, analytics, recognize/report), TOT sub `/api/budgets/*` (bugete, abonamente), TOT sub `/api/support/*` (tichete), TOT sub `/api/exchange/*` (curs demo).
+* **Rute publice**: `POST /api/auth/register`, `POST /api/auth/login`, `GET /health`, `GET /api/system/health`, `POST /api/auth/webauthn/login/options`, `POST /api/auth/webauthn/login/verify`.
+* **Rute protejate JWT** (validate la nivel de Gateway, ÎNAINTE de orice forwarding — vezi `backend/gateway/app/routers/proxy.py::_is_protected`): `GET/POST /api/auth/me`, `/api/auth/change-password`, `/api/auth/verify-email`, `/api/auth/resend-verification-email`, passkey register/credentials/step-up, TOT sub `/api/accounts/*`, `/api/transactions/*`, `/api/budgets/*`, `/api/support/*`, `/api/exchange/*`, `/api/verification/*`, `/api/ai/*`.
 * Fiecare microserviciu cu rute protejate își validează ȘI el, independent, tokenul (defense in depth) — nu se bazează exclusiv pe Gateway.
 * `user_id`-ul vine STRICT din JWT — frontendul nu poate trimite un `user_id`/`from_account_id` arbitrar.
 
@@ -97,6 +114,8 @@ Gateway aplică un rate limit simplu, **în memorie**, per IP (implicit 300 cere
 ```bash
 docker compose up --build
 ```
+
+⚠️ Prima pornire a `verification-service` durează mult mai mult decât restul (build-ul instalează TensorFlow + DeepFace, apoi descarcă modelele la boot) — e normal, se întâmplă o singură dată (imagine + model cache-uite după).
 
 ## Cum îl opresc
 
@@ -121,10 +140,12 @@ Datele din MongoDB **persistă** (volum `mongodb_data`) atât timp cât nu rulez
 - budgets-service: http://localhost:8004/docs
 - support-service: http://localhost:8005/docs
 - exchange-service: http://localhost:8006/docs
+- verification-service: http://localhost:8007/docs
+- ai-orchestrator-service: http://localhost:8008/docs
 
 ## Teste automate
 
-Fiecare serviciu cu logică de business are teste pytest, rulate cu o bază MongoDB de TEST separată (nu ating datele demo):
+Fiecare serviciu cu logică de business are teste pytest, rulate cu o bază MongoDB de TEST separată (nu ating datele demo). `verification-service` și `ai-orchestrator-service` sunt stateless — nu au nevoie de `MONGO_URL` la teste.
 
 ```bash
 docker compose exec auth-service pip install pytest==8.3.3 pytest-asyncio==0.24.0 -q
@@ -144,11 +165,17 @@ docker compose exec -e MONGO_URL=mongodb://mongodb:27017/support_db_test support
 
 docker compose exec exchange-service pip install pytest==8.3.3 pytest-asyncio==0.24.0 httpx==0.27.2 -q
 docker compose exec -e MONGO_URL=mongodb://mongodb:27017/exchange_db_test exchange-service python -m pytest -q
+
+docker compose exec verification-service pip install pytest==8.3.3 pytest-asyncio==0.24.0 -q
+docker compose exec verification-service python -m pytest -q
+
+docker compose exec ai-orchestrator-service pip install -r requirements-dev.txt -q
+docker compose exec ai-orchestrator-service python -m pytest -q
 ```
 
 ## Configurare
 
-Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `.gitignore`, nu conține secrete reale implicit).
+Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `.gitignore`, nu conține secrete reale implicit). Vezi comentariile din `.env.example` pentru: alegerea MongoDB Atlas vs. local, SMTP pentru codul de verificare email, și credențialele Azure OpenAI pentru MaestroAgent.
 
 ## Limitări cunoscute (documentate explicit, nu ascunse)
 
@@ -157,19 +184,17 @@ Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `
 - **Rate limiting**: în memorie, per instanță de Gateway — nu se scalează orizontal fără o soluție distribuită.
 - **JWT în frontend**: ținut în `sessionStorage`, alegere de DEVELOPMENT, nu arhitectură de securitate pentru producție.
 - **IBAN demo**: cifrele de control sunt pseudo-aleatoare, NU calculate conform standardului real (MOD-97) — suficient pentru UI, nu valid ca IBAN real.
-- **Un singur cont per user** (RON): pagina Conturi e pregătită pentru mai multe conturi, dar backendul provizionează încă un singur cont curent RON la register.
 - **Schimb valutar 100% demo**: `exchange-service` NU are nicio integrare FX reală — ratele sunt un dataset static de development (vezi `backend/services/exchange-service/app/config.py`). Confirmarea unui schimb NU mută fonduri reale între conturi (nu există conturi multi-valută încă) — doar înregistrează o simulare, clar marcată `is_demo: true`.
-- **Notificări**: doar frontend, in-memory, per sesiune (`NotificationsService`) — nu există încă un backend/colecție Mongo dedicată persistenței notificărilor.
+- **Verificare identitate**: DeepFace compară efectiv fețele (nu e simulat), dar NU validează că documentul e un buletin real, nu e expirat, sau că datele extrase (nume, CNP) corespund — doar potrivirea facială e reală.
+- **Similaritate facială**: procentul afișat (`similarity_percent`) e derivat direct din distanța cosine întoarsă de DeepFace, NU o probabilitate calibrată statistic — util ca reper vizual, nu ca metrică de încredere formală.
 
 ## Ce lipsește față de planul complet (Cumpăna)
 
-Fundația de backend + frontend (subiectul acestui README) e considerată prioritară și trebuie să fie solidă înainte de a trece la etapa de AI. Ce nu există încă, planificat pentru etapele următoare:
-
 - **RabbitMQ** — nu rulează încă în `docker-compose.yml`. Necesar pentru fluxul asincron (`transaction.created` → analiză Guardian în fundal, fără să blocheze userul).
-- **ai-orchestrator-service** — orchestratorul + cei 3 agenți AI (Spending, Budget, Guardian) + integrarea cu Azure AI Foundry. Nu există niciun folder/serviciu pentru el încă. Pagina `/app/copilot` există vizual, dar chat-ul e dezactivat ("Coming in the next phase") — nicio integrare AI reală.
 - **Financial Guardian** — zona vizuală există (Cardul meu, Detalii tranzacție), marcată explicit "Coming in AI phase" — fără detecție reală de anomalii.
+- **Validare IBAN MOD-97** — clienții pot avea IBAN-uri demo generate cu cifre de control pseudo-aleatoare; validarea reală MOD-97 la transferuri nu e încă aplicată.
 - Plăți reale, Visa/Mastercard, SEPA, Open Banking/PSD2, IBAN-uri bancare reale, schimb valutar real, PIN real de card — intenționat, niciodată planificate (proiect demo) — vezi butoanele marcate "Coming soon" din Cardul meu (Change PIN, Transaction alerts, Payment confirmation).
 
 ## UI — MaestroBank
 
-Design-ul curent al Angular-ului reproduce mockup-urile din `UI reference/` (Overview, Cards, Transactions, Exchange, AI Copilot) — sidebar bleumarin, fundal alb, accent albastru, design tokens centralizate în `frontend/src/styles.css`. Componente reutilizabile în `frontend/src/app/shared/components/` (AppShell, Sidebar, Topbar, StatCard, AccountCard, TransactionRow, TransactionDetailsPanel, StatusBadge, ToggleControl, ActionButton, Modal, ConfirmDialog, EmptyState, LoadingSkeleton, Toast, Icon). Pagini în `frontend/src/app/features/*`.
+Design-ul curent al Angular-ului reproduce mockup-urile din `UI reference/` (Overview, Cards, Transactions, Exchange, AI Copilot) — sidebar bleumarin, fundal alb, accent albastru, design tokens centralizate în `frontend/src/styles.css` (inclusiv temă dark, comutabilă din topbar). Componente reutilizabile în `frontend/src/app/shared/components/` (AppShell, Sidebar, Topbar, StatCard, AccountCard, TransactionRow, TransactionDetailsPanel, StatusBadge, ToggleControl, ActionButton, Modal, ConfirmDialog, EmptyState, LoadingSkeleton, Toast, Icon). Pagini în `frontend/src/app/features/*`, inclusiv fluxul de onboarding (`features/onboarding/`) și abonamentele/obiectivele de economisire (Pockets, tab "Obiective" din Conturi).

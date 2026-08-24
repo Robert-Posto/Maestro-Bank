@@ -66,7 +66,16 @@ async def create_or_update_staff_user(db_auth, email: str, password: str) -> str
     if existing is not None:
         await db_auth.users.update_one(
             {"_id": existing["_id"]},
-            {"$set": {"password_hash": password_hash, "role": "staff", "is_active": True}},
+            {
+                "$set": {
+                    "password_hash": password_hash,
+                    "role": "staff",
+                    "is_active": True,
+                    # Vezi comentariul de la insert_one mai jos.
+                    "email_verified": True,
+                    "identity_verified": True,
+                }
+            },
         )
         print(f"Cont de personal existent actualizat: {email}")
         return str(existing["_id"])
@@ -81,6 +90,13 @@ async def create_or_update_staff_user(db_auth, email: str, password: str) -> str
             "is_active": True,
             "role": "staff",
             "is_demo": True,
+            # Contul de personal NU trece prin register public — n-are cum
+            # să capete codul de verificare/selfie-ul din onboarding. Fără
+            # astea explicit, UserMeOut cade pe False (câmp lipsă) și
+            # authGuard din frontend l-ar împinge la fiecare login în
+            # onboarding, pe care nu-l poate termina (nu-i user real).
+            "email_verified": True,
+            "identity_verified": True,
         }
     )
     print(f"Cont de personal nou creat: {email}")

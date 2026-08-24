@@ -272,6 +272,7 @@ async def list_pending_holds() -> list[dict]:
         composed.append(
             {
                 "id": str(hold["_id"]),
+                "user_id": evaluation["user_id"] if evaluation else None,
                 "from_iban": hold["from_iban"],
                 "to_iban": hold["to_iban"],
                 "from_name": hold.get("from_name"),

@@ -1,6 +1,6 @@
 <app-page-header title="Rețineri de fraudă" subtitle="Transferuri suspecte, oprite pentru revizuire manuală — sună clientul înainte de a decide.">
   <app-action-button variant="secondary" (pressed)="load()">
-    <app-icon name="filter" [size]="16" /> Reîmprospătează
+    <app-icon name="reload" [size]="16" /> Reîmprospătează
   </app-action-button>
 </app-page-header>
 
@@ -57,6 +57,11 @@
         </div>
 
         <div class="hold-card__actions">
+          @if (hold.user_id) {
+            <app-action-button variant="ghost" (pressed)="viewCustomer(hold)">
+              <app-icon name="profile" [size]="15" /> Vezi contul clientului
+            </app-action-button>
+          }
           <app-action-button variant="danger" (pressed)="askReject(hold)">
             <app-icon name="close" [size]="15" /> Respinge
           </app-action-button>

@@ -13,15 +13,22 @@ Extern (prin Gateway) acestea devin:
   GET   /api/transactions/staff/holds
   POST  /api/transactions/staff/holds/{id}/approve
   POST  /api/transactions/staff/holds/{id}/reject
+  GET   /api/transactions/staff/customers/{user_id}/transactions
 """
 
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
 
-from app import holds
+from app import holds, service
 from app.fraud import staff as staff_service
-from app.models import FraudEvaluationOut, FraudEvaluationReviewRequest, HoldResolutionOut, StaffHoldOut
+from app.models import (
+    FraudEvaluationOut,
+    FraudEvaluationReviewRequest,
+    HoldResolutionOut,
+    StaffHoldOut,
+    TransactionOut,
+)
 from app.security import RequireStaff
 
 router = APIRouter(prefix="/transactions/staff", tags=["staff"])
@@ -80,3 +87,24 @@ async def approve_hold(transaction_id: str, staff_user_id: str = RequireStaff):
 async def reject_hold(transaction_id: str, staff_user_id: str = RequireStaff):
     doc = await holds.reject_hold(transaction_id, staff_user_id)
     return HoldResolutionOut.from_transaction_doc(doc)
+
+
+@router.get(
+    "/customers/{user_id}/transactions",
+    response_model=list[TransactionOut],
+    response_model_by_alias=False,
+)
+async def get_customer_transactions(
+    user_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    skip: int = Query(default=0, ge=0),
+    staff_user_id: str = RequireStaff,
+):
+    """READ-ONLY — istoricul de tranzacții al unui client oarecare, pentru
+    personalul care revizuiește un hold și vrea contextul complet (nu doar
+    tranzacția care a declanșat reținerea). Reutilizează EXACT
+    service.list_transactions_for_user, care oricum ia user_id ca parametru
+    simplu (nu-l derivă din JWT) — funcționează identic pentru orice user_id,
+    fie userul propriu (ruta normală, /transactions), fie unul arbitrar
+    (aici, gatat de RequireStaff)."""
+    return await service.list_transactions_for_user(user_id, limit, skip)
