@@ -36,6 +36,10 @@ export interface StaffHoldView {
   hold_expires_at: string | null;
   score: number | null;
   fired_rule_ids: string[];
+  /** Analiza AI (Financial Guardian) în limbaj natural, DOAR pentru
+   * personal — vezi backend app/guardian/. Poate fi null pe scurt timp,
+   * imediat după crearea reținerii, cât timp analiza încă se generează. */
+  guardian_staff_explanation: string | null;
   customer: StaffHoldCustomerContact | null;
 }
 
@@ -52,6 +56,16 @@ export interface FraudEvaluationReview {
   note: string;
 }
 
+export interface GuardianEvaluationView {
+  status: 'ready' | 'template_fallback';
+  staff_explanation: string | null;
+  customer_tier: string | null;
+  customer_phrase: string | null;
+  source: 'llm' | 'template' | null;
+  generated_at: string | null;
+  model: string | null;
+}
+
 export interface FraudEvaluationView {
   id: string;
   transaction_id: string;
@@ -66,6 +80,7 @@ export interface FraudEvaluationView {
   error: string | null;
   created_at: string;
   review: FraudEvaluationReview | null;
+  guardian: GuardianEvaluationView | null;
 }
 
 @Injectable({ providedIn: 'root' })

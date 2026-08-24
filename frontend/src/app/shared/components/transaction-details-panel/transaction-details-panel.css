@@ -164,9 +164,25 @@
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-md);
   padding: var(--mb-space-4);
-  background: linear-gradient(120deg, var(--mb-surface), var(--mb-negative-bg));
-  border-color: rgba(220, 38, 38, 0.35);
+  background: var(--mb-surface);
   margin-bottom: var(--mb-space-5);
+}
+
+/* Culoarea cardului urmează tier-ul REAL calculat de Financial Guardian
+   (vezi transaction-details-panel.ts::riskTone) — nu mai e mereu roșu. */
+.details-panel__guardian--success {
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-positive-bg));
+  border-color: color-mix(in srgb, var(--mb-positive) 35%, transparent);
+}
+
+.details-panel__guardian--warning {
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-warning-bg));
+  border-color: color-mix(in srgb, var(--mb-warning) 35%, transparent);
+}
+
+.details-panel__guardian--error {
+  background: linear-gradient(120deg, var(--mb-surface), var(--mb-negative-bg));
+  border-color: color-mix(in srgb, var(--mb-negative) 35%, transparent);
 }
 
 .details-panel__guardian-header {
@@ -177,31 +193,37 @@
   font-size: var(--mb-font-size-sm);
 }
 
+.details-panel__guardian-header app-status-badge {
+  margin-left: auto;
+}
+
 .details-panel__guardian-icon {
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  color: var(--mb-negative);
+  color: var(--mb-text-secondary);
   background: var(--mb-surface);
 }
 
-.details-panel__coming-soon {
-  margin-left: auto;
-  font-size: var(--mb-font-size-xs);
-  font-weight: var(--mb-font-weight-medium);
-  color: var(--mb-text-tertiary);
-  background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
-  padding: 0.15rem 0.55rem;
-  border-radius: var(--mb-radius-pill);
+.details-panel__guardian--success .details-panel__guardian-icon {
+  color: var(--mb-positive);
+}
+
+.details-panel__guardian--warning .details-panel__guardian-icon {
+  color: var(--mb-warning);
+}
+
+.details-panel__guardian--error .details-panel__guardian-icon {
+  color: var(--mb-negative);
 }
 
 .details-panel__guardian p {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-secondary);
   line-height: var(--mb-line-height-base);
+  margin: 0;
 }
 
 .details-panel__support {

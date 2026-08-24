@@ -52,6 +52,19 @@ class HoldInfoOut(BaseModel):
     resolution: str | None = None
 
 
+class RiskOut(BaseModel):
+    """Nivelul de risc AFIȘABIL CLIENTULUI — vezi app/guardian/service.py.
+    `tier`/`status` sunt calculate SINCRON, fără LLM; `phrase` pentru
+    "unusual"/"potentially_dangerous" e completată ASINCRON (status trece
+    din "pending" în "ready"/"template_fallback"). NU conține NICIODATĂ
+    ID-uri de regulă sau alte detalii care ar putea fi folosite ca să
+    "învețe" pragurile motorului — vezi guardian/prompt.py."""
+
+    tier: Literal["safe", "unusual", "potentially_dangerous", "held"]
+    phrase: str | None = None
+    status: Literal["pending", "ready", "template_fallback"]
+
+
 class TransactionOut(BaseModel):
     """DTO orientat pe VIEWER — `direction`/`counterparty_iban` sunt
     calculate relativ la contul userului care face requestul, nu sunt un
@@ -75,6 +88,7 @@ class TransactionOut(BaseModel):
     reported: bool = False
     created_at: datetime
     hold: HoldInfoOut | None = None
+    risk: RiskOut | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -163,6 +177,21 @@ class FraudEvaluationReviewOut(BaseModel):
     note: str = ""
 
 
+class GuardianOut(BaseModel):
+    """Output-ul Guardian (app/guardian/) pentru o evaluare — vezi
+    app/guardian/service.py::generate_guardian_explanations. `staff_
+    explanation` NU trebuie NICIODATĂ expus printr-un DTO orientat spre
+    client (vezi TransactionOut, care nu-l conține deloc)."""
+
+    status: Literal["ready", "template_fallback"]
+    staff_explanation: str | None = None
+    customer_tier: str | None = None
+    customer_phrase: str | None = None
+    source: Literal["llm", "template"] | None = None
+    generated_at: datetime | None = None
+    model: str | None = None
+
+
 class FraudEvaluationOut(BaseModel):
     id: str = Field(alias="_id")
     transaction_id: str
@@ -177,6 +206,7 @@ class FraudEvaluationOut(BaseModel):
     error: str | None
     created_at: datetime
     review: FraudEvaluationReviewOut | None = None
+    guardian: GuardianOut | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -217,6 +247,7 @@ class StaffHoldOut(BaseModel):
     hold_expires_at: datetime | None = None
     score: int | None = None
     fired_rule_ids: list[str] = []
+    guardian_staff_explanation: str | None = None
     customer: StaffHoldCustomerContact | None = None
 
 
