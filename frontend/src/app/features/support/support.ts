@@ -1,21 +1,24 @@
 import { Component, ElementRef, OnInit, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
-import { AiChatMessage as AiHistoryMessage, AiPendingAction, AiSupportService } from '../../services/ai-support.service';
+import {
+  AiChatMessage as AiHistoryMessage,
+  AiPendingAction,
+  AiRecommendedAction,
+  AiSupportService,
+} from '../../services/ai-support.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
-import { EmptyState } from '../../shared/components/empty-state/empty-state';
-import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { Modal } from '../../shared/components/modal/modal';
 import { Icon } from '../../shared/components/icon/icon';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
 
 /** Statusul unui card, exact cum îl întoarce accounts-service (CardOut) — vezi
  * app/tools/support_cards_tools.py::get_card_status din ai-orchestrator-service. */
@@ -49,14 +52,6 @@ interface ChatContext {
   tickets?: SupportTicket[];
 }
 
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  card: 'Card',
-  transfer: 'Transfer',
-  account: 'Cont',
-  technical: 'Tehnic',
-  other: 'Altele',
-};
-
 const FAQ_ITEMS = [
   { q: 'Cum blochez temporar cardul?', a: 'Din pagina Carduri, secțiunea Control card, activează "Blocare temporară card".' },
   { q: 'Cum fac un transfer?', a: 'Din Plăți & Transferuri, completează IBAN-ul destinație și suma, apoi confirmă.' },
@@ -70,38 +65,31 @@ interface ChatMessage {
   text: string;
   time: string;
   context?: ChatContext;
+  /** Sugestii de follow-up ale agentului (vezi respond_to_user::recommended_actions
+   * din app/agents/support.py) — populate de GPT, NU doar text irosit: un
+   * click retrimite eticheta ca mesaj nou, exact ca o întrebare rapidă. */
+  recommendedActions?: AiRecommendedAction[];
 }
 
 function formatChatTime(date: Date): string {
   return date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Suport minimal de formatare pentru răspunsurile Support Agent — DOAR
- * `**bold**` -> <strong> și linii noi păstrate (vezi .support-chat__bubble
- * { white-space: pre-line } în CSS). Escapăm HTML-ul ÎNAINTE de a insera
- * tag-uri proprii, ca textul modelului să nu poată injecta markup. */
-function formatChatText(text: string): string {
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-}
-
-/** Support — vezi task-ul MaestroBank, secțiunea 20. Fără AI. */
+/**
+ * Support — chat live cu Support Agent (ai-orchestrator-service, prin
+ * Gateway — vezi services/ai-support.service.ts). Vizual, aceeași familie
+ * cu MaestroAssistent (vezi features/copilot) — bule/carduri, avatar +
+ * nume + oră pe fiecare mesaj, markdown-lite pentru text — dar funcțional
+ * diferit: Support Agent răspunde despre cont/card/tranzacții/tichete (NU
+ * forecast/buget, vezi app/prompts/support_prompt.py), iar aici mai
+ * există și FAQ + un formular de solicitare nouă, pe care MaestroAssistent
+ * nu le are (fără o listă persistentă a solicitărilor trimise — la
+ * cererea userului).
+ */
 @Component({
   selector: 'app-support',
   standalone: true,
-  imports: [
-    FormsModule,
-    DatePipe,
-    MoneyPipe,
-    PageHeader,
-    ActionButton,
-    StatusBadge,
-    EmptyState,
-    LoadingSkeleton,
-    Modal,
-    Icon,
-    TransactionRow,
-  ],
+  imports: [FormsModule, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow],
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
@@ -110,13 +98,11 @@ export class Support implements OnInit {
   private readonly aiSupport = inject(AiSupportService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
-  protected readonly categoryLabels = CATEGORY_LABELS;
   protected readonly faqItems = FAQ_ITEMS;
 
-  protected readonly loading = signal(true);
-  protected readonly tickets = signal<SupportTicket[]>([]);
   protected readonly modalOpen = signal(false);
   protected readonly saving = signal(false);
 
@@ -125,15 +111,15 @@ export class Support implements OnInit {
   protected readonly message = signal('');
   protected readonly chatInput = signal('');
   protected readonly supportTyping = signal(false);
+  /** Adevărat doar dacă răspunsul curent durează mai mult decât normal
+   * (vezi timeout-ul de pe backend, app/llm/azure_openai.py) — ca userul
+   * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
+  protected readonly supportTypingSlow = signal(false);
+  private slowTimer?: ReturnType<typeof setTimeout>;
   private readonly pendingAction = signal<AiPendingAction | null>(null);
-  protected readonly chatMessages = signal<ChatMessage[]>([
-    {
-      id: 1,
-      role: 'support',
-      text: 'Bună! Scrie-ne cu ce te putem ajuta — sau alege o întrebare rapidă mai jos.',
-      time: formatChatTime(new Date()),
-    },
-  ]);
+  /** Gol la start (ca MaestroAssistent — vezi features/copilot/copilot.ts)
+   * -> arată ecranul de bun-venit cu sugestii, nu un mesaj seedat static. */
+  protected readonly chatMessages = signal<ChatMessage[]>([]);
 
   constructor() {
     effect(() => {
@@ -145,22 +131,10 @@ export class Support implements OnInit {
   }
 
   ngOnInit(): void {
-    this.load();
     const shouldOpen = this.route.snapshot.queryParamMap.get('newTicket') === '1';
     const presetCategory = this.route.snapshot.queryParamMap.get('category') as TicketCategory | null;
     if (presetCategory) this.category.set(presetCategory);
     if (shouldOpen) this.openModal();
-  }
-
-  private load(): void {
-    this.loading.set(true);
-    this.supportApi.listTickets().subscribe({
-      next: (tickets) => {
-        this.tickets.set(tickets);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
   }
 
   protected openModal(): void {
@@ -179,6 +153,19 @@ export class Support implements OnInit {
   /** Întrebare rapidă aleasă din lista de sugestii — trimisă ca mesaj real către Support Agent. */
   protected askSuggested(item: { q: string; a: string }): void {
     this.askAgent(item.q);
+  }
+
+  /** Acțiune recomandată de agent (vezi ChatMessage.recommendedActions).
+   * Dacă are `route` (rezolvată determinist de backend, NU de GPT — vezi
+   * ai-support.service.ts), navighează REAL la pagina aia. Altfel (ex.
+   * "view_tickets"), retrimite eticheta ca mesaj nou, la fel ca o
+   * întrebare rapidă. */
+  protected runRecommendedAction(action: AiRecommendedAction): void {
+    if (action.route) {
+      this.router.navigateByUrl(action.route);
+      return;
+    }
+    this.askAgent(action.label);
   }
 
   /** Trimite un mesaj către Support Agent (backend/ai-orchestrator-service, prin
@@ -202,10 +189,14 @@ export class Support implements OnInit {
       { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
     ]);
     this.supportTyping.set(true);
+    this.supportTypingSlow.set(false);
+    // Majoritatea răspunsurilor vin în 10-20s (tool-calling GPT-5-mini) —
+    // dacă trece mai mult, arătăm un indiciu, ca să nu pară că s-a blocat.
+    this.slowTimer = setTimeout(() => this.supportTypingSlow.set(true), 15_000);
 
     this.aiSupport.chat({ message: text, history, pending_action: pending }).subscribe({
       next: (response) => {
-        this.supportTyping.set(false);
+        this.stopTyping();
         const context = response.context as ChatContext | undefined;
         this.chatMessages.update((messages) => [
           ...messages,
@@ -215,24 +206,26 @@ export class Support implements OnInit {
             text: response.answer,
             time: formatChatTime(new Date()),
             context: context && Object.keys(context).length > 0 ? context : undefined,
+            recommendedActions: response.recommended_actions.length > 0 ? response.recommended_actions : undefined,
           },
         ]);
         const nextPending = response.metadata?.['pending_action'] as AiPendingAction | undefined;
         if (response.requires_confirmation && nextPending) {
           this.pendingAction.set(nextPending);
         }
-        if (response.intent === 'support_ticket' && !response.requires_confirmation) {
-          this.load(); // tichet creat prin chat — reîmprospătăm "Solicitările mele"
-        }
       },
       error: (err) => {
-        this.supportTyping.set(false);
+        this.stopTyping();
         this.toast.error(extractErrorMessage(err, 'Chat-ul de suport nu a putut răspunde. Încearcă din nou.'));
       },
     });
   }
 
-  protected readonly formatChatText = formatChatText;
+  private stopTyping(): void {
+    this.supportTyping.set(false);
+    this.supportTypingSlow.set(false);
+    clearTimeout(this.slowTimer);
+  }
 
   /** Transformă flag-urile booleene ale unui card într-o listă afișabilă,
    * ca template-ul să nu itereze direct pe cheile obiectului. */
@@ -254,8 +247,7 @@ export class Support implements OnInit {
     this.supportApi
       .createTicket({ subject: this.subject().trim(), category: this.category(), message: this.message().trim() })
       .subscribe({
-        next: (ticket) => {
-          this.tickets.update((list) => [ticket, ...list]);
+        next: () => {
           this.saving.set(false);
           this.modalOpen.set(false);
           this.toast.success('Tichet de suport trimis.');

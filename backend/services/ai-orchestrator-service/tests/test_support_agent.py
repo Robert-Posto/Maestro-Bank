@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 # --- Card status -----------------------------------------------------------
 
 
-async def test_card_status_active(monkeypatch, auth_header: dict[str, str]):
+async def test_card_status_active(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_card_status(authorization, last_four=None):
         return {
             "last_four": "5678",
@@ -60,7 +60,7 @@ async def test_card_status_active(monkeypatch, auth_header: dict[str, str]):
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Cardul meu este activ?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Cardul meu este activ?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert response.intent == "card_status"
@@ -68,7 +68,7 @@ async def test_card_status_active(monkeypatch, auth_header: dict[str, str]):
     assert response.requires_confirmation is False
 
 
-async def test_card_status_frozen(monkeypatch, auth_header: dict[str, str]):
+async def test_card_status_frozen(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_card_status(authorization, last_four=None):
         return {"last_four": "5678", "status": "active", "is_frozen": True}
 
@@ -89,7 +89,7 @@ async def test_card_status_frozen(monkeypatch, auth_header: dict[str, str]):
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="De ce nu pot plăti cu cardul?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="De ce nu pot plăti cu cardul?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert "blocat" in response.answer.lower()
@@ -98,7 +98,7 @@ async def test_card_status_frozen(monkeypatch, auth_header: dict[str, str]):
 # --- Tranzacții --------------------------------------------------------------
 
 
-async def test_transaction_found(monkeypatch, auth_header: dict[str, str]):
+async def test_transaction_found(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_transaction_details(authorization, transaction_id):
         assert transaction_id == "TRX123"
         return {
@@ -127,14 +127,14 @@ async def test_transaction_found(monkeypatch, auth_header: dict[str, str]):
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Ce este tranzacția TRX123?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Ce este tranzacția TRX123?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert response.intent == "transaction_details"
     assert "342,18" in response.answer or "Kaufland" in response.answer
 
 
-async def test_transaction_not_found(monkeypatch, auth_header: dict[str, str]):
+async def test_transaction_not_found(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_transaction_details(authorization, transaction_id):
         return {"error": "Resursa nu a fost găsită.", "status_code": 404}
 
@@ -155,7 +155,7 @@ async def test_transaction_not_found(monkeypatch, auth_header: dict[str, str]):
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Ce este tranzacția TRX999?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Ce este tranzacția TRX999?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert "nu am găsit" in response.answer.lower() or "negăsit" in response.answer.lower()
@@ -164,7 +164,7 @@ async def test_transaction_not_found(monkeypatch, auth_header: dict[str, str]):
 # --- Transferuri ---------------------------------------------------------------
 
 
-async def test_transfer_completed(monkeypatch, auth_header: dict[str, str]):
+async def test_transfer_completed(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_transfer_status(authorization, transaction_id):
         return {"id": "TRX1", "status": "completed", "amount_minor": 10000, "currency": "RON"}
 
@@ -182,13 +182,13 @@ async def test_transfer_completed(monkeypatch, auth_header: dict[str, str]):
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Transferul meu e finalizat?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Transferul meu e finalizat?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert "finalizat" in response.answer.lower()
 
 
-async def test_transfer_failed_does_not_invent_reason(monkeypatch, auth_header: dict[str, str]):
+async def test_transfer_failed_does_not_invent_reason(monkeypatch, support_auth_header: dict[str, str]):
     """Backendul NU stochează un motiv pentru status="failed" — agentul nu
     trebuie să inventeze unul (vezi system prompt + task-ul, secțiunea 13)."""
 
@@ -212,7 +212,7 @@ async def test_transfer_failed_does_not_invent_reason(monkeypatch, auth_header: 
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="De ce a eșuat transferul meu?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="De ce a eșuat transferul meu?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert "eșuat" in response.answer.lower()
@@ -225,7 +225,7 @@ async def test_transfer_failed_does_not_invent_reason(monkeypatch, auth_header: 
 # --- Tichete de suport -----------------------------------------------------
 
 
-async def test_list_my_support_tickets(monkeypatch, auth_header: dict[str, str]):
+async def test_list_my_support_tickets(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_get_my_support_tickets(authorization):
         return [{"id": "t1", "subject": "Card blocat", "status": "open"}]
 
@@ -243,13 +243,13 @@ async def test_list_my_support_tickets(monkeypatch, auth_header: dict[str, str])
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Ce solicitări am deschise?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Ce solicitări am deschise?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert "card blocat" in response.answer.lower()
 
 
-async def test_create_ticket_after_confirmation(monkeypatch, auth_header: dict[str, str]):
+async def test_create_ticket_after_confirmation(monkeypatch, support_auth_header: dict[str, str]):
     async def fake_create_support_ticket(authorization, subject, category, message):
         return {"id": "SUP-123", "subject": subject, "category": category, "status": "open"}
 
@@ -265,7 +265,7 @@ async def test_create_ticket_after_confirmation(monkeypatch, auth_header: dict[s
         ),
     )
 
-    response = await support_service.handle_chat(payload, auth_header["Authorization"], llm_client=FakeLLMClient([]))
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
 
     assert response.requires_confirmation is False
     assert "SUP-123" in response.answer
@@ -274,7 +274,7 @@ async def test_create_ticket_after_confirmation(monkeypatch, auth_header: dict[s
 # --- Out of scope ------------------------------------------------------------
 
 
-async def test_out_of_scope_question_not_answered_as_spending_agent(auth_header: dict[str, str]):
+async def test_out_of_scope_question_not_answered_as_spending_agent(support_auth_header: dict[str, str]):
     fake_llm = FakeLLMClient(
         [
             FakeMessage(
@@ -293,8 +293,70 @@ async def test_out_of_scope_question_not_answered_as_spending_agent(auth_header:
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Îmi permit o vacanță de 5000 lei?"), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Îmi permit o vacanță de 5000 lei?"), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert response.metadata.get("out_of_scope") is True
     assert "spending" in response.answer.lower() or "forecast" in response.answer.lower()
+
+
+# --- recommended_actions -> rute REALE, rezolvate determinist ----------------
+
+
+async def test_navigate_action_gets_a_real_deterministic_route(support_auth_header: dict[str, str]):
+    """GPT alege DOAR `type` (din enum) + `label` — ruta reală vine STRICT
+    din backend (app/services/support_service.py::_ACTION_ROUTES), nu de
+    la model (vezi app/agents/support.py::TOOL_SCHEMAS, unde `type` e
+    constrâns la un enum, nu mai e string liber)."""
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(
+                tool_calls=[
+                    make_tool_call(
+                        "respond_to_user",
+                        {
+                            "answer": "Poți deschide un card nou din pagina Carduri.",
+                            "intent": "card_help",
+                            "recommended_actions": [{"type": "navigate_cards", "label": "Deschide Carduri"}],
+                        },
+                    )
+                ]
+            )
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Ce tipuri de card pot deschide?"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.recommended_actions[0].type == "navigate_cards"
+    assert response.recommended_actions[0].route == "/app/cards"
+
+
+async def test_non_navigate_action_has_no_route(support_auth_header: dict[str, str]):
+    """"ask_followup" nu apare în harta de rute -> route=None determinist,
+    indiferent ce `type` "necunoscut" ar trimite modelul (defensiv, chiar
+    dacă schema JSON ar trebui deja să prevină asta)."""
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(
+                tool_calls=[
+                    make_tool_call(
+                        "respond_to_user",
+                        {
+                            "answer": "Vrei să verific și alt card?",
+                            "intent": "card_status",
+                            "recommended_actions": [{"type": "ask_followup", "label": "Verifică alt card"}],
+                        },
+                    )
+                ]
+            )
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Cardul meu e activ?"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.recommended_actions[0].type == "ask_followup"
+    assert response.recommended_actions[0].route is None

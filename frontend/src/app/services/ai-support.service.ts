@@ -17,6 +17,12 @@ export interface AiPendingAction {
 export interface AiRecommendedAction {
   type: string;
   label: string;
+  /** Rută REALĂ Angular (ex. "/app/cards"), rezolvată determinist de
+   * backend (vezi app/services/support_service.py::_ACTION_ROUTES) — NU
+   * generată de GPT. Absentă/null pentru acțiuni care NU navighează
+   * nicăieri (ex. "view_tickets") — acolo frontend-ul retrimite `label`
+   * ca mesaj nou, la fel ca o întrebare rapidă. */
+  route?: string | null;
 }
 
 export interface AiChatRequest {

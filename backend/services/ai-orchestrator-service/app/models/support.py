@@ -46,6 +46,12 @@ class PendingAction(BaseModel):
 class RecommendedAction(BaseModel):
     type: str
     label: str
+    # Rută REALĂ Angular (ex. "/app/cards"), rezolvată determinist de
+    # backend din `type` (vezi app/services/support_service.py::_ACTION_ROUTES)
+    # — NU generată/inventată de GPT, care alege doar `type`+`label`. None
+    # pentru acțiunile care nu navighează nicăieri (ex. "view_tickets"),
+    # caz în care frontend-ul retrimite `label` ca mesaj nou.
+    route: str | None = None
 
 
 class ChatRequest(BaseModel):
