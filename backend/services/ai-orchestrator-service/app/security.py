@@ -49,3 +49,24 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
 
 
 CurrentAuth = Depends(get_auth_context)
+
+
+# --- Support Agent (vezi app/agents/support.py) --------------------------
+# Support Agent nu ia nicio decizie de autorizare pe baza user_id-ului
+# extras dintr-un token — doar retransmite header-ul BRUT ("Bearer <token>")
+# neschimbat către Gateway la fiecare tool call (vezi app/tools/support_*).
+# Gateway-ul + fiecare microserviciu din spate fac toată izolarea per-user,
+# exact ca pentru orice alt client (Angular inclusiv). De-aia dependency-ul
+# de mai jos întoarce direct header-ul, nu un AuthContext structurat.
+async def get_authorization(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Lipsește header-ul Authorization: Bearer <token>.",
+        )
+    token = authorization.split(" ", 1)[1]
+    _decode(token)  # doar validare — ridică 401 dacă tokenul e invalid/expirat
+    return authorization
+
+
+CurrentAuthorization = Depends(get_authorization)

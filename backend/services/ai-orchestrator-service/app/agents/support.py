@@ -17,15 +17,41 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 from app.config import settings
-from app.llm.azure_openai import AzureOpenAIClient, azure_openai_client
+from app.llm.azure_openai import chat_completion
 from app.models.support import ChatMessage
 from app.prompts.support_prompt import SUPPORT_SYSTEM_PROMPT
 from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
 
 logger = logging.getLogger("ai-orchestrator-service")
+
+
+class SupportLLMClient(Protocol):
+    """Interfața minimă de care are nevoie bucla de mai jos — implementată
+    atât de `_ChatCompletionAdapter` (producție, mai jos), cât și de
+    `FakeLLMClient` din teste (vezi tests/conftest.py), ca cele două să
+    poată fi interschimbate fără nicio altă modificare în acest fișier."""
+
+    async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Any: ...
+
+
+class _ChatCompletionAdapter:
+    """Adaptor subțire peste `app.llm.azure_openai.chat_completion` (clientul
+    Azure OpenAI comun, folosit deja de Spending + Forecast Agent — vezi
+    app/agents/spending_forecast.py), ca Support Agent să NU mai aibă
+    propriul client Azure separat. Singurul motiv de a exista: Support
+    Agent a fost scris inițial cu o interfață bazată pe clase (`.complete()`,
+    vezi tests/conftest.py::FakeLLMClient) — păstrăm exact acea interfață
+    aici, ca testele existente să rămână neschimbate.
+    """
+
+    async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Any:
+        return await chat_completion(messages, tools=tools)
+
+
+_default_llm_client = _ChatCompletionAdapter()
 
 _READ_TOOL_MODULES: dict[str, Any] = {
     "get_my_account": support_accounts_tools,
@@ -184,9 +210,33 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                     },
                     "recommended_actions": {
                         "type": "array",
+                        "description": (
+                            "Sugestii de follow-up, afișate ca butoane clickable. `type` TREBUIE să fie din "
+                            "enum-ul de mai jos — NU inventa alte valori. Cele care încep cu 'navigate_' duc "
+                            "userul REAL la acea pagină din aplicație (ruta e rezolvată determinist de backend, "
+                            "nu de tine); 'view_tickets' și 'ask_followup' retrimit `label` ca mesaj nou către tine."
+                        ),
                         "items": {
                             "type": "object",
-                            "properties": {"type": {"type": "string"}, "label": {"type": "string"}},
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "navigate_cards",
+                                        "navigate_accounts",
+                                        "navigate_transactions",
+                                        "navigate_transfers",
+                                        "navigate_exchange",
+                                        "navigate_budgets",
+                                        "navigate_spending_forecast",
+                                        "navigate_profile",
+                                        "open_support_ticket",
+                                        "view_tickets",
+                                        "ask_followup",
+                                    ],
+                                },
+                                "label": {"type": "string", "maxLength": 60},
+                            },
                             "required": ["type", "label"],
                         },
                     },
@@ -213,7 +263,7 @@ async def run_support_agent(
     message: str,
     history: list[ChatMessage],
     authorization: str,
-    llm_client: AzureOpenAIClient = azure_openai_client,
+    llm_client: SupportLLMClient = _default_llm_client,
 ) -> tuple[str, str, list[dict[str, Any]], bool, dict[str, Any]]:
     """Rulează bucla de tool-calling GPT-5-mini pentru Support Agent.
 

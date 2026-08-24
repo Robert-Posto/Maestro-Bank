@@ -22,7 +22,7 @@ from conftest import FakeLLMClient, FakeMessage, make_tool_call
 pytestmark = pytest.mark.asyncio
 
 
-async def test_write_tool_request_asks_confirmation_without_executing(monkeypatch, auth_header: dict[str, str]):
+async def test_write_tool_request_asks_confirmation_without_executing(monkeypatch, support_auth_header: dict[str, str]):
     """"Vreau să raportez o plată..." -> modelul cere create_support_ticket
     -> orchestratorul NU execută nimic, doar întoarce o întrebare de
     confirmare + pending_action. Tool-ul real de creare NU trebuie apelat."""
@@ -54,7 +54,7 @@ async def test_write_tool_request_asks_confirmation_without_executing(monkeypatc
 
     response = await support_service.handle_chat(
         ChatRequest(message="Vreau să raportez o plată pe care nu o recunosc."),
-        auth_header["Authorization"],
+        support_auth_header["Authorization"],
         llm_client=fake_llm,
     )
 
@@ -64,7 +64,7 @@ async def test_write_tool_request_asks_confirmation_without_executing(monkeypatc
     assert "confirm" in response.answer.lower() or "da" in response.answer.lower()
 
 
-async def test_explicit_yes_after_confirmation_executes_the_tool(monkeypatch, auth_header: dict[str, str]):
+async def test_explicit_yes_after_confirmation_executes_the_tool(monkeypatch, support_auth_header: dict[str, str]):
     called_with: dict = {}
 
     async def fake_create_support_ticket(authorization, subject, category, message):
@@ -80,16 +80,20 @@ async def test_explicit_yes_after_confirmation_executes_the_tool(monkeypatch, au
 
     response = await support_service.handle_chat(
         ChatRequest(message="Da, te rog.", pending_action=pending),
-        auth_header["Authorization"],
+        support_auth_header["Authorization"],
         llm_client=FakeLLMClient([]),
     )
 
     assert called_with["subject"] == "Plată nerecunoscută"
     assert response.requires_confirmation is False
     assert "SUP-42" in response.answer
+    # "view_tickets" nu navighează nicăieri (userul e deja pe pagina de
+    # suport) — route rămâne None, frontend-ul retrimite eticheta ca mesaj.
+    assert response.recommended_actions[0].type == "view_tickets"
+    assert response.recommended_actions[0].route is None
 
 
-async def test_vague_intent_does_not_execute_write_action(monkeypatch, auth_header: dict[str, str]):
+async def test_vague_intent_does_not_execute_write_action(monkeypatch, support_auth_header: dict[str, str]):
     """"Poate ar trebui să..." NU este o confirmare explicită — vezi
     task-ul, secțiunea 29: acest mesaj NU trebuie să declanșeze crearea
     tichetului, chiar dacă există un pending_action din turul anterior."""
@@ -115,7 +119,7 @@ async def test_vague_intent_does_not_execute_write_action(monkeypatch, auth_head
 
     response = await support_service.handle_chat(
         ChatRequest(message="Poate ar trebui să fac ceva în privința asta.", pending_action=pending),
-        auth_header["Authorization"],
+        support_auth_header["Authorization"],
         llm_client=fake_llm,
     )
 
@@ -123,7 +127,7 @@ async def test_vague_intent_does_not_execute_write_action(monkeypatch, auth_head
     assert response.requires_confirmation is False
 
 
-async def test_card_freeze_is_guidance_only_no_action_executed(auth_header: dict[str, str]):
+async def test_card_freeze_is_guidance_only_no_action_executed(support_auth_header: dict[str, str]):
     """Blocarea cardului e guidance-only în V1 (vezi task-ul, secțiunea 10 —
     permis explicit când confirmarea ar complica prea mult branch-ul).
     Nu există niciun tool `freeze_card` expus modelului — verificăm doar
@@ -145,7 +149,7 @@ async def test_card_freeze_is_guidance_only_no_action_executed(auth_header: dict
     )
 
     response = await support_service.handle_chat(
-        ChatRequest(message="Blochează-mi cardul."), auth_header["Authorization"], llm_client=fake_llm
+        ChatRequest(message="Blochează-mi cardul."), support_auth_header["Authorization"], llm_client=fake_llm
     )
 
     assert response.requires_confirmation is False
