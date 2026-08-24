@@ -10,6 +10,8 @@ export interface RegisterPayload {
   first_name: string;
   last_name: string;
   email: string;
+  // Fictiv/neverificat momentan — vezi AuthUser.phone_number mai jos.
+  phone_number: string;
   password: string;
 }
 
@@ -23,6 +25,12 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   email: string;
+  // Absent pe /auth/register (UserOut) — prezent DOAR pe /auth/me
+  // (UserMeOut). role gatează /app/staff/* (vezi core/staff.guard.ts) —
+  // DOAR ca indiciu de UI, autorizarea reală rămâne server-side
+  // (require_staff). phone_number e fictiv, neverificat — vezi backend.
+  role?: 'customer' | 'staff';
+  phone_number?: string | null;
   email_verified?: boolean;
   identity_verified?: boolean;
 }

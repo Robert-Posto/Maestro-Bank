@@ -4,7 +4,7 @@
   </div>
 
   <nav class="sidebar__nav">
-    @for (group of navGroups; track $index) {
+    @for (group of navGroups(); track $index) {
       <div class="sidebar__group">
         @if (group.label) {
           <p class="sidebar__group-label">{{ group.label }}</p>

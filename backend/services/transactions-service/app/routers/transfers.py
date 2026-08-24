@@ -13,13 +13,14 @@ Extern (prin Gateway) acestea devin:
   GET   /api/transactions/{id}
   PATCH /api/transactions/{id}/recognize
   POST  /api/transactions/{id}/report
+  POST  /api/transactions/{id}/hold/cancel
 
 ORDINE IMPORTANTĂ: rutele cu path literal (/export, /analytics/*) trebuie
 înregistrate ÎNAINTE de GET /{transaction_id} (wildcard cu UN SINGUR
 segment) — altfel acesta le-ar "înghiți" (ex. "export" interpretat ca
-transaction_id). /{transaction_id}/recognize și /{transaction_id}/report
-au 2 segmente, deci nu sunt de fapt ambigue cu wildcard-ul de 1 segment,
-dar păstrăm ordinea oricum, pentru claritate.
+transaction_id). /{transaction_id}/recognize, /{transaction_id}/report și
+/{transaction_id}/hold/cancel au 2+ segmente, deci nu sunt de fapt ambigue
+cu wildcard-ul de 1 segment, dar păstrăm ordinea oricum, pentru claritate.
 """
 
 from datetime import datetime
@@ -123,3 +124,8 @@ async def report_transaction(
     user_id: str = CurrentUserId,
 ):
     return await service.report_transaction(transaction_id, user_id, payload)
+
+
+@router.post("/{transaction_id}/hold/cancel", response_model=TransactionOut, response_model_by_alias=False)
+async def cancel_hold(transaction_id: str, user_id: str = CurrentUserId):
+    return await service.cancel_own_hold(transaction_id, user_id)

@@ -90,6 +90,7 @@ USERS = [
         "first_name": "Octavia",
         "last_name": "Stefan",
         "email": "octavia.demo@maestrobank.local",
+        "phone_number": "+40721000001",
         "salary_range_ron": (9200, 9500),
         "salary_day": 25,
         "opening_balance_ron": 13000,
@@ -126,6 +127,7 @@ USERS = [
         "first_name": "Andrei",
         "last_name": "Popescu",
         "email": "andrei.demo@maestrobank.local",
+        "phone_number": "+40721000002",
         "salary_range_ron": (7400, 7600),
         "salary_day": 28,
         "opening_balance_ron": 4500,
@@ -155,6 +157,7 @@ USERS = [
         "first_name": "Maria",
         "last_name": "Ionescu",
         "email": "maria.demo@maestrobank.local",
+        "phone_number": "+40721000003",
         "salary_range_ron": (10800, 11200),
         "salary_day": 30,
         "opening_balance_ron": 9500,
@@ -374,10 +377,12 @@ async def create_demo_user(db_auth, db_accounts, spec: dict, password_hash: str,
         "first_name": spec["first_name"],
         "last_name": spec["last_name"],
         "email": spec["email"],
+        "phone_number": spec.get("phone_number"),
         "password_hash": password_hash,
         "created_at": created_at,
         "is_active": True,
         "is_demo": True,
+        "role": "customer",
     }
     result = await db_auth.users.insert_one(user_doc)
     user_id = str(result.inserted_id)
@@ -390,6 +395,14 @@ async def create_demo_user(db_auth, db_accounts, spec: dict, password_hash: str,
             "currency": "RON",
             "balance_minor": 0,  # se recalculează la final, din suma tranzacțiilor generate
             "status": "active",
+            # Fără acest câmp, contul e "invizibil" pentru get_account_by_user/
+            # get_account_for_user (query Mongo strict pe account_type="current",
+            # nu doar defaultul Pydantic la citire) — vezi accounts-service/app/
+            # service.py::backfill_missing_account_types pentru explicația completă.
+            # Backfill-ul de-acolo rulează DOAR la boot-ul accounts-service, deci
+            # NU acoperă conturi inserate direct de acest script între două
+            # restart-uri — trebuie setat explicit aici, la creare.
+            "account_type": "current",
             "created_at": created_at,
             "is_demo": True,
         }

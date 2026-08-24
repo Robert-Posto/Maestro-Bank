@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { staffGuard } from './core/staff.guard';
 import { authGuard, guestGuard, onboardingAuthGuard, onboardingIdentityGuard } from './core/auth.guard';
 
 export const routes: Routes = [
@@ -86,6 +87,11 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
+      },
+      {
+        path: 'staff-holds',
+        canActivate: [staffGuard],
+        loadComponent: () => import('./features/staff-holds/staff-holds').then((m) => m.StaffHolds),
       },
     ],
   },
