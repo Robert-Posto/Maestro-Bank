@@ -150,6 +150,56 @@ async def backfill_missing_account_types() -> None:
         logger.info("accounts-service: backfill account_type=current aplicat pe %s conturi vechi", result.modified_count)
 
 
+_FRAUD_HOLDING_ACCOUNT_USER_ID = "system:fraud-holding"
+
+
+async def ensure_fraud_holding_account() -> str:
+    """Idempotent, rulat la fiecare pornire (vezi main.py::lifespan) —
+    contul-pseudo intern în care staționează fondurile unui transfer reținut
+    de motorul de fraud (transactions-service/app/holds.py), între crearea
+    hold-ului și rezolvarea lui (aprobare/respingere/expirare).
+
+    Exact același rol ca celelalte conturi-pseudo (comercianți, sold
+    inițial — vezi scripts/seed_demo_data.py) — un cont "system:*" cu
+    balance_minor real, mutat prin EXACT același apply_internal_transfer ca
+    orice alt transfer. Fără câmp nou pe accounts: banii chiar ies din
+    contul sursă în momentul reținerii, deci tot restul codului care
+    citește balance_minor ca "disponibil acum" (delete_account, taxa de
+    card fizic, alocarea în pockets) vede automat soldul corect, fără nicio
+    modificare acolo.
+    """
+    db = get_database()
+    existing = await db.accounts.find_one({"user_id": _FRAUD_HOLDING_ACCOUNT_USER_ID})
+    if existing is not None:
+        return str(existing["_id"])
+
+    iban = await generate_unique_demo_iban(db.accounts)
+    result = await db.accounts.insert_one(
+        {
+            "user_id": _FRAUD_HOLDING_ACCOUNT_USER_ID,
+            "iban": iban,
+            "currency": "RON",
+            "balance_minor": 0,
+            "status": "active",
+            "account_type": "current",
+            "is_fraud_holding_account": True,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    logger.info("accounts-service: cont-pseudo de reținere fraud creat (account_id=%s)", result.inserted_id)
+    return str(result.inserted_id)
+
+
+async def get_fraud_holding_account_id() -> str:
+    db = get_database()
+    account = await db.accounts.find_one({"user_id": _FRAUD_HOLDING_ACCOUNT_USER_ID})
+    if account is None:
+        # Nu ar trebui să se întâmple (ensure_fraud_holding_account rulează
+        # la fiecare boot) — dar nu presupunem, creăm defensiv dacă lipsește.
+        return await ensure_fraud_holding_account()
+    return str(account["_id"])
+
+
 async def list_accounts_for_user(user_id: str) -> list[dict]:
     """Toate conturile userului (curent + economii/depozit/student), cel mai vechi primul."""
     db = get_database()

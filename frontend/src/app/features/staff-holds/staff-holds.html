@@ -1,0 +1,86 @@
+<app-page-header title="Rețineri de fraudă" subtitle="Transferuri suspecte, oprite pentru revizuire manuală — sună clientul înainte de a decide.">
+  <app-action-button variant="secondary" (pressed)="load()">
+    <app-icon name="filter" [size]="16" /> Reîmprospătează
+  </app-action-button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="72" [gap]="14" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca reținerile" [description]="error()!" />
+} @else if (holds().length === 0) {
+  <app-empty-state icon="shield" title="Nicio reținere activă" description="Toate transferurile semnalate au fost deja rezolvate." />
+} @else {
+  <div class="holds-list">
+    @for (hold of holds(); track hold.id) {
+      <div class="hold-card">
+        <div class="hold-card__main">
+          <div class="hold-card__customer">
+            <app-icon name="profile" [size]="18" />
+            <div>
+              <p class="hold-card__name">{{ hold.customer?.first_name }} {{ hold.customer?.last_name }}</p>
+              @if (hold.customer?.phone_number) {
+                <a class="hold-card__phone" [href]="'tel:' + hold.customer!.phone_number">
+                  <app-icon name="phone" [size]="13" /> {{ hold.customer!.phone_number }}
+                </a>
+              } @else {
+                <span class="hold-card__phone hold-card__phone--missing">Fără telefon în evidență</span>
+              }
+            </div>
+          </div>
+
+          <div class="hold-card__transfer">
+            <span class="hold-card__amount">{{ hold.amount_minor | money: hold.currency }}</span>
+            <span class="hold-card__route">
+              {{ hold.from_name || hold.from_iban }} <app-icon name="arrow-up-right" [size]="13" /> {{ hold.to_name || hold.to_iban }}
+            </span>
+            @if (hold.description) {
+              <span class="hold-card__description">{{ hold.description }}</span>
+            }
+          </div>
+
+          <div class="hold-card__risk">
+            <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
+            <div class="hold-card__rules">
+              @for (ruleId of hold.fired_rule_ids; track ruleId) {
+                <span class="hold-card__rule-tag">{{ ruleId }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="hold-card__meta">
+            <span>{{ minutesAgo(hold.created_at) }}</span>
+            @if (hold.hold_expires_at) {
+              <span class="hold-card__expiry">expiră {{ hold.hold_expires_at | date: 'dd MMM, HH:mm' }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="hold-card__actions">
+          <app-action-button variant="danger" (pressed)="askReject(hold)">
+            <app-icon name="close" [size]="15" /> Respinge
+          </app-action-button>
+          <app-action-button variant="primary" (pressed)="askApprove(hold)">
+            <app-icon name="check" [size]="15" /> Aprobă
+          </app-action-button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (pendingAction(); as action) {
+  <app-confirm-dialog
+    [title]="action.kind === 'approve' ? 'Aprobi transferul?' : 'Respingi transferul?'"
+    [message]="
+      action.kind === 'approve'
+        ? 'Fondurile vor fi eliberate imediat către beneficiar (' + (action.hold.to_name || action.hold.to_iban) + '). Ai confirmat identitatea/intenția clientului la telefon?'
+        : 'Fondurile vor reveni imediat în contul clientului. Beneficiarul (' + (action.hold.to_name || action.hold.to_iban) + ') NU va primi banii.'
+    "
+    [confirmLabel]="action.kind === 'approve' ? 'Aprobă' : 'Respinge'"
+    [danger]="action.kind === 'reject'"
+    [loading]="resolving()"
+    (confirmed)="confirmAction()"
+    (cancelled)="cancelAction()"
+  />
+}

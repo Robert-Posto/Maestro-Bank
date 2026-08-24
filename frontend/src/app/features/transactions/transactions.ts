@@ -73,6 +73,7 @@ export class Transactions implements OnInit {
   protected readonly recognizing = signal(false);
   protected readonly reporting = signal(false);
   protected readonly exporting = signal(false);
+  protected readonly cancellingHold = signal(false);
 
   protected readonly selectedTransaction = computed<TransactionDetail | null>(() => {
     const id = this.selectedId();
@@ -189,6 +190,23 @@ export class Transactions implements OnInit {
       error: (err) => {
         this.reporting.set(false);
         this.toast.error(extractErrorMessage(err, 'Nu am putut raporta tranzacția.'));
+      },
+    });
+  }
+
+  protected cancelHold(): void {
+    const tx = this.selectedTransaction();
+    if (!tx) return;
+    this.cancellingHold.set(true);
+    this.transactionsApi.cancelHold(tx.id).subscribe({
+      next: (updated) => {
+        this.updateLocal(updated);
+        this.cancellingHold.set(false);
+        this.toast.success('Transfer anulat — fondurile au revenit în cont.');
+      },
+      error: (err) => {
+        this.cancellingHold.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut anula transferul.'));
       },
     });
   }

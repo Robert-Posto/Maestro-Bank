@@ -311,3 +311,11 @@ class InternalTransferRequest(BaseModel):
 class InternalTransferResponse(BaseModel):
     from_balance_minor: int
     to_balance_minor: int
+
+
+class FraudHoldingAccountView(BaseModel):
+    """Contul-pseudo intern în care staționează fondurile unui transfer
+    reținut de motorul de fraud — vezi service.py::ensure_fraud_holding_account
+    și transactions-service/app/holds.py."""
+
+    account_id: str

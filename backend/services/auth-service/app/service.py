@@ -70,11 +70,16 @@ async def register_user(payload: UserRegister) -> dict:
         "first_name": payload.first_name,
         "last_name": payload.last_name,
         "email": payload.email,
+        "phone_number": payload.phone_number,
         # Doar hash-ul ajunge în baza de date — parola în clar nu e
         # niciodată salvată sau logată.
         "password_hash": hash_password(payload.password),
         "created_at": datetime.now(timezone.utc),
         "is_active": True,
+        # UserRegister nu are câmp "role" — un client nu poate NICIODATĂ
+        # cere rolul "staff" prin înregistrare publică. Singura cale spre
+        # role="staff" e scripts/create_staff_user.py, direct în Mongo.
+        "role": "customer",
         # Onboarding: userul pornește neverificat pe ambele fronturi —
         # vezi send_verification_code / verify_email_code mai jos și
         # mark_identity_verified (apelat de verification-service).
@@ -192,7 +197,7 @@ async def authenticate_user(payload: UserLogin) -> str:
     if not user.get("is_active", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Contul este dezactivat.")
 
-    token = create_access_token(user_id=str(user["_id"]), email=user["email"])
+    token = create_access_token(user_id=str(user["_id"]), email=user["email"], role=user.get("role", "customer"))
     logger.info("auth-service: autentificare reușită (user_id=%s)", user["_id"])
     return token
 
@@ -280,3 +285,26 @@ async def get_user_name(user_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
 
     return {"first_name": user["first_name"], "last_name": user["last_name"]}
+
+
+async def get_user_contact(user_id: str) -> dict:
+    """Rută INTERNĂ, DOAR pentru personal (transactions-service::routers/staff.py
+    — lista de hold-uri de revizuit, unde personalul are nevoie să sune
+    clientul). Separată deliberat de get_user_name — restul apelanților nu
+    ar trebui să primească email/telefon."""
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+
+    db = get_database()
+    user = await db.users.find_one({"_id": object_id})
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+
+    return {
+        "first_name": user["first_name"],
+        "last_name": user["last_name"],
+        "email": user["email"],
+        "phone_number": user.get("phone_number"),
+    }

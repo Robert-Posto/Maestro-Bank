@@ -23,8 +23,10 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app import holds
 from app.config import settings
 from app.database import get_database
+from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
 from app.money import format_minor_amount
 from app.models import (
     ReportTransactionRequest,
@@ -130,6 +132,7 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "recognized": doc.get("recognized", False),
         "reported": doc.get("reported", False),
         "created_at": doc["created_at"],
+        "hold": doc.get("hold"),
     }
 
 
@@ -198,8 +201,39 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
     }
     insert_result = await db.transactions.insert_one(transaction_doc)
 
+    # Scor fraud + audit. Când `fraud_shadow_mode` e activ (Faza 1), banda
+    # întoarsă e ÎNTOTDEAUNA None — create_transfer nu are cum să ramifice
+    # pe ea, vezi garanția structurală din app/fraud/service.py. Când
+    # aplicarea reală e activă, banda "hold" chiar gatează ramura de mai
+    # jos — restul benzilor (None/pass/notify/step_up) nu schimbă nimic
+    # încă (vezi planul fazei — doar 80+ are aplicare reală acum).
+    decision_band: str | None = None
     try:
-        await _apply_transfer(source["id"], destination["id"], payload.amount_minor)
+        decision_band = await evaluate_and_record_transfer_risk(
+            transaction_id=insert_result.inserted_id,
+            transaction=transaction_doc,
+            source_account=source,
+            user_id=user_id,
+            evaluated_at=now,
+        )
+    except Exception:
+        logger.critical(
+            "transactions-service: evaluate_and_record_transfer_risk a scăpat o excepție netratată "
+            "(tx_id=%s) — nu ar trebui să fie posibil, vezi app/fraud/service.py",
+            insert_result.inserted_id,
+        )
+
+    is_held = decision_band == "hold"
+    try:
+        if is_held:
+            await holds.create_hold(
+                transaction_id=insert_result.inserted_id,
+                source_account_id=source["id"],
+                amount_minor=payload.amount_minor,
+                evaluated_at=now,
+            )
+        else:
+            await _apply_transfer(source["id"], destination["id"], payload.amount_minor)
     except HTTPException as exc:
         await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "failed"}})
         logger.warning(
@@ -209,18 +243,73 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
         )
         raise
 
-    # NU returnăm "completed" înainte ca accounts-service să fi confirmat.
-    await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "completed"}})
-    logger.info("transactions-service: transfer reușit (tx_id=%s)", insert_result.inserted_id)
+    if is_held:
+        # NU marcăm "completed" — holds.create_hold a setat deja
+        # status="pending_review" + hold{...}. NU actualizăm profilul —
+        # un transfer reținut, nerezolvat încă, nu e "comportament normal
+        # confirmat" (vezi app/fraud/profile.py).
+        logger.info("transactions-service: transfer reținut pentru revizuire (tx_id=%s)", insert_result.inserted_id)
+        await _notify_user(
+            user_id,
+            "transfer_hold",
+            f"Transferul de {format_minor_amount(payload.amount_minor)} {source['currency']} către "
+            f"{payload.to_iban} este în verificare de securitate — vei fi anunțat imediat ce e rezolvat.",
+        )
+    else:
+        # NU returnăm "completed" înainte ca accounts-service să fi confirmat.
+        await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "completed"}})
+        logger.info("transactions-service: transfer reușit (tx_id=%s)", insert_result.inserted_id)
 
+        await _notify_user(
+            user_id,
+            "transfer",
+            f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+        )
+
+        # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
+        # actualizează DOAR la transferuri efectiv "completed" — vezi
+        # app/fraud/profile.py. Best-effort, la fel ca _notify_user: un
+        # profil stale/lipsă doar degradează spre cold start la
+        # următoarea evaluare.
+        try:
+            await record_completed_transfer_for_profile(user_id=user_id, transaction=transaction_doc, evaluated_at=now)
+        except Exception:
+            logger.warning(
+                "transactions-service: record_completed_transfer_for_profile a scăpat o excepție netratată (tx_id=%s)",
+                insert_result.inserted_id,
+            )
+
+    final_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
+    return to_transaction_view(final_doc, viewer_account_id=source["id"])
+
+
+async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:
+    """Clientul își anulează PROPRIA reținere — nu are nevoie de WebAuthn
+    (anularea e direcția sigură: banii se întorc la el, nu pleacă mai
+    departe — vezi planul, "self-service release" e amânat, dar cancel nu).
+    Verificarea de proprietate rezolvă contul curent al userului AUTENTIFICAT
+    (din JWT, niciodată dintr-un câmp trimis de client) și confirmă că
+    EXACT acel cont e sursa hold-ului, exact ca la restul rutelor "userul
+    meu" din acest fișier."""
+    source = await _get_account_by_user(user_id)
+
+    try:
+        object_id = ObjectId(transaction_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.") from exc
+
+    db = get_database()
+    transaction = await db.transactions.find_one({"_id": object_id})
+    if transaction is None or transaction["from_account_id"] != source["id"]:
+        # 404, nu 403 — nu confirmăm existența unei tranzacții a altcuiva.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.")
+
+    updated_doc = await holds.cancel_hold(transaction_id)
+    logger.info("transactions-service: hold anulat de client (tx_id=%s)", transaction_id)
     await _notify_user(
-        user_id,
-        "transfer",
-        f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+        user_id, "transfer_hold_cancelled", "Ai anulat transferul reținut — fondurile au revenit în cont."
     )
-
-    completed_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
-    return to_transaction_view(completed_doc, viewer_account_id=source["id"])
+    return to_transaction_view(updated_doc, viewer_account_id=source["id"])
 
 
 async def _notify_user(user_id: str, kind: str, text: str) -> None:

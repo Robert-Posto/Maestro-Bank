@@ -42,6 +42,12 @@
       </label>
 
       <label class="auth-field">
+        <span>Telefon</span>
+        <input type="tel" [ngModel]="phoneNumber()" (ngModelChange)="phoneNumber.set($event)" name="phoneNumber" autocomplete="tel" placeholder="+40 7xx xxx xxx" />
+        <span class="auth-hint">Folosit doar pentru contact — necesar acum, verificarea prin SMS vine într-o etapă viitoare.</span>
+      </label>
+
+      <label class="auth-field">
         <span>Parolă</span>
         <input type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" autocomplete="new-password" placeholder="••••••••" />
         <span class="auth-hint">Minimum 8 caractere, cel puțin o literă și o cifră.</span>

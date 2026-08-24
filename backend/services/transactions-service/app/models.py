@@ -44,6 +44,14 @@ class TransferRequest(BaseModel):
         return normalized if normalized in TRANSACTION_CATEGORIES else "other"
 
 
+class HoldInfoOut(BaseModel):
+    """Prezent DOAR pe o tranzacție reținută (status="pending_review" sau
+    care A FOST reținută) — vezi app/holds.py."""
+
+    expires_at: datetime
+    resolution: str | None = None
+
+
 class TransactionOut(BaseModel):
     """DTO orientat pe VIEWER — `direction`/`counterparty_iban` sunt
     calculate relativ la contul userului care face requestul, nu sunt un
@@ -66,6 +74,7 @@ class TransactionOut(BaseModel):
     recognized: bool = False
     reported: bool = False
     created_at: datetime
+    hold: HoldInfoOut | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -130,3 +139,98 @@ class ScheduledTransferOut(BaseModel):
     @classmethod
     def convert_object_id(cls, value: Any) -> str:
         return str(value)
+
+
+# --- Personal — revizuire evaluări fraud (vezi routers/staff.py) -----------
+#
+# DOAR pentru personal (RequireStaff, app/security.py). Evaluarea automată
+# originală (score/fired_rules/decision_would_apply) nu se schimbă NICIODATĂ
+# — vezi app/fraud/staff.py::review_evaluation. O revizuire e o adnotare
+# adăugată, nu o rescriere.
+
+FraudReviewOutcome = Literal["confirmed_fraud", "false_positive", "legitimate"]
+
+
+class FraudEvaluationReviewRequest(BaseModel):
+    outcome: FraudReviewOutcome
+    note: str = Field(default="", max_length=1000)
+
+
+class FraudEvaluationReviewOut(BaseModel):
+    reviewed_by: str
+    reviewed_at: datetime
+    outcome: FraudReviewOutcome
+    note: str = ""
+
+
+class FraudEvaluationOut(BaseModel):
+    id: str = Field(alias="_id")
+    transaction_id: str
+    user_id: str
+    status: str
+    score: int | None
+    fired_rules: list[dict[str, Any]]
+    decision_would_apply: str | None
+    ruleset_version: str
+    shadow_mode: bool
+    evaluated_at: datetime
+    error: str | None
+    created_at: datetime
+    review: FraudEvaluationReviewOut | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", "transaction_id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)
+
+
+# --- Personal — rezolvare hold-uri (vezi app/holds.py, routers/staff.py) --
+#
+# DOAR pentru personal (RequireStaff). Distinct de FraudEvaluationOut de mai
+# sus (audit/calibrare, orice evaluare) — acestea sunt DOAR reținerile încă
+# nerezolvate, cu tot ce are nevoie personalul ca să decidă: scor, sumă,
+# beneficiar, ȘI datele de contact ale clientului (ca să-l poată suna).
+
+
+class StaffHoldCustomerContact(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    phone_number: str | None = None
+
+
+class StaffHoldOut(BaseModel):
+    id: str
+    from_iban: str
+    to_iban: str
+    from_name: str | None = None
+    to_name: str | None = None
+    amount_minor: int
+    currency: str
+    description: str
+    category: str
+    status: str
+    created_at: datetime
+    hold_expires_at: datetime | None = None
+    score: int | None = None
+    fired_rule_ids: list[str] = []
+    customer: StaffHoldCustomerContact | None = None
+
+
+class HoldResolutionOut(BaseModel):
+    id: str = Field(alias="_id")
+    status: str
+    resolution: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)
+
+    @classmethod
+    def from_transaction_doc(cls, doc: dict) -> "HoldResolutionOut":
+        return cls(_id=doc["_id"], status=doc["status"], resolution=(doc.get("hold") or {}).get("resolution"))
