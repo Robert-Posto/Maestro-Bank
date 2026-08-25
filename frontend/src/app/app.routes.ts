@@ -64,6 +64,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/transfers/transfers').then((m) => m.Transfers),
       },
       {
+        // Pagina deschisă de link-ul de "Cerere de plată" (vezi Transfers,
+        // tab "Solicită plată") — orice user autentificat o poate deschide și
+        // plăti, nu doar cel care a creat cererea (authGuard de pe 'app'
+        // e suficient, nu mai adăugăm un guard separat aici).
+        path: 'pay/:id',
+        loadComponent: () => import('./features/pay-request/pay-request').then((m) => m.PayRequest),
+      },
+      {
         path: 'exchange',
         loadComponent: () => import('./features/exchange/exchange').then((m) => m.Exchange),
       },

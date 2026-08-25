@@ -262,6 +262,29 @@ import { Component, input } from '@angular/core';
           <path d="M20 12a8 8 0 0 1-14 5.3L4 16" />
           <path d="M4 21v-5h5" />
         }
+        @case ('mic') {
+          <rect x="9" y="2" width="6" height="12" rx="3" />
+          <path d="M5 10a7 7 0 0 0 14 0" />
+          <path d="M12 17v4" />
+          <path d="M8 21h8" />
+        }
+        @case ('mic-off') {
+          <path d="M9 9v3a3 3 0 0 0 5.1 2.1" />
+          <path d="M15 9.5V5a3 3 0 0 0-5.2-2" />
+          <path d="M5 10a7 7 0 0 0 10.8 5.9" />
+          <path d="M19 10a7 7 0 0 1-.6 2.9" />
+          <path d="M12 17v4" />
+          <path d="M8 21h8" />
+          <path d="M3 3l18 18" />
+        }
+        @case ('volume') {
+          <path d="M4 10v4h3.5L12 17.5v-11L7.5 10H4z" />
+          <path d="M16 9a4 4 0 0 1 0 6" />
+          <path d="M18.5 6.5a8 8 0 0 1 0 11" />
+        }
+        @case ('stop') {
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        }
       }
     </svg>
   `,

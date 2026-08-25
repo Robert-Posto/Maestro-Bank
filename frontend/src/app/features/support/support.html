@@ -35,6 +35,18 @@
             } @else {
               <div class="support-chat__answer" [innerHTML]="chatMessage.text | markdownLite"></div>
 
+              @if (speech.ttsSupported && chatMessage.text) {
+                <button
+                  type="button"
+                  class="support-chat__listen-btn"
+                  [class.support-chat__listen-btn--active]="speech.speakingMessageId() === chatMessage.id"
+                  (click)="toggleSpeak(chatMessage)"
+                >
+                  <app-icon [name]="speech.speakingMessageId() === chatMessage.id ? 'stop' : 'volume'" [size]="13" />
+                  {{ speech.speakingMessageId() === chatMessage.id ? 'Oprește' : 'Ascultă' }}
+                </button>
+              }
+
               @if (chatMessage.context?.transactions; as transactions) {
                 <div class="support-chat__context-card">
                   @for (t of transactions; track t.id) {
@@ -135,12 +147,24 @@
     }
 
     <form class="support-chat__composer" (ngSubmit)="sendChatMessage()">
+      @if (speech.sttSupported) {
+        <button
+          type="button"
+          class="support-chat__mic-btn"
+          [class.support-chat__mic-btn--active]="speech.listening()"
+          [attr.aria-label]="speech.listening() ? 'Oprește ascultarea' : 'Vorbește mesajul'"
+          [disabled]="supportTyping()"
+          (click)="toggleListening()"
+        >
+          <app-icon [name]="speech.listening() ? 'mic-off' : 'mic'" [size]="17" />
+        </button>
+      }
       <input
         type="text"
         name="chatMessage"
         autocomplete="off"
         aria-label="Mesaj pentru Support Agent"
-        placeholder="Scrie mesajul tău..."
+        [placeholder]="speech.listening() ? 'Te ascult...' : 'Scrie mesajul tău...'"
         [ngModel]="chatInput()"
         (ngModelChange)="chatInput.set($event)"
         [disabled]="supportTyping()"

@@ -103,6 +103,20 @@ class SubscriptionOut(BaseModel):
         return str(value)
 
 
+class SubscriptionSuggestion(BaseModel):
+    """Abonament detectat pasiv din istoricul de tranzacții (vezi
+    service.py::detect_recurring_payments) — NU e persistat, NU e un
+    abonament real până userul îl confirmă explicit (POST /subscriptions,
+    cu aceste valori pre-completate)."""
+
+    name: str
+    amount_minor: int
+    currency: str = "RON"
+    billing_day: int
+    occurrences: int
+    last_seen: datetime
+
+
 class InternalSubscriptionView(BaseModel):
     """Reprezentare simplificată, pentru consum de către transactions-service (forecast)."""
 

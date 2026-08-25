@@ -16,6 +16,7 @@ import logging
 from fastapi import FastAPI
 
 from app.config import settings
+from app.routers.speech import router as speech_router
 from app.routers.spending_forecast import router as spending_forecast_router
 from app.routers.support import router as support_router
 
@@ -35,3 +36,4 @@ async def health_check():
 
 app.include_router(spending_forecast_router)
 app.include_router(support_router)
+app.include_router(speech_router)

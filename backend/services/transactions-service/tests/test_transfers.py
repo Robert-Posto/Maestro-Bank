@@ -52,7 +52,7 @@ DEST_ACCOUNT = {
 
 def _make_token(user_id: str) -> str:
     now = datetime.now(timezone.utc)
-    payload = {"sub": user_id, "email": "test@example.com", "iat": now, "exp": now + timedelta(minutes=5)}
+    payload = {"sub": user_id, "email": "test@example.com", "iat": now, "exp": now + timedelta(minutes=30)}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 

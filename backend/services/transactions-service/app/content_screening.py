@@ -475,6 +475,113 @@ _CYBER_INFRASTRUCTURE = [
     "power grid attack",
     "sabotaj infrastructura critica",
     "critical infrastructure sabotage",
+    "ransomware infrastructura",
+    "infrastructure ransomware",
+    "atac asupra retelei de apa",
+    "water supply attack",
+]
+
+# --- 11. Corupție / mită / trafic de influență ------------------------------
+# Categorie nouă — userul a semnalat că multe cuvinte "periculoase" scapă;
+# coruptia/mita nu erau acoperite deloc, deși e o formă reală de
+# criminalitate financiară relevantă pentru descrierea unui transfer bancar.
+_CORRUPTION = [
+    "mita",
+    "bribe",
+    "bribery",
+    "spaga",
+    "plic cu bani mita",
+    "cash bribe envelope",
+    "trafic de influenta",
+    "influence peddling",
+    "coruptie",
+    "corruption",
+    "functionar corupt",
+    "corrupt official",
+    "comision ilegal",
+    "kickback",
+    "kickback scheme",
+    "plata sub masa",
+    "under the table payment",
+    "fonduri europene fraudate",
+    "eu funds fraud",
+    "delapidare",
+    "embezzlement",
+    "conflict de interese ascuns",
+    "hidden conflict of interest",
+]
+
+# --- 12. Falsificare / contrafacere -----------------------------------------
+_COUNTERFEITING = [
+    "bani falsi",
+    "counterfeit money",
+    "counterfeit currency",
+    "bancnote false",
+    "fake banknotes",
+    "documente false",
+    "forged documents",
+    "acte falsificate",
+    "falsified papers",
+    "pasaport fals",
+    "fake passport",
+    "buletin fals",
+    "fake id card",
+    "identitate falsa",
+    "false identity",
+    "marfa contrafacuta",
+    "counterfeit goods",
+    "medicamente contrafacute",
+    "counterfeit medicine",
+    "falsificare de acte",
+    "document forgery",
+]
+
+# --- 13. Escrocherii / fraudă online ----------------------------------------
+_SCAMS = [
+    "schema piramidala",
+    "pyramid scheme",
+    "schema ponzi",
+    "ponzi scheme",
+    "escrocherie romantica",
+    "romance scam",
+    "furt de identitate",
+    "identity theft",
+    "phishing",
+    "clonare card",
+    "card cloning",
+    "skimming card",
+    "card skimming",
+    "frauda cu cripto",
+    "crypto scam",
+    "investitie garantata fals",
+    "guaranteed investment scam",
+    "recuperator de fonduri fals",
+    "recovery scam",
+    "sextorcare",
+    "sextortion",
+    "santaj cu poze",
+    "blackmail with photos",
+    "rascumparare digitala",
+    "ransomware payment",
+    "plata ransomware",
+]
+
+# --- 14. Ură / incitare la violență -----------------------------------------
+_HATE_INCITEMENT = [
+    "discurs instigator la ura",
+    "hate speech incitement",
+    "incitare la violenta",
+    "incitement to violence",
+    "curatare rasiala",
+    "racial cleansing",
+    "suprematie rasiala",
+    "racial supremacy",
+    "propaganda extremista",
+    "extremist propaganda",
+    "manifest extremist",
+    "extremist manifesto",
+    "recrutare extremista",
+    "extremist recruitment",
 ]
 
 _FLAGGED_TERM_ROOTS: list[str] = [
@@ -488,17 +595,31 @@ _FLAGGED_TERM_ROOTS: list[str] = [
     *_FINANCIAL_CRIME,
     *_PIRACY_EXTORTION,
     *_CYBER_INFRASTRUCTURE,
+    *_CORRUPTION,
+    *_COUNTERFEITING,
+    *_SCAMS,
+    *_HATE_INCITEMENT,
 ]
 
 _FLAGGED_TERM_PATTERN = re.compile(r"\b(?:" + "|".join(_FLAGGED_TERM_ROOTS) + r")\w*", re.IGNORECASE)
 
 
+# Substituții leetspeak comune — fără astea, "b0mba"/"t3rorist" treceau
+# nedetectate, deși conțin exact aceleași rădăcini pentru orice cititor
+# uman. Doar cele mai frecvente/neambigue (nu "1"->"l", care ar produce
+# prea multe fals-pozitive pe text normal cu cifre — "apartament 1 camera"
+# nu trebuie să devină "apartament l camera" și să riște o coliziune).
+_LEETSPEAK_MAP = str.maketrans({"0": "o", "3": "e", "4": "a", "@": "a", "$": "s", "7": "t"})
+
+
 def _normalize(text: str) -> str:
     """Lowercase + elimină diacriticele — ca "bombă"/"bomba" să fie
-    tratate identic, indiferent cum tastează userul."""
+    tratate identic, indiferent cum tastează userul — plus substituții
+    leetspeak uzuale ("b0mba" -> "bomba"), ca userii care încearcă să
+    ocolească filtrul cu cifre în loc de litere să tot fie prinși."""
     decomposed = unicodedata.normalize("NFKD", text)
     without_diacritics = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return without_diacritics.lower()
+    return without_diacritics.lower().translate(_LEETSPEAK_MAP)
 
 
 def screen_description(description: str) -> str | None:

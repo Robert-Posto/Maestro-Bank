@@ -1,0 +1,194 @@
+.pay-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.pay-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  box-shadow: var(--mb-shadow-xs);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--mb-space-3);
+}
+
+.pay-card--loading {
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pay-loading {
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-sm);
+}
+
+/* --- Solicitant + sumă --- */
+
+.pay-requester {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  text-align: left;
+}
+
+.pay-requester__avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--mb-blue-100);
+  color: var(--mb-blue-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--mb-font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.pay-status-amount {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-semibold);
+  margin-top: var(--mb-space-2);
+}
+
+.pay-status-desc {
+  color: var(--mb-text-secondary);
+  font-size: var(--mb-font-size-sm);
+}
+
+.pay-disclaimer {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: var(--mb-space-1);
+}
+
+/* --- Status card (paid/cancelled/expired) --- */
+
+.pay-status-badge {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 4px 12px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+}
+
+.pay-status-badge--paid {
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+}
+
+.pay-status-badge--cancelled,
+.pay-status-badge--expired {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+}
+
+.pay-status-note {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+}
+
+/* --- Cererea proprie --- */
+
+.pay-own-badge {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mb-blue-600);
+}
+
+.pay-own-hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  max-width: 320px;
+}
+
+.pay-own-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mb-space-3);
+  margin-top: var(--mb-space-2);
+}
+
+/* --- Erori / avertismente --- */
+
+.pay-error {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+  font-size: var(--mb-font-size-xs);
+  padding: var(--mb-space-2) var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  width: 100%;
+  text-align: left;
+}
+
+/* Vezi transfers.css::.transfer-content-warning — același design token,
+   duplicat aici (stiluri per-componentă, fără leak între componente Angular). */
+.pay-content-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
+  font-size: var(--mb-font-size-xs);
+  line-height: 1.5;
+  text-align: left;
+  width: 100%;
+}
+
+.pay-content-warning app-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* --- Success --- */
+
+.pay-success__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pay-success__amount {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.pay-success__meta {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+}
+
+.pay-back-link {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  text-decoration: none;
+  margin-top: var(--mb-space-2);
+}
+
+.pay-back-link:hover {
+  color: var(--mb-blue-600);
+}

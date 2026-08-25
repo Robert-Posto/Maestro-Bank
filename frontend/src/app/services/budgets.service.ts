@@ -42,6 +42,17 @@ export interface SubscriptionPayload {
   category?: string;
 }
 
+/** Abonament detectat pasiv din istoricul de tranzacții — nu e încă real
+ * (nu apare în listSubscriptions) până nu-l confirmi explicit. */
+export interface SubscriptionSuggestion {
+  name: string;
+  amount_minor: number;
+  currency: string;
+  billing_day: number;
+  occurrences: number;
+  last_seen: string;
+}
+
 /** Bugete + abonamente (budgets-service, prin /api/budgets/*). */
 @Injectable({ providedIn: 'root' })
 export class BudgetsService {
@@ -69,6 +80,10 @@ export class BudgetsService {
 
   listSubscriptions(): Observable<Subscription[]> {
     return this.http.get<Subscription[]>(`${API_BASE_URL}/budgets/subscriptions`);
+  }
+
+  listSubscriptionSuggestions(): Observable<SubscriptionSuggestion[]> {
+    return this.http.get<SubscriptionSuggestion[]>(`${API_BASE_URL}/budgets/subscriptions/suggestions`);
   }
 
   createSubscription(payload: SubscriptionPayload): Observable<Subscription> {
