@@ -30,10 +30,20 @@ _chat_client: AsyncAzureOpenAI | AsyncOpenAI | None = None
 def _build_client(endpoint: str, api_key: str) -> AsyncAzureOpenAI | AsyncOpenAI:
     endpoint = endpoint.rstrip("/")
     timeout = settings.guardian_llm_timeout_seconds
+    # max_retries=0 — SDK-ul reîncearcă intern implicit (până la 2x), ceea
+    # ce s-ar compune cu reîncercarea NOASTRĂ din complete_json (_MAX_
+    # ATTEMPTS=2), ducând la timeout*(2+1)*2 ≈ 48s în cel mai rău caz sub
+    # o resursă Azure lentă/încărcată — confirmat live (log-uri cu
+    # "Retrying request..." interne, urmate de reîncercarea proprie).
+    # O singură reîncercare, la nivelul nostru, e suficientă (vezi spec).
     if endpoint.endswith("/openai/v1"):
-        return AsyncOpenAI(base_url=endpoint, api_key=api_key, timeout=timeout)
+        return AsyncOpenAI(base_url=endpoint, api_key=api_key, timeout=timeout, max_retries=0)
     return AsyncAzureOpenAI(
-        azure_endpoint=endpoint, api_key=api_key, api_version=settings.azure_openai_api_version, timeout=timeout
+        azure_endpoint=endpoint,
+        api_key=api_key,
+        api_version=settings.azure_openai_api_version,
+        timeout=timeout,
+        max_retries=0,
     )
 
 

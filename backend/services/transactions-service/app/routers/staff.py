@@ -106,5 +106,11 @@ async def get_customer_transactions(
     service.list_transactions_for_user, care oricum ia user_id ca parametru
     simplu (nu-l derivă din JWT) — funcționează identic pentru orice user_id,
     fie userul propriu (ruta normală, /transactions), fie unul arbitrar
-    (aici, gatat de RequireStaff)."""
-    return await service.list_transactions_for_user(user_id, limit, skip)
+    (aici, gatat de RequireStaff).
+
+    `include_all_statuses=True` — spre deosebire de clientul obișnuit,
+    personalul are nevoie de imaginea COMPLETĂ, inclusiv încercări primite
+    care n-au ajuns la acest client (reținute, eșuate, anulate) — context
+    relevant într-o investigație de fraudă, nu doar experiența "curată" a
+    clientului (vezi service.py::_build_filter_query)."""
+    return await service.list_transactions_for_user(user_id, limit, skip, include_all_statuses=True)

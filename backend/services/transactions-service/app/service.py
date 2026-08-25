@@ -134,7 +134,12 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "reported": doc.get("reported", False),
         "created_at": doc["created_at"],
         "hold": doc.get("hold"),
-        "risk": doc.get("risk"),
+        # Evaluarea de risc e despre COMPORTAMENTUL EXPEDITORULUI (sumă
+        # neobișnuită pentru EL, beneficiar nou pentru EL etc.) — n-are
+        # niciun sens pentru cine PRIMEȘTE banii, și i-ar arăta un card
+        # "Financial Guardian" despre o tranzacție la care n-a făcut
+        # nimic neobișnuit. Vizibil DOAR pe partea de expeditor.
+        "risk": doc.get("risk") if is_outgoing else None,
     }
 
 
@@ -462,7 +467,7 @@ async def run_due_scheduled_transfers() -> None:
         await db.scheduled_transfers.update_one({"_id": schedule["_id"]}, {"$set": {"next_run_at": next_run}})
 
 
-def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> dict:
+def _build_filter_query(source_account_id: str, filters: TransactionFilters, *, include_all_statuses: bool = False) -> dict:
     """Construiește filtrul Mongo pentru lista/exportul de tranzacții ale
     userului curent. TOATĂ filtrarea se face aici, în backend — nu doar
     în frontend — astfel încât paginarea și exportul CSV să rămână
@@ -472,13 +477,38 @@ def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> 
     parametrul e validat (trebuie să corespundă contului userului) dar nu
     schimbă practic rezultatul — pregătit arhitectural pentru userii cu
     mai multe conturi, fără să inventăm funcționalitate inexistentă acum.
+
+    NOTĂ despre vizibilitate expeditor/destinatar: expeditorul vede
+    ÎNTREGUL istoric al propriilor transferuri, indiferent de status —
+    are nevoie să știe ce s-a întâmplat cu banii lui (reținut, eșuat,
+    anulat, reușit). Destinatarul vede o tranzacție DOAR după ce chiar a
+    ajuns la el (status="completed") — nu are niciun motiv să afle că
+    cineva a ÎNCERCAT să-i trimită bani care au fost reținuți pentru
+    verificare de fraudă, au eșuat sau au fost anulate; ar dezvălui
+    inutil informații despre expeditor și ar crea confuzie fără rost.
+
+    `include_all_statuses` dezactivează exact restricția de mai sus —
+    folosit STRICT de personal (routers/staff.py::get_customer_transactions),
+    care revizuiește un client și are nevoie de imaginea completă (inclusiv
+    încercări primite care n-au ajuns la el — context relevant pentru o
+    investigație de fraudă), nu de experiența "curată" a clientului obișnuit.
     """
-    query: dict = {"$or": [{"from_account_id": source_account_id}, {"to_account_id": source_account_id}]}
+    if include_all_statuses:
+        query: dict = {"$or": [{"from_account_id": source_account_id}, {"to_account_id": source_account_id}]}
+    else:
+        query = {
+            "$or": [
+                {"from_account_id": source_account_id},
+                {"to_account_id": source_account_id, "status": "completed"},
+            ]
+        }
 
     if filters.direction == "outgoing":
         query["from_account_id"] = source_account_id
     elif filters.direction == "incoming":
         query["to_account_id"] = source_account_id
+        if not include_all_statuses:
+            query["status"] = "completed"
 
     if filters.category:
         query["category"] = filters.category.strip().lower()
@@ -509,7 +539,7 @@ def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> 
 
 
 async def list_transactions_for_user(
-    user_id: str, limit: int, skip: int, filters: TransactionFilters | None = None
+    user_id: str, limit: int, skip: int, filters: TransactionFilters | None = None, *, include_all_statuses: bool = False
 ) -> list[dict]:
     db = get_database()
     source = await _get_account_by_user(user_id)
@@ -519,7 +549,7 @@ async def list_transactions_for_user(
         # dacă account_id aparține altcuiva).
         return []
 
-    query = _build_filter_query(source["id"], filters or TransactionFilters())
+    query = _build_filter_query(source["id"], filters or TransactionFilters(), include_all_statuses=include_all_statuses)
     cursor = db.transactions.find(query).sort("created_at", -1).skip(skip).limit(limit)
     docs = await cursor.to_list(length=limit)
     return [to_transaction_view(doc, viewer_account_id=source["id"]) for doc in docs]
@@ -600,6 +630,14 @@ async def get_transaction_for_user(transaction_id: str, user_id: str) -> dict:
     doc = await db.transactions.find_one({"_id": object_id})
     if doc is None or source["id"] not in (doc["from_account_id"], doc["to_account_id"]):
         # Nu dezvăluim că tranzacția există dar nu-i aparține — 404 în ambele cazuri.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
+
+    # Destinatarul (fără să fie și expeditorul — vezi _build_filter_query
+    # pentru motiv) n-are voie să vadă tranzacția înainte să chiar ajungă
+    # la el — același 404 "nu există", ca să nu dezvăluim nici măcar că a
+    # existat o încercare.
+    is_receiver_only = doc["to_account_id"] == source["id"] and doc["from_account_id"] != source["id"]
+    if is_receiver_only and doc["status"] != "completed":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
 
     return to_transaction_view(doc, viewer_account_id=source["id"])
