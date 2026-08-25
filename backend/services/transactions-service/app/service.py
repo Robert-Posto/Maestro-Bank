@@ -151,9 +151,14 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         # "Financial Guardian" despre o tranzacție la care n-a făcut
         # nimic neobișnuit. Vizibil DOAR pe partea de expeditor.
         "risk": doc.get("risk") if is_outgoing else None,
-        # Screening de descriere (vezi create_transfer) — informativ, doar
-        # pentru expeditor, la fel ca "risk" mai sus.
-        "content_warning": doc.get("content_warning") if is_outgoing else None,
+        # Screening determinist al descrierii (termeni de terorism/violență
+        # — vezi app/content_screening.py), SEPARAT de motorul de fraudă
+        # (app/fraud/). Spre deosebire de "risk" (comportamentul
+        # EXPEDITORULUI, irelevant pentru cine primește), descrierea e
+        # aceeași informație pe care o vede oricum și destinatarul (vezi
+        # câmpul "description" de mai sus) — deci vizibilă ambelor părți,
+        # nu doar expeditorului.
+        "content_warning": doc.get("content_warning"),
     }
 
 
