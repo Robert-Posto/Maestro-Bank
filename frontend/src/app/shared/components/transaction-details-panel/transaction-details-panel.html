@@ -28,6 +28,12 @@
   </div>
 
   <dl class="details-panel__grid">
+    @if (transaction().description) {
+      <div class="details-panel__field details-panel__field--wide">
+        <dt>Descriere</dt>
+        <dd>{{ transaction().description }}</dd>
+      </div>
+    }
     <div class="details-panel__field">
       <dt>Cont / Card</dt>
       <dd>{{ accountLabel() }}</dd>

@@ -901,14 +901,6 @@
   padding: var(--mb-space-2) 0;
 }
 
-.copilot-agent__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  color: #7c3aed;
-  background: color-mix(in srgb, #7c3aed 14%, var(--mb-surface));
-}
-
 @media (max-width: 1100px) {
   .copilot-layout {
     grid-template-columns: 1fr;

@@ -145,13 +145,6 @@
   justify-content: center;
 }
 
-.transfer-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
-  gap: var(--mb-space-5);
-  align-items: start;
-}
-
 .transfer-card {
   width: 100%;
   max-width: 480px;
@@ -163,16 +156,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-4);
-}
-
-.transfer-layout .transfer-card {
-  max-width: none;
-}
-
-.transfer-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mb-space-5);
 }
 
 /* --- Form fields --- */
@@ -400,100 +383,18 @@
   border-radius: var(--mb-radius-sm);
 }
 
-/* --- Mini card visual (sidebar) --- */
-
-.transfer-mini-card {
-  position: relative;
-  border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-5);
-  background: linear-gradient(135deg, var(--mb-navy-800) 0%, var(--mb-navy-950) 100%);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: var(--mb-space-4);
-  box-shadow: var(--mb-shadow-lg);
-}
-
-.transfer-mini-card__top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.transfer-mini-card__brand {
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-semibold);
-  letter-spacing: -0.01em;
-}
-
-.transfer-mini-card__type {
-  font-size: var(--mb-font-size-xs);
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.transfer-mini-card__chip {
-  width: 34px;
-  height: 25px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #d9c98a, #b89a4a);
-}
-
-.transfer-mini-card__iban {
-  font-size: var(--mb-font-size-sm);
-  letter-spacing: 0.08em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  word-break: break-all;
-}
-
-.transfer-mini-card__bottom {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--mb-space-3);
-}
-
-.transfer-mini-card__label {
-  display: block;
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.transfer-mini-card__value {
-  display: block;
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-medium);
-  margin-top: 2px;
-}
-
-/* --- Side info card --- */
-
-.transfer-side-card {
-  background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-5);
-  box-shadow: var(--mb-shadow-xs);
-}
-
-.transfer-side-card__header {
+.transfer-safety-note {
   display: flex;
   align-items: center;
   gap: var(--mb-space-2);
-  margin-bottom: var(--mb-space-3);
-  font-size: var(--mb-font-size-sm);
-  color: var(--mb-blue-600);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+  line-height: var(--mb-line-height-base);
 }
 
-.transfer-explain-list {
-  margin: 0;
-  padding-left: var(--mb-space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--mb-space-2);
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-text-secondary);
-  line-height: var(--mb-line-height-base);
+.transfer-safety-note app-icon {
+  flex-shrink: 0;
+  color: var(--mb-blue-600);
 }
 
 /* --- Review step --- */
@@ -660,22 +561,6 @@
 }
 
 /* --- Responsive --- */
-
-@media (max-width: 1100px) {
-  .transfer-layout {
-    grid-template-columns: 1fr;
-  }
-  .transfer-layout .transfer-card {
-    max-width: 480px;
-    margin: 0 auto;
-    width: 100%;
-  }
-  .transfer-side {
-    max-width: 480px;
-    margin: 0 auto;
-    width: 100%;
-  }
-}
 
 @media (max-width: 640px) {
   .transfer-row {
