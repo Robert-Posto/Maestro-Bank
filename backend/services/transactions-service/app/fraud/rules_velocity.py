@@ -1,5 +1,6 @@
-"""Familia "velocity" (VEL-01, VEL-02, VEL-05 — VEL-03/VEL-04 excluse din
-Faza 1, vezi planul) — pure, vezi rules_amount.py pentru convenția generală.
+"""Familia "velocity" (VEL-01, VEL-02, VEL-03, VEL-05 — VEL-04 rămâne
+exclusă, are nevoie de tracking al încercărilor de login eșuate, care nu
+există încă) — pure, vezi rules_amount.py pentru convenția generală.
 """
 
 from datetime import timedelta
@@ -48,6 +49,23 @@ def check_vel_02(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None
             "daily_average_minor": round(daily_average),
             "multiplier_used": ruleset.vel02_multiplier,
         },
+    )
+
+
+def check_vel_03(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
+    """>= 3 beneficiari NOI (niciodată plătiți înainte de fereastra
+    curentă) în 60 min — diversificare bruscă, distinctă de VEL-01 (volum
+    brut, orice beneficiar) și VEL-05 (escaladare către UN SINGUR
+    beneficiar)."""
+    count = ctx.window.new_beneficiaries_last_60min
+    if count < ruleset.vel03_min_new_beneficiaries:
+        return None
+    return RuleOutcome(
+        rule_id="VEL-03",
+        family="velocity",
+        weight=ruleset.vel03_weight,
+        contributes_to_score=True,
+        values={"new_beneficiaries_last_60min": count, "threshold": ruleset.vel03_min_new_beneficiaries},
     )
 
 

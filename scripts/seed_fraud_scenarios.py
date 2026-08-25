@@ -15,7 +15,7 @@ Creează:
   - 10 useri "baseline": user + cont RON + card + ~40-60 tranzacții de
     cheltuieli, distribuite pe 60 de zile, cu categorii/sume realiste —
     suficient cât să dea un cohort baseline (percentile globale) cu sens.
-  - 8 useri "scenariu": fiecare reproduce UN tipar clar din catalog (vezi
+  - 10 useri "scenariu": fiecare reproduce UN tipar clar din catalog (vezi
     SCENARIOS mai jos), cu istoric propriu STABILIT (>=20 tranzacții, ca să
     nu cadă în cold start din greșeală — exceptând scenariul "dormant",
     unde cold start / inactivitatea e CHIAR punctul testat).
@@ -424,6 +424,30 @@ async def scenario_mule_sender(client, tokens, user_ctx, mule_target_ctx) -> dic
     return {"key": user_ctx["key"], "scenario": "tipar mulă (BEN-05)", "trigger": result}
 
 
+async def scenario_new_beneficiary_burst(client, tokens, user_ctx, dest_ctxs) -> dict:
+    """VEL-03: 3 transferuri mici, către 3 beneficiari DIFERIȚI, niciodată
+    plătiți înainte, rapid — sub pragul VEL-01 (>5/10min)."""
+    results = []
+    for i, dest_ctx in enumerate(dest_ctxs):
+        result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], 4_000 + i * 500, f"Plată {i+1}", "other")
+        results.append(result)
+    return {"key": user_ctx["key"], "scenario": "beneficiari noi (VEL-03)", "trigger": results[-1], "all_triggers": results}
+
+
+async def scenario_smurfing(client, tokens, user_ctx, dest_ctx) -> dict:
+    """STR-01: 3 transferuri, sume DIFERITE (evită STR-02) și
+    NEcrescătoare (evită VEL-05), toate în banda 90-99% din pragul de
+    "raportare" (implicit 5.000.000 bani = 50.000 RON — vezi
+    ruleset_config.py). Userul ăsta are un sold inițial mult mai mare
+    decât restul (vezi seed()), ca sumele mari să NU declanșeze și
+    AMT-03/AMT-04 incidental."""
+    results = []
+    for amount_minor in (4_700_000, 4_650_000, 4_800_000):
+        result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], amount_minor, "Transfer", "other")
+        results.append(result)
+    return {"key": user_ctx["key"], "scenario": "smurfing (STR-01)", "trigger": results[-1], "all_triggers": results}
+
+
 # --------------------------------------------------------------------------
 # Orchestrare
 # --------------------------------------------------------------------------
@@ -489,15 +513,25 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
         ("scenario-structuring", "Structuring", "Scenario"),
         ("scenario-passthrough", "Passthrough", "Scenario"),
         ("scenario-mulesender", "MuleSender", "Scenario"),
+        ("scenario-benfanout", "BenFanout", "Scenario"),
+        ("scenario-smurfing", "Smurfing", "Scenario"),
     ]
     scenario_users: dict[str, dict] = {}
     for key, first_name, last_name in scenario_specs:
         scenario_users[key] = await create_scenario_user(db_auth, db_accounts, key, first_name, last_name, password_hash, window_start)
 
-    # drain/velocity/escalating/structuring/passthrough/mulesender: istoric NORMAL, RECENT
-    for key in ["scenario-drain", "scenario-velocity", "scenario-escalating", "scenario-structuring", "scenario-passthrough", "scenario-mulesender"]:
+    # drain/velocity/escalating/structuring/passthrough/mulesender/benfanout: istoric NORMAL, RECENT
+    for key in [
+        "scenario-drain", "scenario-velocity", "scenario-escalating", "scenario-structuring",
+        "scenario-passthrough", "scenario-mulesender", "scenario-benfanout",
+    ]:
         user_ctx = scenario_users[key]
         generate_spending_history(ledger, user_ctx, merchant_accounts, opening_ctx, 20_000.0, window_start, now, 30)
+
+    # smurfing: sold inițial MULT mai mare — sumele de 45-48k RON din
+    # scenario_smurfing nu trebuie să declanșeze incidental AMT-03/AMT-04
+    # (vezi docstring-ul acelei funcții).
+    generate_spending_history(ledger, scenario_users["scenario-smurfing"], merchant_accounts, opening_ctx, 200_000.0, window_start, now, 30)
 
     # newcat: istoric STRICT în 2 categorii (groceries, transport) — ca
     # "entertainment" să fie garantat nou la declanșator
@@ -553,6 +587,10 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
         fresh_dest_4 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-4", "Beneficiar Nou 4", now)
         fresh_dest_5 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-5", "Beneficiar Nou 5", now)
         fresh_dest_6 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-6", "Beneficiar Nou 6", now)
+        fresh_dest_7 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-7", "Beneficiar Nou 7", now)
+        fresh_dest_8 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-8", "Beneficiar Nou 8", now)
+        fresh_dest_9 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-9", "Beneficiar Nou 9", now)
+        smurfing_dest = await create_pseudo_account(db_accounts, "fraud-sim-smurfing-dest", "Beneficiar Smurfing", now)
 
         scenario_results.append(await scenario_drain(http_client, tokens, drain_ctx, fresh_dest_1))
         scenario_results.append(
@@ -566,6 +604,10 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
         )
         scenario_results.append(await scenario_passthrough(http_client, tokens, passthrough_ctx, fresh_dest_5))
         scenario_results.append(await scenario_mule_sender(http_client, tokens, scenario_users["scenario-mulesender"], mule_target_ctx))
+        scenario_results.append(
+            await scenario_new_beneficiary_burst(http_client, tokens, scenario_users["scenario-benfanout"], [fresh_dest_7, fresh_dest_8, fresh_dest_9])
+        )
+        scenario_results.append(await scenario_smurfing(http_client, tokens, scenario_users["scenario-smurfing"], smurfing_dest))
 
         shadow_report = None
         try:

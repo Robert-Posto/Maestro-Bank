@@ -150,6 +150,7 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         # "Financial Guardian" despre o tranzacție la care n-a făcut
         # nimic neobișnuit. Vizibil DOAR pe partea de expeditor.
         "risk": doc.get("risk") if is_outgoing else None,
+        "content_warning": doc.get("content_warning"),
     }
 
 

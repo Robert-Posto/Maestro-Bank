@@ -8,6 +8,8 @@ NICIODATĂ ID-uri de regulă — analistul le vede deja separat, pe pagină."""
 
 RULE_ANALYST_HINTS: dict[str, str] = {
     "AMT-01": "Suma e mult peste ce cheltuiește de obicei clientul — merită să confirmi cu el scopul sumei; poate fi o achiziție mare planificată (electronice, o mașină) sau ceva ce nu-i aparține.",
+    "VEL-03": "Clientul a plătit mai mulți beneficiari noi, pe care nu i-a mai plătit niciodată, într-un timp foarte scurt — verifică dacă îi recunoaște pe toți sau dacă cineva îi controlează contul și îl golește către conturi diferite.",
+    "STR-01": "Mai multe transferuri, la scurt timp unul de altul, se opresc mereu chiar sub aceeași valoare rotundă — un tipar tipic pentru cineva care încearcă deliberat să evite o limită de raportare; tratează cu prioritate și întreabă clientul de ce sumele sunt mereu atât de apropiate.",
     "AMT-02": "Suma e neobișnuit de mare pentru genul ăsta de cheltuială la acest client — întreabă-l ce a cumpărat, ca să te asiguri că achiziția are sens pentru el.",
     "AMT-03": "Transferul folosește o parte foarte mare din soldul disponibil al contului — verifică dacă clientul știe cât de mult îi afectează asta restul fondurilor.",
     "AMT-04": "Practic golește contul clientului — fie e o mutare planificată (ex. își mută banii în alt cont al lui), fie altcineva controlează contul; confirmă direct cu el.",

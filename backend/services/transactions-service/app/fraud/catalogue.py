@@ -1,4 +1,4 @@
-"""Registrul FIX al celor 18 reguli din Faza 1.
+"""Registrul FIX al celor 20 de reguli implementate.
 
 Ordinea de aici e ordinea de EVALUARE (irelevantă pentru scor, care
 grupează pe familie și sortează descrescător după greutate — vezi
@@ -14,9 +14,9 @@ from app.fraud.rules_amount import check_amt_01, check_amt_02, check_amt_03, che
 from app.fraud.rules_behaviour import check_beh_01, check_beh_02, check_beh_03
 from app.fraud.rules_beneficiary import check_ben_01, check_ben_03, check_ben_05
 from app.fraud.rules_device import check_dev_03
-from app.fraud.rules_structuring import check_str_02
+from app.fraud.rules_structuring import check_str_01, check_str_02
 from app.fraud.rules_temporal import check_time_01, check_time_02
-from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_05
+from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_03, check_vel_05
 
 CheckFn = Callable[[RuleContext, RulesetConfig], RuleOutcome | None]
 
@@ -35,6 +35,7 @@ RULES: tuple[RuleSpec, ...] = (
     RuleSpec("AMT-05", check_amt_05),
     RuleSpec("VEL-01", check_vel_01),
     RuleSpec("VEL-02", check_vel_02),
+    RuleSpec("VEL-03", check_vel_03),
     RuleSpec("VEL-05", check_vel_05),
     RuleSpec("BEN-01", check_ben_01),
     RuleSpec("BEN-03", check_ben_03),
@@ -45,5 +46,6 @@ RULES: tuple[RuleSpec, ...] = (
     RuleSpec("BEH-01", check_beh_01),
     RuleSpec("BEH-02", check_beh_02),
     RuleSpec("BEH-03", check_beh_03),
+    RuleSpec("STR-01", check_str_01),
     RuleSpec("STR-02", check_str_02),
 )
