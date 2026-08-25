@@ -13,28 +13,60 @@
   align-items: start;
 }
 
-/* --- Chat --- */
-
+/* --- Chat ---
+   Înălțime FIXĂ, NICIODATĂ recalculată — vezi copilot.css::.copilot-chat
+   pentru raționamentul complet (aceeași idee, identic aplicată aici). */
 .support-chat {
   display: flex;
   flex-direction: column;
-  min-height: 680px;
+  height: 720px;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-sm);
+  overflow: hidden;
 }
 
 .support-chat__messages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-5);
-  padding: 0 0 var(--mb-space-5);
+  padding: var(--mb-space-5);
+  background: var(--mb-surface-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-chat__messages {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes support-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-chat__message-row {
+    animation: none;
+  }
 }
 
 .support-chat__message-row {
   display: flex;
   align-items: flex-start;
   gap: var(--mb-space-3);
+  animation: support-message-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .support-chat__message-row--user {
@@ -533,8 +565,9 @@
    MaestroAssistent (vezi features/copilot/copilot.css::.copilot-welcome),
    doar cu identitatea Support Agent (icon, text) și sugestiile din FAQ. */
 
+/* Starea goală rămâne compactă, nu întinsă la cei 720px fixați mai sus. */
 .support-chat--empty {
-  min-height: 0;
+  height: auto;
 }
 
 .support-chat--empty .support-chat__messages {
@@ -681,10 +714,17 @@
 
 /* --- Rail lateral: agent, solicitări + FAQ --- */
 
+/* Aceeași problemă ca la MaestroAssistent (vezi copilot.css::.copilot-side)
+   — .support-layout are align-items: start, deci rândul de grid = maximul
+   dintre .support-chat (înălțime fixă) și .support-sidebar; fără o limită
+   și aici, sidebar-ul (mai înalt exact când sosesc carduri de context noi)
+   putea împinge toată pagina mai jos decât viewport-ul. */
 .support-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-4);
+  max-height: 720px;
+  overflow-y: auto;
 }
 
 .support-panel {
@@ -776,6 +816,7 @@
     min-height: 540px;
   }
 }
+
 
 @media (max-width: 640px) {
   .support-chat__message-row--user {

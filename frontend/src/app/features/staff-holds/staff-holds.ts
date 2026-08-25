@@ -17,6 +17,31 @@ import { extractErrorMessage } from '../../shared/error-utils';
 
 type PendingAction = { hold: StaffHoldView; kind: 'approve' | 'reject' };
 
+/** Explicații pentru codurile de regulă (vezi backend
+ * app/fraud/catalogue.py — cele 18 reguli fixe, Faza 1). Personalul vede
+ * doar codul pe rând (ex. "AMT-04"); tooltip-ul la hover explică ce a
+ * declanșat-o, fără să caute în cod. */
+const FRAUD_RULE_DESCRIPTIONS: Record<string, string> = {
+  'AMT-01': 'Sumă de peste 2x cât transferă de obicei acest client (comparat cu ultimele 90 de zile).',
+  'AMT-02': 'Sumă de peste 4x mediana categoriei respective pentru acest client (ultimele 90 de zile).',
+  'AMT-03': 'Sumă de peste 70% din soldul disponibil al clientului.',
+  'AMT-04': 'Sumă de peste 98% din soldul disponibil — practic golește contul.',
+  'AMT-05': 'Primul transfer mare (5x media) al unui client cu istoric scurt (sub 20 de tranzacții).',
+  'VEL-01': 'Peste 5 tranzacții în ultimele 10 minute.',
+  'VEL-02': 'Suma cumulată în ultima oră depășește de 3x media zilnică a clientului.',
+  'VEL-05': 'Sume tot mai mari trimise către ACELAȘI beneficiar în 30 de minute (tipar de "testare" înainte de golire de cont).',
+  'BEN-01': 'Prima plată vreodată către acest beneficiar.',
+  'BEN-03': 'Țara IBAN-ului destinație nu apare în istoricul clientului.',
+  'BEN-05': 'Beneficiarul a primit bani de la 5+ expeditori diferiți în ultimele 24h (posibil cont-mulă).',
+  'TIME-01': 'Ora tranzacției e în afara intervalului obișnuit de activitate al clientului.',
+  'TIME-02': 'Prima activitate a clientului după peste 90 de zile de inactivitate.',
+  'DEV-03': 'Un passkey nou a fost înregistrat pe cont în ultimele 60 de minute.',
+  'BEH-01': 'Categorie de cheltuială pe care acest client n-a mai folosit-o niciodată.',
+  'BEH-02': 'Categorie folosită în mai puțin de 5% din istoricul clientului.',
+  'BEH-03': 'Bani primiți urmați de o retragere aproape egală în maxim 2 ore (posibil pass-through).',
+  'STR-02': 'Aceeași sumă exactă trimisă către 3+ beneficiari diferiți în 60 de minute (posibilă structurare).',
+};
+
 /**
  * Personal — reținerile aflate în așteptare (scor >= prag "hold" — vezi
  * backend app/holds.py). Fiecare rând poartă datele de contact ale
@@ -62,6 +87,10 @@ export class StaffHolds implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  protected ruleDescription(ruleId: string): string {
+    return FRAUD_RULE_DESCRIPTIONS[ruleId] ?? 'Regulă de fraudă fără descriere înregistrată.';
   }
 
   protected scoreTone(score: number | null): BadgeTone {

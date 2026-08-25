@@ -14,7 +14,29 @@
 }
 
 .sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
   padding: 0 var(--mb-space-2) var(--mb-space-6);
+}
+
+/* Static — NU pulsează (vezi route-loader.ts pentru varianta care
+   pulsează, la încărcare de pagină). Fundal deschis, la fel ca
+   route-loader__tile: partea navy a logo-ului e invizibilă pe fundalul
+   navy al sidebar-ului fără o plăcuță de contrast dedesubt. */
+.sidebar__brand-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--mb-text-on-navy);
+}
+
+.sidebar__brand-mark img {
+  width: 22px;
+  height: auto;
 }
 
 .sidebar__brand-name {
@@ -44,6 +66,9 @@
 }
 
 .sidebar__group-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   padding: 0 var(--mb-space-3) var(--mb-space-1);
   color: var(--mb-navy-text-faint);
   font-size: 0.68rem;
@@ -52,21 +77,27 @@
   text-transform: uppercase;
 }
 
-/* Zonă întreagă evidențiată (ex. "Asistenți AI") — un container tinted în
-   jurul ÎNTREGULUI grup (etichetă + toate link-urile), nu doar un singur
-   rând (asta arăta inconsecvent — vezi sidebar__link--accent, eliminat).
-   Fundal translucid albastru-violet peste gradientul navy al sidebar-ului
-   — suficient de contrastant ca zona să iasă în evidență dintr-o privire,
-   fără să șteargă contrastul text/fundal al link-urilor din interior. */
-.sidebar__group--highlight {
-  padding: var(--mb-space-3) var(--mb-space-2);
-  border-radius: var(--mb-radius-md);
-  background: linear-gradient(165deg, rgba(94, 124, 255, 0.18), rgba(168, 116, 255, 0.1));
-  border: 1px solid rgba(158, 150, 255, 0.32);
+/* "Segmentare" pentru Asistenți AI, dar CONSECVENTĂ cu restul sidebar-ului
+   — nu o cutie separată cu propriul fundal/padding (asta arăta ciudat, un
+   element străin față de restul, care sunt toate doar linie-divizor +
+   etichetă). Folosim exact același mecanism ca oricare alt grup
+   (.sidebar__group + .sidebar__group, divizor sus + etichetă) — doar mai
+   accentuat (divizor mai gros/saturat, etichetă + iconiță colorate) ca
+   zona să iasă clar în evidență ca fiind despre agenți AI, fără să
+   introducă un pattern vizual nou. Specificitate egală cu ".sidebar__group
+   + .sidebar__group" (2 clase) ca să câștige cascada indiferent de ordinea
+   din fișier. */
+.sidebar__group + .sidebar__group.sidebar__group--highlight {
+  border-top-width: 2px;
+  border-top-color: rgba(110, 138, 255, 0.55);
 }
 
 .sidebar__group--highlight .sidebar__group-label {
-  color: #c9d1ff;
+  color: #c2caff;
+}
+
+.sidebar__group--highlight .sidebar__group-label app-icon {
+  color: #8fa2ff;
 }
 
 .sidebar__link {
@@ -107,38 +138,12 @@
   display: flex;
 }
 
-/* Clasă dedicată (NU un selector generic "span") — un badge e și el un
-   <span>, iar o regulă generică ar câștiga în fața lui .sidebar__link-badge
-   (specificitate egală, dar declarată mai devreme) și i-ar fura din spațiul
-   flex, comprimând eticheta AI ca să încapă un badge care oricum nu are
-   nevoie de el. Exact bug-ul care făcea "MaestroAgent" ilizibil. */
 .sidebar__link-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sidebar__link-badge {
-  flex: 0 0 auto;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--mb-radius-pill);
-  /* Userul a cerut eliminarea highlight-ului de pe TOT rândul (gradient +
-     border pe .sidebar__link--accent, eliminat) — dar a vrut păstrată
-     culoarea care marchează "e AI" undeva. Insigna e singurul loc rămas
-     pentru asta: gradient albastru-violet solid, fără shimmer/animație
-     (mișcarea era parte din ce arăta "ciudat"), doar pe eticheta mică, nu
-     pe rândul întreg. */
-  background: linear-gradient(120deg, #5e7cff, #a874ff);
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: var(--mb-font-weight-semibold);
-  letter-spacing: 0.02em;
-}
-
-.sidebar__link--active .sidebar__link-badge {
-  background: linear-gradient(120deg, #7c93ff, #bd94ff);
 }
 
 /* Cascadă la încărcarea sidebar-ului — fiecare link intră puțin decalat
@@ -163,8 +168,7 @@
 .sidebar__link:nth-of-type(5) { animation-delay: 240ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar__link,
-  .sidebar__link-badge {
+  .sidebar__link {
     animation: none;
   }
 }

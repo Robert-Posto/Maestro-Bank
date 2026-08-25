@@ -1,8 +1,22 @@
+/* Stivuite, NU una lângă alta — un client are de obicei puține conturi
+   (1-4) dar poate avea până la 25 de tranzacții recente; una lângă alta
+   cu align-items: start, panoul de Conturi rămânea scurt sus, iar cel de
+   Tranzacții se întindea singur mult mai jos pe partea dreaptă — arăta
+   dezechilibrat/ciudat. Stivuit, fiecare panou ia lățimea completă și
+   propria înălțime naturală. */
 .staff-customer {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--mb-space-5);
-  align-items: start;
+}
+
+/* Conturile puține nu au nevoie de o listă verticală lungă — le așezăm
+   într-un rând care se adaptează, la fel ca pe pagina Conturi a clientului
+   (vezi features/accounts/accounts.css). */
+.staff-customer__accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--mb-space-3);
 }
 
 .staff-customer__panel {
@@ -42,8 +56,33 @@
   border-top: 1px solid var(--mb-border);
 }
 
-@media (max-width: 900px) {
-  .staff-customer {
+@media (max-width: 640px) {
+  .staff-customer__accounts-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Backdrop propriu pentru detaliile tranzacției — NU app-modal, care are
+   propriul header cu titlu + ×; TransactionDetailsPanel are deja unul al
+   lui (gândit pentru folosire inline, ca sidebar sticky, în layout-ul
+   split de pe pagina Tranzacții a clientului — vezi transaction-details-
+   panel.css). Îmbrăcat în app-modal, ar fi ieșit un header dublu. Aici
+   doar centrăm cardul lui propriu peste un fundal, la fel vizual ca
+   app-modal, fără să-i mai adăugăm un al doilea header. */
+.staff-customer__details-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 38, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: var(--mb-space-4);
+}
+
+.staff-customer__details-dialog {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
 }

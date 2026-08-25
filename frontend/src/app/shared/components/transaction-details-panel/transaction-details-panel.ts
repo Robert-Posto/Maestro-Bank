@@ -63,6 +63,10 @@ export class TransactionDetailsPanel {
   readonly recognizing = input(false);
   readonly reporting = input(false);
   readonly cancellingHold = input(false);
+  /** Vedere READ-ONLY (personal, în staff-customer — vezi task-ul) — ascunde
+   * acțiunile de scriere (anulare hold, recunoaște, raportează) și CTA-ul
+   * de contact suport, care n-au sens pe contul altui user. */
+  readonly readonly = input(false);
 
   readonly closed = output<void>();
   readonly recognize = output<void>();

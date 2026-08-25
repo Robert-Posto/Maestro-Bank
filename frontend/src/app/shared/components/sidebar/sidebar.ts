@@ -7,8 +7,6 @@ interface NavItem {
   label: string;
   route: string;
   icon: string;
-  /** Insignă mică opțională lângă etichetă (ex. "AI") — vezi sidebar.css::sidebar__link-badge. */
-  badge?: string;
 }
 
 interface NavGroup {
@@ -59,8 +57,11 @@ const NAV_GROUPS: NavGroup[] = [
       // de navigare, ca oricare alta — NU mai e un card promo în footer.
       // Fără tratament vizual distinct (gradient/border/glow) — userul l-a
       // vrut eliminat, arăta ca un element rupt/inconsecvent față de restul
-      // sidebar-ului; insigna "AI" rămâne, ca simplă etichetă informativă.
-      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot', badge: 'AI' },
+      // sidebar-ului. Fără insignă "AI" — Support e la fel de mult un
+      // agent AI și nu are una, deci ar fi inconsecvent să aibă doar
+      // MaestroAgent; grupul ("Asistenți AI") spune deja asta o dată,
+      // pentru amândouă, nu are nevoie s-o repete per-element.
+      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot' },
       { label: 'Support', route: '/app/support', icon: 'support' },
     ],
   },

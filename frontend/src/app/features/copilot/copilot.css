@@ -5,13 +5,17 @@
   align-items: start;
 }
 
-/* --- Chat --- */
-
+/* --- Chat ---
+   Înălțime FIXĂ, într-un singur loc, NICIODATĂ recalculată — nici din
+   viewport, nici din conținut. Am încercat variante "exacte" (100vh minus
+   diverse tokenuri) — tot arătau instabil, pagina/cutia tot "se mișcau".
+   O valoare statică e garantat stabilă: cutia e mereu la fel, indiferent
+   de conversație. Dacă pe un ecran mic pagina trebuie să deruleze puțin ca
+   să vezi tot chat-ul, e un compromis acceptat — mai bine decât mișcare. */
 .copilot-chat {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 620px;
+  height: 720px;
   overflow: hidden;
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-lg);
@@ -23,11 +27,18 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-6);
   padding: var(--mb-space-6);
   background: var(--mb-surface-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-chat__messages {
+    scroll-behavior: auto;
+  }
 }
 
 .copilot-suggestions {
@@ -61,6 +72,24 @@
   display: flex;
   align-items: flex-start;
   gap: var(--mb-space-3);
+  animation: copilot-message-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes copilot-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-message-row {
+    animation: none;
+  }
 }
 
 .copilot-message-row--user {
@@ -478,10 +507,24 @@
 
 /* --- Sidebar --- */
 
+/* Coloana din grid nu se "întinde" (.copilot-layout are align-items:
+   start), deci înălțimea RÂNDULUI de grid = maximul dintre .copilot-chat
+   (înălțime 100%, vezi mai jos) și .copilot-side. Fără o limită și aici,
+   .copilot-side (care devine mai înalt exact când sosește un răspuns —
+   apare grila de context financiar) putea împinge rândul, deci pagina
+   întreagă, mai sus decât viewport-ul. max-height: 100% se raportează la
+   înălțimea DEFINITĂ a .copilot-layout (vezi .copilot-page mai sus) — cu
+   scroll intern propriu dacă vreodată conținutul nu încape. */
+/* max-height fix, IDENTIC cu .copilot-chat — dacă panoul de context devine
+   mai înalt (apare grila de context financiar la primul răspuns), n-are
+   voie să împingă rândul de grid, deci pagina, mai jos. Scroll intern
+   propriu dacă vreodată conținutul nu încape. */
 .copilot-side {
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-4);
+  max-height: 720px;
+  overflow-y: auto;
 }
 
 .copilot-side-card {
@@ -585,9 +628,11 @@
   }
 }
 
-/* Compact, intentional initial state: keeps the composer above the fold. */
-.copilot-chat--empty {
-  min-height: 0;
+/* Compact, intentional initial state: keeps the composer above the fold —
+   starea goală (doar mesajul de bun venit) rămâne compactă, nu întinsă la
+   cei 720px fixați mai sus (vezi .copilot-chat). */
+.copilot-chat.copilot-chat--empty {
+  height: auto;
 }
 
 .copilot-chat--empty .copilot-chat__messages {
@@ -765,19 +810,9 @@
   gap: var(--mb-space-6);
 }
 
-.copilot-chat {
-  min-height: 680px;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 .copilot-chat__messages {
   gap: var(--mb-space-5);
-  padding: 0 0 var(--mb-space-5);
-  background: transparent;
+  padding: var(--mb-space-5);
 }
 
 .copilot-message-row--user {

@@ -40,13 +40,19 @@ export type StatTrend = 'up' | 'down' | 'neutral';
         min-width: 0;
       }
       /* Pentru situația în care mai multe stat-card-uri stau într-un rând
-         unificat (o singură cutie cu divizoare), nu fiecare în cutia lui —
-         wrapper-ul din pagina consumatoare oferă fundalul/bordura/shadow-ul. */
+         unificat (o singură cutie cu divizoare) — wrapper-ul din pagina
+         consumatoare oferă bordura/radius-ul/shadow-ul exterior (vezi
+         spending-forecast.css::.sf-stats). Fundalul NU se elimină aici —
+         wrapper-ul folosește trucul clasic "gap: 1px + background pe
+         culoarea bordurii" ca gap-ul să devină un divizor subțire între
+         carduri; asta cere ca fiecare card să rămână OPAC (moștenește
+         var(--mb-surface) de la .stat-card mai sus), altfel gri-ul
+         wrapper-ului se vede peste tot, nu doar prin gap — exact bug-ul
+         raportat ("panelul de sus e gri și arată ciudat"). */
       .stat-card--flush {
         border: none;
         border-radius: 0;
         box-shadow: none;
-        background: transparent;
       }
       .stat-card__row {
         display: flex;
