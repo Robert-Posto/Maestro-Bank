@@ -18,10 +18,48 @@ import pytest
 
 from app.models.support import ChatRequest
 from app.services import support_service
-from app.tools import support_cards_tools, support_ticket_tools, support_transactions_tools
+from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
 from conftest import FakeLLMClient, FakeMessage, make_tool_call
 
 pytestmark = pytest.mark.asyncio
+
+
+# --- Conturi (toate) ---------------------------------------------------------
+
+
+async def test_get_my_accounts_populates_accounts_context(monkeypatch, support_auth_header: dict[str, str]):
+    """"Am cont de economii?" -> GPT cheamă get_my_accounts (NU doar
+    get_my_account, care întoarce STRICT contul curent) — verifică datele
+    REALE ale userului, nu presupune din conversație (vezi system prompt)."""
+
+    async def fake_get_my_accounts(authorization):
+        return [
+            {"id": "acc1", "iban": "RO1", "currency": "RON", "balance_minor": 100000, "status": "active", "account_type": "current"},
+            {"id": "acc2", "iban": "RO2", "currency": "RON", "balance_minor": 50000, "status": "active", "account_type": "savings"},
+        ]
+
+    monkeypatch.setattr(support_accounts_tools, "get_my_accounts", fake_get_my_accounts)
+
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(tool_calls=[make_tool_call("get_my_accounts", {})]),
+            FakeMessage(
+                tool_calls=[
+                    make_tool_call(
+                        "respond_to_user",
+                        {"answer": "Da, ai și un cont de economii, pe lângă cel curent.", "intent": "account_help"},
+                    )
+                ]
+            ),
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Am cont de economii?"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.context["accounts"][1]["account_type"] == "savings"
+    assert "economii" in response.answer.lower()
 
 
 # --- Card status -----------------------------------------------------------
@@ -360,3 +398,40 @@ async def test_non_navigate_action_has_no_route(support_auth_header: dict[str, s
 
     assert response.recommended_actions[0].type == "ask_followup"
     assert response.recommended_actions[0].route is None
+
+
+# --- Istoric conversație (persistat acum în sessionStorage, vezi frontend) --
+
+
+async def test_long_history_is_truncated_before_reaching_the_model(support_auth_header: dict[str, str]):
+    """Frontend-ul persistă acum conversația între vizite (sessionStorage) —
+    istoricul poate crește mult în timp. Verificăm plafonarea determinist(ă)
+    (vezi app/agents/support.py::_MAX_HISTORY_MESSAGES), NU lăsăm tot
+    istoricul să ajungă la GPT indiferent cât de lung e."""
+    from app.models.support import ChatMessage as SupportChatMessage
+
+    long_history = [
+        SupportChatMessage(role="user" if i % 2 == 0 else "assistant", content=f"mesaj {i}") for i in range(30)
+    ]
+
+    fake_llm = FakeLLMClient(
+        [FakeMessage(tool_calls=[make_tool_call("respond_to_user", {"answer": "Ok.", "intent": "unknown"})])]
+    )
+
+    await support_service.handle_chat(
+        ChatRequest(message="Ultima întrebare", history=long_history),
+        support_auth_header["Authorization"],
+        llm_client=fake_llm,
+    )
+
+    # NOTĂ: `fake_llm.calls[0]` e o REFERINȚĂ la lista de mesaje, nu o
+    # copie — orchestratorul o mai mută după acest apel (adaugă echo-ul
+    # assistant/tool-call, vezi app/agents/support.py), deci nu numărăm
+    # lungimea totală (fragilă), ci strict câte din istoricul original
+    # ("mesaj N") au ajuns la model.
+    sent_messages = fake_llm.calls[0]
+    history_entries_sent = [m for m in sent_messages if isinstance(m.get("content"), str) and m["content"].startswith("mesaj ")]
+    assert len(history_entries_sent) == 12
+    # Cele mai RECENTE 12 (18..29), nu primele.
+    assert history_entries_sent[0]["content"] == "mesaj 18"
+    assert history_entries_sent[-1]["content"] == "mesaj 29"

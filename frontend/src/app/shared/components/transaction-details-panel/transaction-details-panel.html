@@ -115,6 +115,13 @@
     </div>
   }
 
+  @if (transaction().content_warning; as contentWarning) {
+    <div class="details-panel__content-warning">
+      <app-icon name="info" [size]="16" />
+      <p>{{ contentWarning }}</p>
+    </div>
+  }
+
   <div class="details-panel__support">
     <p>Ai nevoie de ajutor cu această tranzacție?</p>
     <button type="button" class="details-panel__support-link" (click)="contactSupport.emit()">

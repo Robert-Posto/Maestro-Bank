@@ -392,6 +392,27 @@
   line-height: var(--mb-line-height-base);
 }
 
+/* Avertisment de conținut (vezi app/content_screening.py) — informativ,
+   transferul TOT a reușit (ecranul ăsta e "success"), NU e o eroare. */
+.transfer-content-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  margin-top: var(--mb-space-3);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
+  font-size: var(--mb-font-size-xs);
+  line-height: 1.5;
+  text-align: left;
+}
+
+.transfer-content-warning app-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .transfer-safety-note app-icon {
   flex-shrink: 0;
   color: var(--mb-blue-600);

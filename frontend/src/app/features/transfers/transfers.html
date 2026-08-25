@@ -93,6 +93,10 @@
         </label>
       </div>
 
+      @if (descriptionWarning(); as warning) {
+        <p class="transfer-content-warning"><app-icon name="info" [size]="15" /> {{ warning }}</p>
+      }
+
       <label class="transfer-checkbox">
         <input type="checkbox" [ngModel]="saveAsBeneficiary()" (ngModelChange)="saveAsBeneficiary.set($event)" name="saveBeneficiary" />
         <span class="transfer-checkbox__box"><app-icon name="check" [size]="11" /></span>
@@ -177,6 +181,9 @@
           <span class="transfer-success__iban">{{ tx.counterparty_iban }}</span>
         }
       </p>
+      @if (tx.content_warning) {
+        <p class="transfer-content-warning"><app-icon name="info" [size]="15" /> {{ tx.content_warning }}</p>
+      }
       <div class="transfer-success__actions">
         <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">Fă un nou transfer</app-action-button>
         <a routerLink="/app/transactions" class="transfer-success__link">Vezi în tranzacții ›</a>

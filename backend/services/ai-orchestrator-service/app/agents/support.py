@@ -27,6 +27,16 @@ from app.tools import support_accounts_tools, support_cards_tools, support_ticke
 
 logger = logging.getLogger("ai-orchestrator-service")
 
+# Serviciul e stateless între cereri HTTP — frontend-ul retrimite istoricul
+# la fiecare mesaj (acum persistat în sessionStorage, vezi
+# features/support/support.ts, deci poate crește mult în timp). Limită
+# defensivă aici, indiferent ce trimite clientul (vezi și
+# app/models/support.py::ChatRequest.history, max_length=40) — evită
+# context nemărginit (cost/latență), fără să taie coerența unei conversații
+# normale. Identic ca valoare cu Spending + Forecast Agent (vezi
+# app/agents/spending_forecast.py::_MAX_HISTORY_MESSAGES).
+_MAX_HISTORY_MESSAGES = 12
+
 
 class SupportLLMClient(Protocol):
     """Interfața minimă de care are nevoie bucla de mai jos — implementată
@@ -55,6 +65,7 @@ _default_llm_client = _ChatCompletionAdapter()
 
 _READ_TOOL_MODULES: dict[str, Any] = {
     "get_my_account": support_accounts_tools,
+    "get_my_accounts": support_accounts_tools,
     "get_my_cards": support_cards_tools,
     "get_card_status": support_cards_tools,
     "get_transaction_details": support_transactions_tools,
@@ -79,6 +90,7 @@ _CONTEXT_KEY_BY_TOOL: dict[str, str] = {
     "get_card_status": "card",
     "get_my_cards": "cards",
     "get_my_account": "account",
+    "get_my_accounts": "accounts",
     "get_my_support_tickets": "tickets",
 }
 
@@ -88,6 +100,19 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_my_account",
             "description": "Întoarce contul curent RON al userului autentificat (IBAN, sold, status).",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_my_accounts",
+            "description": (
+                "Întoarce TOATE conturile reale ale userului autentificat (curent + economii/depozit/"
+                "student, dacă are), fiecare cu `account_type`. Folosește ACEST tool (nu get_my_account) "
+                "pentru orice întrebare despre ce conturi are userul deja — ex. 'am cont de economii?', "
+                "'ce conturi am', 'am deschis un depozit?'."
+            ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -276,7 +301,7 @@ async def run_support_agent(
     Ridică `PendingConfirmationRequired` dacă modelul cere un tool de scriere.
     """
     messages: list[dict[str, Any]] = [{"role": "system", "content": SUPPORT_SYSTEM_PROMPT}]
-    messages.extend({"role": m.role, "content": m.content} for m in history)
+    messages.extend({"role": m.role, "content": m.content} for m in history[-_MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
 
     collected_context: dict[str, Any] = {}

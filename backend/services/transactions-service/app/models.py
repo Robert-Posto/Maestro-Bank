@@ -44,6 +44,20 @@ class TransferRequest(BaseModel):
         return normalized if normalized in TRANSACTION_CATEGORIES else "other"
 
 
+class DescriptionCheckRequest(BaseModel):
+    """POST /transactions/transfers/screen-description — verificare LIVE,
+    în timp ce userul scrie în câmpul de descriere (înainte de a trimite
+    efectiv transferul), vezi app/content_screening.py. Fără efecte
+    secundare — nu creează nimic, doar rulează același screening
+    determinist ca la crearea reală a transferului."""
+
+    description: str = Field(default="", max_length=140)
+
+
+class DescriptionCheckResponse(BaseModel):
+    warning: str | None = None
+
+
 class HoldInfoOut(BaseModel):
     """Prezent DOAR pe o tranzacție reținută (status="pending_review" sau
     care A FOST reținută) — vezi app/holds.py."""
@@ -89,6 +103,11 @@ class TransactionOut(BaseModel):
     created_at: datetime
     hold: HoldInfoOut | None = None
     risk: RiskOut | None = None
+    # Screening determinist al descrierii (termeni de terorism/violență —
+    # vezi app/content_screening.py), NEcondiționat de motorul de fraudă
+    # (app/fraud/) — un semnal complet separat. Informativ, NU blochează
+    # transferul (vezi service.py::create_transfer).
+    content_warning: str | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 

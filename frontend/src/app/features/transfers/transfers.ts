@@ -1,7 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 
 import {
   AccountView,
@@ -43,6 +45,7 @@ type MainTab = 'new' | 'scheduled';
 export class Transfers implements OnInit {
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryOptions: SelectOption[] = TRANSACTION_CATEGORIES.map((c) => ({
@@ -61,6 +64,13 @@ export class Transfers implements OnInit {
   protected readonly toIban = signal('');
   protected readonly amount = signal<number | null>(null);
   protected readonly description = signal('');
+  /** Avertisment LIVE (vezi app/content_screening.py din
+   * transactions-service) — actualizat pe măsură ce userul scrie în
+   * descriere, ÎNAINTE de a trimite transferul, nu doar după (vezi
+   * constructor, mai jos). null = fără avertisment (sau verificare încă
+   * în curs / eșuată — fail-open, nu blocăm formularul dacă backend-ul
+   * răspunde greu). */
+  protected readonly descriptionWarning = signal<string | null>(null);
   protected readonly category = signal('other');
   protected readonly saveBeneficiaryName = signal('');
   protected readonly saveAsBeneficiary = signal(false);
@@ -81,6 +91,28 @@ export class Transfers implements OnInit {
   protected readonly scheduleDescription = signal('');
   protected readonly scheduleFrequency = signal<ScheduleFrequency>('monthly');
   protected readonly scheduleSaving = signal(false);
+
+  constructor() {
+    // Verificare LIVE a descrierii, direct din câmpul de formular — nu
+    // după ce transferul e deja trimis (vezi feedback userului: "vreau sa
+    // mi apara in timp real verificarea... fix cand scriu in casuta").
+    // debounceTime + distinctUntilChanged: un apel per pauză de scris, nu
+    // unul per literă; switchMap anulează automat un apel în curs dacă
+    // userul mai scrie între timp (fără condiții de cursă pe răspunsuri
+    // vechi care ar sosi întârziat).
+    toObservable(this.description)
+      .pipe(
+        debounceTime(400),
+        distinctUntilChanged(),
+        switchMap((description) => {
+          const trimmed = description.trim();
+          if (!trimmed) return of({ warning: null });
+          return this.banking.screenTransferDescription(trimmed).pipe(catchError(() => of({ warning: null })));
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ warning }) => this.descriptionWarning.set(warning));
+  }
 
   ngOnInit(): void {
     this.loadingContext.set(true);
