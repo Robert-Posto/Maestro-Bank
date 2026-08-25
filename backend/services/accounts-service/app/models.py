@@ -144,11 +144,25 @@ class CardCreateRequest(BaseModel):
     din cont (vezi app/service.py::_PHYSICAL_CARD_FEE_MINOR). Cardurile de
     unică folosință ("is_one_time=True") sunt, ca la Revolut, DOAR virtuale
     — nu are sens un card fizic de unică folosință.
+
+    `pin` — ALES de user chiar la deschiderea cardului (ca la un card real
+    fizic emis de bancă), NU generat de sistem — vezi app/pin.py. Stocat
+    DOAR ca hash bcrypt (`pin_hash`, în app/service.py::create_card), NEVER
+    în clar. Folosit ulterior pentru POST /cards/{id}/reveal — vezi
+    CardRevealRequest mai jos.
     """
 
     design: CardDesign
     type: CardType = "virtual"
     is_one_time: bool = False
+    pin: str = Field(min_length=4, max_length=4)
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("PIN-ul trebuie să conțină exact 4 cifre.")
+        return value
 
     @field_validator("is_one_time")
     @classmethod
@@ -161,21 +175,26 @@ class CardCreateRequest(BaseModel):
 class CardRevealRequest(BaseModel):
     """POST /cards/{id}/reveal — necesită o reconfirmare a identității (nu
     doar JWT-ul) înainte de a dezvălui PAN/CVV — acțiune sensibilă, ca la
-    orice bancă reală. Exact UNA dintre cele două metode: fie parola, fie
-    un assertion WebAuthn (passkey) pentru challenge-ul de step-up deschis
-    în prealabil prin auth-service (POST /auth/webauthn/stepup/options).
+    orice bancă reală. Exact UNA dintre cele două metode: fie PIN-ul
+    cardului (ales la creare — vezi CardCreateRequest.pin), fie un
+    assertion WebAuthn (passkey) pentru challenge-ul de step-up deschis în
+    prealabil prin auth-service (POST /auth/webauthn/stepup/options).
+
+    ÎNAINTE folosea parola de cont — schimbat la cererea userului: detaliile
+    cardului ar trebui reconfirmate cu PIN-ul cardului (specific cardului),
+    nu cu parola contului (care deblochează orice, nu doar cardul ăsta).
     """
 
-    password: str | None = Field(default=None, min_length=1)
+    pin: str | None = Field(default=None, min_length=4, max_length=4)
     webauthn_challenge_id: str | None = None
     webauthn_assertion: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def _exactly_one_method(self) -> "CardRevealRequest":
-        has_password = self.password is not None
+        has_pin = self.pin is not None
         has_webauthn = self.webauthn_challenge_id is not None and self.webauthn_assertion is not None
-        if has_password == has_webauthn:
-            raise ValueError("Trimite fie parola, fie o confirmare biometrică — nu ambele sau niciuna.")
+        if has_pin == has_webauthn:
+            raise ValueError("Trimite fie PIN-ul cardului, fie o confirmare biometrică — nu ambele sau niciuna.")
         return self
 
 
