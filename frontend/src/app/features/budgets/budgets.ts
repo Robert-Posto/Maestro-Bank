@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
-import { Budget, BudgetPeriod, BudgetsService, Subscription } from '../../services/budgets.service';
+import { Budget, BudgetPeriod, BudgetsService, Subscription, SubscriptionSuggestion } from '../../services/budgets.service';
 import { SpendingAnalytics, TransactionsService } from '../../services/transactions.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -70,6 +70,8 @@ export class Budgets implements OnInit {
   protected readonly budgets = signal<Budget[]>([]);
   protected readonly subscriptions = signal<Subscription[]>([]);
   protected readonly spending = signal<SpendingAnalytics | null>(null);
+  protected readonly suggestions = signal<SubscriptionSuggestion[]>([]);
+  protected readonly acceptingSuggestion = signal<string | null>(null);
 
   protected readonly budgetsWithProgress = computed<BudgetWithProgress[]>(() => {
     const spendByCategory = new Map(this.spending()?.by_category.map((c) => [c.category, c.amount_minor]) ?? []);
@@ -122,6 +124,7 @@ export class Budgets implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadSuggestions();
   }
 
   private load(): void {
@@ -138,6 +141,16 @@ export class Budgets implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /** Separat de load() — cere istoricul de tranzacții cross-service, un
+   * apel în plus care poate eșua fără să blocheze restul paginii (nu e
+   * critic, e doar o sugestie). */
+  private loadSuggestions(): void {
+    this.budgetsApi.listSubscriptionSuggestions().subscribe({
+      next: (suggestions) => this.suggestions.set(suggestions),
+      error: () => this.suggestions.set([]),
     });
   }
 
@@ -242,6 +255,36 @@ export class Budgets implements OnInit {
           this.toast.error(extractErrorMessage(err, 'Nu am putut crea abonamentul.'));
         },
       });
+  }
+
+  protected acceptSuggestion(suggestion: SubscriptionSuggestion): void {
+    this.acceptingSuggestion.set(suggestion.name);
+    this.budgetsApi
+      .createSubscription({
+        name: suggestion.name,
+        amount_minor: suggestion.amount_minor,
+        billing_day: suggestion.billing_day,
+        currency: suggestion.currency,
+      })
+      .subscribe({
+        next: (sub) => {
+          this.subscriptions.update((list) => [sub, ...list]);
+          this.suggestions.update((list) => list.filter((s) => s.name !== suggestion.name));
+          this.acceptingSuggestion.set(null);
+          this.toast.success(`"${sub.name}" adăugat ca abonament.`);
+        },
+        error: (err) => {
+          this.acceptingSuggestion.set(null);
+          this.toast.error(extractErrorMessage(err, 'Nu am putut adăuga abonamentul.'));
+        },
+      });
+  }
+
+  /** Doar local, pentru sesiunea curentă — detecția e stateless, deci
+   * sugestia poate reapărea la un reload viitor; nu merită complexitatea
+   * unei liste de "respinse" persistate pentru un demo. */
+  protected dismissSuggestion(suggestion: SubscriptionSuggestion): void {
+    this.suggestions.update((list) => list.filter((s) => s.name !== suggestion.name));
   }
 
   protected toggleSubscriptionActive(sub: Subscription): void {

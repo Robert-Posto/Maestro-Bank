@@ -36,13 +36,13 @@ Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceea�
 | **nginx** | reverse proxy către Gateway | — | 8080 (expus) |
 | **gateway** | routing `/api/*` → microservicii, JWT, CORS, rate limiting, status agregat | — (doar ping) | 8000 (expus) |
 | **auth-service** | users, autentificare, JWT, hash parole (bcrypt), schimbare parolă, passkeys (WebAuthn), verificare email la onboarding, provizionare automată cont bancar | `auth_db` | 8001 |
-| **accounts-service** | conturi (curent + economii/depozit/student), IBAN demo, carduri virtuale demo + control card (freeze/settings/limite), beneficiari, pockets (obiective de economisire) | `accounts_db` | 8002 |
-| **transactions-service** | transferuri (inclusiv programate/recurente), istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
-| **budgets-service** | bugete pe categorie + abonamente/plăți recurente (CRUD complet) | `budgets_db` | 8004 |
+| **accounts-service** | conturi (curent + economii/depozit/student + eur/usd/gbp, pentru schimbul valutar real), IBAN demo, carduri virtuale demo + control card (freeze/settings/limite — vezi limitările de mai jos), beneficiari, pockets (obiective de economisire) | `accounts_db` | 8002 |
+| **transactions-service** | transferuri (inclusiv programate/recurente), screening determinist al descrierii (termeni asociați cu activități ilegale/violente), Financial Guardian (explicații LLM ale deciziilor motorului de fraudă), istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
+| **budgets-service** | bugete pe categorie + abonamente/plăți recurente (CRUD manual + detecție pasivă din istoricul de tranzacții) | `budgets_db` | 8004 |
 | **support-service** | tichete de suport + notificări persistente per user | `support_db` | 8005 |
-| **exchange-service** | motor de schimb valutar **DEMO** (curs/spread/comision simulate — NU integrare FX reală) | `exchange_db` | 8006 |
-| **verification-service** | verificare identitate la onboarding — compară poza buletinului cu un selfie live (DeepFace), apoi marchează userul verificat printr-un apel intern la `auth-service` | — (stateless) | 8007 |
-| **ai-orchestrator-service** | agentul "MaestroAgent" (Spending + Forecast) — chat peste Azure OpenAI (GPT-5-mini), cu tool-calling către celelalte servicii prin Gateway și un strat RAG (fallback local TF-IDF dacă nu sunt embeddings configurate) | — (stateless) | 8008 |
+| **exchange-service** | schimb valutar — curs REAL (feed oficial BNR), execuție REALĂ (mută solduri între contul RON și conturile pe valută eur/usd/gbp); spread-ul și comisionul rămân politică simulată MaestroBank | `exchange_db` | 8006 |
+| **verification-service** | verificare identitate la onboarding — compară poza buletinului cu un selfie live (DeepFace, model `ArcFace`), apoi marchează userul verificat printr-un apel intern la `auth-service` | — (stateless) | 8007 |
+| **ai-orchestrator-service** | găzduiește 2 agenți: "MaestroAgent" (Spending + Forecast) și "Support Agent" (întrebări despre cont/card/tranzacții/tichete) — ambii peste Azure OpenAI (GPT-5-mini), cu tool-calling către celelalte servicii prin Gateway și un strat RAG (fallback local TF-IDF dacă nu sunt embeddings configurate) | — (stateless) | 8008 |
 | **mongodb** | baza de date, comună serviciilor cu stare | — | 27018 (host) → 27017 (container) |
 
 Angular **nu** vorbește niciodată direct cu un microserviciu — trece mereu prin Nginx → Gateway.
@@ -91,9 +91,22 @@ După register, userul trece prin 3 ecrane (`/onboarding/verify-email` → `/onb
 
 Modelele DeepFace (~600MB total) se descarcă o singură dată, la pornirea containerului `verification-service` (`lifespan` din `main.py`, nu la prima cerere reală) — persistate într-un volum Docker dedicat (`verification_models`), ca să nu se redescarce la fiecare recreare a containerului.
 
-## MaestroAgent (AI Copilot)
+## MaestroAgent + Support Agent (AI, `ai-orchestrator-service`)
 
-`/app/copilot` — chat funcțional peste Azure OpenAI (deployment GPT-5-mini), specializat pe analiza cheltuielilor și forecast (`ai-orchestrator-service`). Agentul are tool-calling către `accounts`/`transactions`/`budgets` (prin Gateway, cu JWT-ul userului propagat — nu primește niciodată un `user_id` arbitrar) și un strat RAG minimal peste câteva fișiere de cunoștințe (`app/rag/knowledge/*.md`), cu fallback local (TF-IDF) dacă nu sunt configurate embeddings Azure. Fără credențiale Azure OpenAI setate, serviciul tot pornește (health check trece), dar orice cerere de chat întoarce `503`.
+Serviciul găzduiește 2 agenți separați, ambii peste Azure OpenAI (deployment GPT-5-mini), cu tool-calling propriu — niciunul nu primește vreodată un `user_id` arbitrar, doar JWT-ul userului curent, propagat prin Gateway:
+
+- **MaestroAgent** (`/app/copilot`) — analiza cheltuielilor și forecast de sold. Tool-calling către `accounts`/`transactions`/`budgets`, plus un strat RAG minimal peste `app/rag/knowledge/*.md` (fallback local TF-IDF dacă nu sunt configurate embeddings Azure).
+- **Support Agent** (`/app/support`) — răspunde despre cont/card/tranzacții/tichete, cu tool-calling propriu (`app/tools/support_*.py`) și un filtru determinist de moderare a mesajelor userului (`app/services/moderation_service.py`) — aceeași filozofie ca screening-ul de descrieri din `transactions-service`: listă de cuvinte-cheie, nu LLM, pentru rezultat instant și verificabil.
+
+Fără credențiale Azure OpenAI setate, serviciul tot pornește (health check trece), dar orice cerere de chat întoarce `503`.
+
+## Financial Guardian (explicații AI pentru rețineri de fraudă)
+
+Trăiește în `transactions-service/app/guardian/` — când motorul de fraudă (determinist, 18 reguli) reține un transfer pentru revizuire, Guardian generează ASINCRON, printr-un apel separat la Azure OpenAI, o explicație în limbaj natural pentru personal ("de ce a fost reținut acest transfer") și o frază discretă pentru client. E strict un strat de EXPLICAȚIE peste o decizie deja luată determinist — Guardian nu decide NICIODATĂ dacă un transfer se reține sau nu, doar explică o decizie existentă. Fără credențiale Azure OpenAI, motorul de fraudă funcționează identic (scor + reținere), doar explicația LLM lipsește (fallback pe un șablon static).
+
+## Consolă separată pentru personal (`/admin`)
+
+Un cont cu `role="staff"` (creat DOAR prin `scripts/create_staff_user.py`, niciodată prin înregistrare publică) nu ajunge NICIODATĂ pe `/app/*` — e redirecționat direct către `/admin`, o consolă complet separată (`AdminShell`), fără acces la vreun cont bancar personal. Acolo, personalul revizuiește rețineri de fraudă (aprobă/respinge, vede explicația Guardian) și poate deschide o vedere READ-ONLY a conturilor/tranzacțiilor unui client anume, pornind de la o reținere.
 
 ## JWT
 
@@ -184,9 +197,11 @@ Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `
 - **Rate limiting**: în memorie, per instanță de Gateway — nu se scalează orizontal fără o soluție distribuită.
 - **JWT în frontend**: ținut în `sessionStorage`, alegere de DEVELOPMENT, nu arhitectură de securitate pentru producție.
 - **IBAN demo**: cifrele de control sunt pseudo-aleatoare, NU calculate conform standardului real (MOD-97) — suficient pentru UI, nu valid ca IBAN real.
-- **Schimb valutar 100% demo**: `exchange-service` NU are nicio integrare FX reală — ratele sunt un dataset static de development (vezi `backend/services/exchange-service/app/config.py`). Confirmarea unui schimb NU mută fonduri reale între conturi (nu există conturi multi-valută încă) — doar înregistrează o simulare, clar marcată `is_demo: true`.
 - **Verificare identitate**: DeepFace compară efectiv fețele (nu e simulat), dar NU validează că documentul e un buletin real, nu e expirat, sau că datele extrase (nume, CNP) corespund — doar potrivirea facială e reală.
 - **Similaritate facială**: procentul afișat (`similarity_percent`) e derivat direct din distanța cosine întoarsă de DeepFace, NU o probabilitate calibrată statistic — util ca reper vizual, nu ca metrică de încredere formală.
+- **Setările de securitate ale cardului sunt cosmetice**: freeze, plăți online/contactless/ATM/internaționale, limită zilnică — toate se salvează real în bază și UI-ul reflectă corect starea, dar NIMIC nu le verifică vreodată înainte de a permite o operațiune (spre deosebire de "Coming soon" din secțiunea de mai jos, care sunt marcate explicit ca inerte, astea ARATĂ funcționale). Motivul structural: aplicația nu simulează un flux de "plată cu cardul la comerciant" — banii se mișcă doar prin transferuri IBAN-la-IBAN, deci n-are unde să existe un punct de aplicare a acestor reguli.
+- **Screening de conținut**: lista de termeni periculoși din descrierea unui transfer (`transactions-service/app/content_screening.py`) e o listă demonstrativă (câteva sute de rădăcini, RO+EN), NU conținutul complet al vreunei liste oficiale de sancțiuni/AML. Doar avertizează — transferul TOT trece.
+- **Detecție de abonamente**: euristică deterministă (grupare după descriere, sumă asemănătoare ±10%, cadență 20-40 zile) — NU e ML, poate rata pattern-uri neregulate sau poate cere 2+ apariții înainte să sugereze ceva nou.
 
 ## Ce lipsește față de planul complet (Cumpăna)
 

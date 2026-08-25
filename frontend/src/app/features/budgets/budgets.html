@@ -118,6 +118,37 @@
     </div>
   }
 } @else {
+  @if (suggestions().length > 0) {
+    <div class="suggestions-panel">
+      <div class="suggestions-panel__header">
+        <app-icon name="sparkles" [size]="16" />
+        <div>
+          <strong>Am detectat plăți recurente</strong>
+          <p>Pe baza istoricului tău de tranzacții — confirmă-le ca abonamente, ca să apară în calculele de buget și forecast.</p>
+        </div>
+      </div>
+      <div class="suggestions-panel__list">
+        @for (s of suggestions(); track s.name) {
+          <div class="suggestion-row">
+            <app-merchant-avatar [name]="s.name" [description]="s.name" category="subscriptions" />
+            <div class="suggestion-row__info">
+              <p class="suggestion-row__name">{{ s.name }}</p>
+              <p class="suggestion-row__meta">{{ s.occurrences }} plăți observate · în jur de ziua {{ s.billing_day }} a lunii</p>
+            </div>
+            <span class="suggestion-row__amount">{{ s.amount_minor | money: s.currency }}</span>
+            <div class="suggestion-row__actions">
+              <button type="button" class="suggestion-row__dismiss" title="Ignoră" (click)="dismissSuggestion(s)">
+                <app-icon name="close" [size]="14" />
+              </button>
+              <app-action-button variant="secondary" [loading]="acceptingSuggestion() === s.name" (pressed)="acceptSuggestion(s)">
+                Adaugă
+              </app-action-button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
   @if (subscriptions().length === 0) {
     <app-empty-state icon="calendar" title="Niciun abonament încă" description="Adaugă abonamentele tale recurente (Netflix, chirie etc.)." />
   } @else {

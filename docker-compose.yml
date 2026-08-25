@@ -168,6 +168,8 @@ services:
       - MONGO_URL=${MONGODB_URI_BASE}/budgets_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      # Detecție pasivă de abonamente — citește istoricul de tranzacții.
+      - TRANSACTIONS_SERVICE_URL=http://transactions-service:8000
     volumes:
       - ./backend/services/budgets-service/app:/app/app
       - ./backend/services/budgets-service/tests:/app/tests
