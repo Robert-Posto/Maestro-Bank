@@ -5,9 +5,11 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../core/api-config';
 import { WebauthnStepUpProof } from './webauthn.service';
 
-/** "current" e provizionat automat la înregistrare — celelalte 3 se deschid manual, vezi CreatableAccountType. */
-export type AccountType = 'current' | 'savings' | 'deposit' | 'student';
-export type CreatableAccountType = 'savings' | 'deposit' | 'student';
+/** "current" e provizionat automat la înregistrare — restul se deschid manual, vezi CreatableAccountType.
+ * eur/usd/gbp sunt conturi REALE pe valuta respectivă (nu RON afișat altfel) — necesare ca
+ * schimbul valutar (Exchange) să aibă unde să crediteze/debiteze efectiv. */
+export type AccountType = 'current' | 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
+export type CreatableAccountType = 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
 
 export interface AccountView {
   id: string;
@@ -119,6 +121,11 @@ export interface TransactionView {
   hold: HoldInfo | null;
   /** null DOAR pentru tranzacții dinainte de Financial Guardian sau când motorul e dezactivat — vezi app/guardian/. */
   risk: TransactionRisk | null;
+  /** Screening determinist al descrierii (termeni de terorism/violență —
+   * vezi app/content_screening.py), SEPARAT de `risk` (motorul de fraudă)
+   * — nu blochează transferul, doar informează userul. null = fără
+   * avertisment. */
+  content_warning: string | null;
 }
 
 export interface TransferPayload {
@@ -190,6 +197,16 @@ export class BankingService {
 
   createTransfer(payload: TransferPayload): Observable<TransactionView> {
     return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/transfers`, payload);
+  }
+
+  /** Verificare LIVE a descrierii, ÎNAINTE de a trimite transferul (vezi
+   * features/transfers/transfers.ts, apelată debounced pe măsură ce userul
+   * scrie) — același screening determinist ca la creare, fără efecte
+   * secundare (nu creează nimic). */
+  screenTransferDescription(description: string): Observable<{ warning: string | null }> {
+    return this.http.post<{ warning: string | null }>(`${API_BASE_URL}/transactions/transfers/screen-description`, {
+      description,
+    });
   }
 
   getTransactions(limit = 20, skip = 0): Observable<TransactionView[]> {

@@ -15,6 +15,31 @@ def _category(category: str, amount_minor: int, percentage: float) -> dict:
     return {"category": category, "amount_minor": amount_minor, "percentage": percentage}
 
 
+# --- top_discretionary_category ------------------------------------------
+
+
+def test_top_discretionary_category_picks_highest_discretionary_spend():
+    spending_summary = {
+        "by_category": [
+            _category("groceries", 90000, 60.0),  # esențial, dar exclus (nu e discreționar)
+            _category("restaurants", 30000, 20.0),
+            _category("shopping", 50000, 33.3),  # cea mai mare cheltuială discreționară
+        ]
+    }
+    result = forecast_service.top_discretionary_category(spending_summary)
+    assert result == ("shopping", 50000)
+
+
+def test_top_discretionary_category_none_when_no_discretionary_spending():
+    spending_summary = {"by_category": [_category("groceries", 90000, 100.0)]}
+    assert forecast_service.top_discretionary_category(spending_summary) is None
+
+
+def test_top_discretionary_category_none_when_no_history():
+    assert forecast_service.top_discretionary_category({"by_category": []}) is None
+    assert forecast_service.top_discretionary_category({}) is None
+
+
 # --- split_recurring_payments -----------------------------------------
 
 

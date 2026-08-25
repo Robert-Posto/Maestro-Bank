@@ -39,6 +39,9 @@ function formatChatTime(date: Date): string {
  * + Forecast), prin Gateway (vezi services/ai-copilot.service.ts). Un
  * răspuns implică tool-calling real către GPT-5-mini, deci poate dura
  * 10-20s — de-aia starea "se gândește" e vizibilă, nu doar un spinner sec.
+ *
+ * Support Agent (celălalt agent găzduit de ai-orchestrator-service) e
+ * conectat la pagina Suport (vezi features/support/support.ts), NU aici.
  */
 @Component({
   selector: 'app-copilot',

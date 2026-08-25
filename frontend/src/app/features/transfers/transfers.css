@@ -186,8 +186,7 @@
   font-weight: var(--mb-font-weight-medium);
 }
 
-.transfer-field input,
-.transfer-field select {
+.transfer-field input {
   font-family: inherit;
   font-size: var(--mb-font-size-base);
   padding: 0.65rem var(--mb-space-4);
@@ -198,9 +197,12 @@
   background: var(--mb-surface);
 }
 
-.transfer-field input:focus,
-.transfer-field select:focus {
+.transfer-field input:focus {
   border-color: var(--mb-blue-500);
+}
+
+.transfer-field app-select {
+  display: block;
 }
 
 .transfer-row {
@@ -274,8 +276,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--mb-navy-900);
-  color: #fff;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -397,6 +400,27 @@
   border-radius: var(--mb-radius-sm);
 }
 
+/* Avertisment de conținut (vezi app/content_screening.py) — informativ,
+   transferul TOT a reușit (ecranul ăsta e "success"), NU e o eroare. */
+.transfer-content-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  margin-top: var(--mb-space-3);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
+  font-size: var(--mb-font-size-xs);
+  line-height: 1.5;
+  text-align: left;
+}
+
+.transfer-content-warning app-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 /* --- Mini card visual (sidebar) --- */
 
 .transfer-mini-card {
@@ -495,10 +519,6 @@
 
 /* --- Review step --- */
 
-.transfer-card--review {
-  max-width: 480px;
-}
-
 .transfer-review-title {
   font-size: var(--mb-font-size-md);
 }
@@ -531,8 +551,9 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--mb-navy-900);
-  color: #fff;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;

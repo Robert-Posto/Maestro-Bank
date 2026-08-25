@@ -59,6 +59,8 @@ export class Accounts implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly catalog = ACCOUNT_TYPE_CATALOG;
+  /** "current" + toate tipurile creabile — vezi accounts-service::_MAX_ACCOUNTS_PER_USER (aceeași sursă de adevăr). */
+  protected readonly maxAccounts = 1 + CREATABLE_ACCOUNT_TYPES.length;
 
   protected readonly tab = signal<Tab>('accounts');
 

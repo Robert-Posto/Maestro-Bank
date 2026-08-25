@@ -119,6 +119,67 @@ async def test_transfer_succeeds(client: AsyncClient, mock_accounts):
     # sold sursă a scăzut / sold destinație a crescut (verificat via mock)
     assert mock_accounts["source"]["balance_minor"] == 50_000
     assert body["counterparty_name"] == "Andrei Popescu"
+    assert body["content_warning"] is None
+
+
+async def test_transfer_with_flagged_description_still_succeeds_with_warning(client: AsyncClient, mock_accounts):
+    """Screening determinist al descrierii (vezi app/content_screening.py)
+    — avertisment, dar transferul TOT trece (decizie explicită a userului:
+    "avertisment, dar transferul trece"), nu e blocat ca la fraud/hold."""
+    response = await client.post(
+        "/transactions/transfers",
+        json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 50_000, "description": "pentru ISIS"},
+        headers=AUTH_HEADER,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "completed"
+    assert body["content_warning"] is not None
+    # Soldul tot s-a mutat normal — nu e reținut ca la un hold de fraudă.
+    assert mock_accounts["source"]["balance_minor"] == 50_000
+
+
+# --- Verificare LIVE a descrierii (înainte de a trimite transferul) --------
+
+
+async def test_screen_description_live_flags_terms(client: AsyncClient):
+    """POST /transfers/screen-description — verificarea LIVE (apelată de
+    frontend pe măsură ce userul scrie, ÎNAINTE de a trimite transferul) —
+    NU creează nimic, doar rulează același screening determinist."""
+    response = await client.post(
+        "/transactions/transfers/screen-description", json={"description": "pentru ISIS"}, headers=AUTH_HEADER
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["warning"] is not None
+    # Mesajul NU trebuie să presupună că un transfer s-a întâmplat — la
+    # verificarea live, niciunul nu s-a întâmplat încă.
+    assert "procesat" not in body["warning"].lower()
+
+
+async def test_screen_description_live_clean_text_has_no_warning(client: AsyncClient):
+    response = await client.post(
+        "/transactions/transfers/screen-description", json={"description": "chirie august"}, headers=AUTH_HEADER
+    )
+    assert response.status_code == 200
+    assert response.json()["warning"] is None
+
+
+async def test_screen_description_live_does_not_create_a_transaction(client: AsyncClient):
+    """Verificarea live NU are efecte secundare — niciun document creat."""
+    from app.database import get_database
+
+    count_before = await get_database().transactions.count_documents({})
+    await client.post(
+        "/transactions/transfers/screen-description", json={"description": "pentru ISIS"}, headers=AUTH_HEADER
+    )
+    count_after = await get_database().transactions.count_documents({})
+    assert count_after == count_before
+
+
+async def test_screen_description_live_requires_auth(client: AsyncClient):
+    response = await client.post("/transactions/transfers/screen-description", json={"description": "bomba"})
+    assert response.status_code == 401
 
 
 async def test_counterparty_name_appears_for_both_sides(client: AsyncClient, mock_accounts, monkeypatch):

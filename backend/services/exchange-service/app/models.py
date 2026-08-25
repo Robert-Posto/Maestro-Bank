@@ -1,8 +1,4 @@
-"""Modele Pydantic pentru exchange-service (exchange_db).
-
-Toate răspunsurile includ `is_demo: true` — vezi app/config.py pentru
-nota despre natura simulată a acestor rate.
-"""
+"""Modele Pydantic pentru exchange-service (exchange_db)."""
 
 from datetime import datetime
 from typing import Any
@@ -18,7 +14,6 @@ class RateOut(BaseModel):
     # "BNR" = curs oficial al zilei (Banca Națională a României);
     # "demo-fallback" = BNR indisponibil, folosim ultima valoare cunoscută.
     source: str = "BNR"
-    is_demo: bool = True
 
 
 class QuoteRequest(BaseModel):
@@ -44,11 +39,13 @@ class QuoteOut(BaseModel):
     total_cost_minor: int
     total_cost_percent: float
     source: str = "BNR"
-    is_demo: bool = True
     generated_at: datetime
 
 
-class DemoExchangeOut(BaseModel):
+class ExchangeOut(BaseModel):
+    """Un schimb valutar EXECUTAT — vezi app/service.py::execute_exchange.
+    Solduri chiar mutate (accounts-service), nu doar o simulare logată."""
+
     id: str = Field(alias="_id")
     from_currency: str
     to_currency: str
@@ -57,8 +54,6 @@ class DemoExchangeOut(BaseModel):
     applied_rate: float
     commission_minor: int
     total_cost_minor: int
-    is_demo: bool = True
-    note: str = "Simulare MaestroBank — fără mutare reală de fonduri."
     created_at: datetime
 
     model_config = ConfigDict(populate_by_name=True)

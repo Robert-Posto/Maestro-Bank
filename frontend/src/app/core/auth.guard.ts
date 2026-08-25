@@ -6,13 +6,21 @@ import { AuthService, AuthUser } from '../services/auth.service';
 
 /** Aduce userul curent (din signal, dacă e deja încărcat — ex. navigare
  * internă — sau printr-un fetch, la refresh direct pe o rută). `null`
- * dacă tokenul e invalid/expirat. */
+ * dacă tokenul e invalid/expirat — caz în care ȘTERGEM tokenul stale din
+ * sessionStorage (auth.logout()) ÎNAINTE de a întoarce null. Fără asta,
+ * guestGuard (mai jos) încă vede `isAuthenticated() === true` (verifică
+ * doar PREZENȚA tokenului, nu validitatea lui) și te trimite instant
+ * înapoi în /app -> authGuard eșuează din nou -> redirect infinit
+ * /login <-> /app, cu câte un GET /auth/me la fiecare iterație (bug real,
+ * observat live: userul rămâne cu un JWT valabil sintactic, dar userul lui
+ * nu mai există în baza de date curentă). */
 async function resolveCurrentUser(auth: AuthService): Promise<AuthUser | null> {
   const cached = auth.currentUser();
   if (cached) return cached;
   try {
     return await firstValueFrom(auth.fetchCurrentUser());
   } catch {
+    auth.logout();
     return null;
   }
 }

@@ -28,6 +28,7 @@ from app.models import (
     CardSettingsUpdate,
     CreatableAccountType,
     InternalAccountView,
+    InternalExchangeResponse,
     InternalTransferResponse,
     PocketOut,
 )
@@ -207,13 +208,20 @@ async def list_accounts_for_user(user_id: str) -> list[dict]:
     return await cursor.to_list(length=10)
 
 
-_MAX_ACCOUNTS_PER_USER = 4  # current + savings + deposit + student — suficient pentru acest demo
+_MAX_ACCOUNTS_PER_USER = 7  # current + savings + deposit + student + eur + usd + gbp
 
 _ACCOUNT_TYPE_LABELS: dict[str, str] = {
     "savings": "economii",
     "deposit": "depozit",
     "student": "student",
+    "eur": "EUR",
+    "usd": "USD",
+    "gbp": "GBP",
 }
+
+# Conturile de valută (eur/usd/gbp) au moneda proprie — toate celelalte
+# tipuri (current/savings/deposit/student) rămân RON, ca până acum.
+_CURRENCY_ACCOUNT_TYPES: dict[str, str] = {"eur": "EUR", "usd": "USD", "gbp": "GBP"}
 
 
 async def create_additional_account(
@@ -232,9 +240,10 @@ async def create_additional_account(
     existing = await db.accounts.find_one({"user_id": user_id, "account_type": account_type})
     if existing is not None:
         label = _ACCOUNT_TYPE_LABELS.get(account_type, account_type)
+        preposition = "în" if account_type in _CURRENCY_ACCOUNT_TYPES else "de"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ai deja un cont de {label}.",
+            detail=f"Ai deja un cont {preposition} {label}.",
         )
 
     total = await db.accounts.count_documents({"user_id": user_id})
@@ -249,7 +258,7 @@ async def create_additional_account(
     account_doc = {
         "user_id": user_id,
         "iban": iban,
-        "currency": "RON",
+        "currency": _CURRENCY_ACCOUNT_TYPES.get(account_type, "RON"),
         "balance_minor": 0,
         "status": "active",
         "account_type": account_type,
@@ -855,4 +864,78 @@ async def apply_internal_transfer(from_account_id: str, to_account_id: str, amou
     return InternalTransferResponse(
         from_balance_minor=from_account["balance_minor"],
         to_balance_minor=to_account["balance_minor"],
+    )
+
+
+async def apply_internal_exchange(
+    user_id: str, from_account_type: str, to_account_type: str, debit_minor: int, credit_minor: int
+) -> InternalExchangeResponse:
+    """Aplică efectiv un schimb valutar — debit pe contul sursă, credit pe
+    contul destinație, cu sume DIFERITE (curs aplicat), spre deosebire de
+    apply_internal_transfer (aceeași sumă pe ambele părți). Apelat DOAR de
+    exchange-service, care a calculat deja cursul (compute_quote) — aici
+    doar mutăm soldul. Conturile se rezolvă după user_id + account_type
+    (exchange-service nu cunoaște și n-are nevoie să cunoască ID-urile
+    interne de cont). Aceeași strategie de atomicitate condiționată +
+    rollback manual ca la apply_internal_transfer (vezi acolo pentru nota
+    completă despre limitele ei — MongoDB standalone, fără tranzacții
+    multi-document reale)."""
+    db = get_database()
+
+    from_account = await db.accounts.find_one({"user_id": user_id, "account_type": from_account_type})
+    if from_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Nu ai un cont de tipul '{from_account_type}'.",
+        )
+    to_account = await db.accounts.find_one({"user_id": user_id, "account_type": to_account_type})
+    if to_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nu ai încă un cont pentru moneda asta — deschide unul din pagina Conturi înainte de a schimba valută.",
+        )
+
+    debit_result = await db.accounts.update_one(
+        {"_id": from_account["_id"], "status": "active", "balance_minor": {"$gte": debit_minor}},
+        {"$inc": {"balance_minor": -debit_minor}},
+    )
+    if debit_result.modified_count != 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sold insuficient sau cont sursă inactiv.",
+        )
+
+    credit_result = await db.accounts.update_one(
+        {"_id": to_account["_id"], "status": "active"},
+        {"$inc": {"balance_minor": credit_minor}},
+    )
+    if credit_result.modified_count != 1:
+        # Rollback manual — creditul a eșuat, restituim suma la sursă.
+        await db.accounts.update_one({"_id": from_account["_id"]}, {"$inc": {"balance_minor": debit_minor}})
+        logger.error(
+            "accounts-service: credit eșuat la schimb valutar, rollback aplicat (user_id=%s, from=%s, to=%s)",
+            user_id,
+            from_account_type,
+            to_account_type,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cont destinație inactiv — schimb anulat.",
+        )
+
+    from_doc = await db.accounts.find_one({"_id": from_account["_id"]})
+    to_doc = await db.accounts.find_one({"_id": to_account["_id"]})
+
+    logger.info(
+        "accounts-service: schimb valutar aplicat (user_id=%s, %s->%s, debit_minor=%s, credit_minor=%s)",
+        user_id,
+        from_account_type,
+        to_account_type,
+        debit_minor,
+        credit_minor,
+    )
+
+    return InternalExchangeResponse(
+        from_balance_minor=from_doc["balance_minor"],
+        to_balance_minor=to_doc["balance_minor"],
     )
