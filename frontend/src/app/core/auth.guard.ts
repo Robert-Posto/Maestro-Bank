@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService, AuthUser } from '../services/auth.service';
@@ -40,18 +40,24 @@ function homeRouteFor(user: AuthUser): string[] {
  * verificarea email/identitate (vezi routes 'onboarding' din app.routes.ts).
  * Vezi AuthService pentru nota despre limitările abordării curente cu
  * tokenul (dev-only, nu arhitectură de producție).
+ *
+ * Când redirecționează la /login, păstrează URL-ul ÎNCERCAT în query param
+ * `returnUrl` — altfel cineva care deschide un link de tip "Cerere de
+ * plată" (/app/pay/{id}, vezi features/pay-request) NEautentificat s-ar
+ * loga și ar ajunge pe /app/overview, nu înapoi pe pagina de plată (vezi
+ * Login::submit, care citește acest query param).
  */
-export const authGuard: CanActivateFn = async () => {
+export const authGuard: CanActivateFn = async (_route, state: RouterStateSnapshot) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   if (!auth.isAuthenticated()) {
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
 
   const user = await resolveCurrentUser(auth);
   if (!user) {
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
   if (user.role === 'staff') {
     return router.createUrlTree(['/admin']);

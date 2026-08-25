@@ -155,6 +155,29 @@ export interface ScheduledTransferPayload {
   frequency: ScheduleFrequency;
 }
 
+// --- Cereri de plată (link/QR de tip "Request Money", ca la Revolut) -------
+
+export type PaymentRequestStatus = 'open' | 'paid' | 'cancelled' | 'expired';
+
+export interface PaymentRequestView {
+  id: string;
+  requester_name: string | null;
+  requester_iban: string;
+  amount_minor: number;
+  currency: string;
+  description: string;
+  status: PaymentRequestStatus;
+  created_at: string;
+  expires_at: string;
+  paid_at: string | null;
+  paid_by_name: string | null;
+}
+
+export interface PaymentRequestPayload {
+  amount_minor: number;
+  description: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BankingService {
   constructor(private readonly http: HttpClient) {}
@@ -296,5 +319,29 @@ export class BankingService {
 
   cancelScheduledTransfer(id: string): Observable<void> {
     return this.http.delete<void>(`${API_BASE_URL}/transactions/scheduled-transfers/${id}`);
+  }
+
+  // --- Cereri de plată (link/QR de tip "Request Money") -------------------
+
+  createPaymentRequest(payload: PaymentRequestPayload): Observable<PaymentRequestView> {
+    return this.http.post<PaymentRequestView>(`${API_BASE_URL}/transactions/payment-requests`, payload);
+  }
+
+  getMyPaymentRequests(): Observable<PaymentRequestView[]> {
+    return this.http.get<PaymentRequestView[]>(`${API_BASE_URL}/transactions/payment-requests/mine`);
+  }
+
+  /** Vizualizabilă de ORICE user autentificat — vezi backend
+   * app/routers/payment_requests.py — nu doar de cel care a creat cererea. */
+  getPaymentRequest(id: string): Observable<PaymentRequestView> {
+    return this.http.get<PaymentRequestView>(`${API_BASE_URL}/transactions/payment-requests/${id}`);
+  }
+
+  payPaymentRequest(id: string): Observable<TransactionView> {
+    return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/payment-requests/${id}/pay`, {});
+  }
+
+  cancelPaymentRequest(id: string): Observable<PaymentRequestView> {
+    return this.http.post<PaymentRequestView>(`${API_BASE_URL}/transactions/payment-requests/${id}/cancel`, {});
   }
 }

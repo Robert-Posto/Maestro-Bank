@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import QRCode from 'qrcode';
 
 import {
   AccountView,
   BankingService,
   Beneficiary,
+  PaymentRequestView,
   ScheduleFrequency,
   ScheduledTransferView,
   TransactionView,
@@ -26,7 +28,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 type TransferStep = 'form' | 'review' | 'success';
-type MainTab = 'new' | 'scheduled';
+type MainTab = 'new' | 'scheduled' | 'requests';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -92,6 +94,22 @@ export class Transfers implements OnInit {
   protected readonly scheduleFrequency = signal<ScheduleFrequency>('monthly');
   protected readonly scheduleSaving = signal(false);
 
+  // --- Cereri de plată (link/QR de tip "Request Money") -------------------
+  protected readonly paymentRequests = signal<PaymentRequestView[]>([]);
+  protected readonly paymentRequestsLoading = signal(true);
+
+  protected readonly requestAmount = signal<number | null>(null);
+  protected readonly requestDescription = signal('');
+  protected readonly requestDescriptionWarning = signal<string | null>(null);
+  protected readonly requestCreating = signal(false);
+  protected readonly requestFormError = signal<string | null>(null);
+
+  /** Cererea deschisă în modalul de distribuire (link + QR) — fie imediat
+   * după creare, fie re-deschisă manual dintr-un rând al listei. */
+  protected readonly shareRequest = signal<PaymentRequestView | null>(null);
+  protected readonly shareQrDataUrl = signal<string | null>(null);
+  protected readonly shareQrLoading = signal(false);
+
   constructor() {
     // Verificare LIVE a descrierii, direct din câmpul de formular — nu
     // după ce transferul e deja trimis (vezi feedback userului: "vreau sa
@@ -112,6 +130,26 @@ export class Transfers implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(({ warning }) => this.descriptionWarning.set(warning));
+
+    // Aceeași verificare LIVE, dar pentru descrierea cererii de plată (tab
+    // "Solicită plată") — flux separat, câmp separat, dar exact același
+    // screening determinist reutilizat (banking.screenTransferDescription).
+    // Spre deosebire de transferuri, aici avertismentul chiar BLOCHEAZĂ
+    // trimiterea formularului (vezi createPaymentRequest, mai jos) — o
+    // cerere de plată e un link/QR trimis mai departe, nu o tranzacție
+    // privată deja consumată.
+    toObservable(this.requestDescription)
+      .pipe(
+        debounceTime(400),
+        distinctUntilChanged(),
+        switchMap((description) => {
+          const trimmed = description.trim();
+          if (!trimmed) return of({ warning: null });
+          return this.banking.screenTransferDescription(trimmed).pipe(catchError(() => of({ warning: null })));
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ warning }) => this.requestDescriptionWarning.set(warning));
   }
 
   ngOnInit(): void {
@@ -125,6 +163,7 @@ export class Transfers implements OnInit {
     });
     this.banking.getBeneficiaries().subscribe({ next: (list) => this.beneficiaries.set(list) });
     this.loadScheduledTransfers();
+    this.loadPaymentRequests();
   }
 
   private loadScheduledTransfers(): void {
@@ -188,6 +227,109 @@ export class Transfers implements OnInit {
 
   protected frequencyLabel(frequency: ScheduleFrequency): string {
     return frequency === 'weekly' ? 'Săptămânal' : 'Lunar';
+  }
+
+  // --- Cereri de plată (link/QR de tip "Request Money") -------------------
+
+  private loadPaymentRequests(): void {
+    this.paymentRequestsLoading.set(true);
+    this.banking.getMyPaymentRequests().subscribe({
+      next: (list) => {
+        this.paymentRequests.set(list);
+        this.paymentRequestsLoading.set(false);
+      },
+      error: () => this.paymentRequestsLoading.set(false),
+    });
+  }
+
+  protected paymentRequestLink(requestId: string): string {
+    return `${window.location.origin}/app/pay/${requestId}`;
+  }
+
+  protected paymentRequestStatusLabel(status: PaymentRequestView['status']): string {
+    switch (status) {
+      case 'open':
+        return 'Deschisă';
+      case 'paid':
+        return 'Plătită';
+      case 'cancelled':
+        return 'Anulată';
+      case 'expired':
+        return 'Expirată';
+    }
+  }
+
+  protected createPaymentRequest(): void {
+    this.requestFormError.set(null);
+    const amountMinor = Math.round((this.requestAmount() ?? 0) * 100);
+    if (amountMinor <= 0) {
+      this.requestFormError.set('Introdu o sumă validă, mai mare decât 0.');
+      return;
+    }
+    // Verificarea live (vezi constructor) deja dezactivează butonul, dar
+    // un submit prin Enter în formular poate ocoli starea `disabled` a
+    // butonului — reverificăm aici. Backendul e sursa reală de adevăr
+    // (vezi service.py::create_payment_request, care respinge cu 400),
+    // asta e doar UX mai rapid, nu singura protecție.
+    if (this.requestDescriptionWarning()) {
+      return;
+    }
+
+    this.requestCreating.set(true);
+    this.banking
+      .createPaymentRequest({ amount_minor: amountMinor, description: this.requestDescription().trim() })
+      .subscribe({
+        next: (request) => {
+          this.requestCreating.set(false);
+          this.paymentRequests.update((list) => [request, ...list]);
+          this.requestAmount.set(null);
+          this.requestDescription.set('');
+          this.toast.success('Cerere de plată creată.');
+          this.openShare(request);
+        },
+        error: (err) => {
+          this.requestCreating.set(false);
+          this.requestFormError.set(extractErrorMessage(err, 'Nu am putut crea cererea de plată.'));
+        },
+      });
+  }
+
+  /** Deschide modalul cu link + cod QR — fie imediat după creare, fie
+   * re-deschis manual dintr-un rând al listei ("Distribuie" pe o cerere
+   * încă deschisă). Codul QR e generat client-side (pachetul `qrcode`) —
+   * link-ul în sine e tot ce contează, nu ținem un cod QR generat de backend. */
+  protected openShare(request: PaymentRequestView): void {
+    this.shareRequest.set(request);
+    this.shareQrDataUrl.set(null);
+    this.shareQrLoading.set(true);
+    QRCode.toDataURL(this.paymentRequestLink(request.id), { width: 224, margin: 1 })
+      .then((dataUrl) => {
+        this.shareQrDataUrl.set(dataUrl);
+        this.shareQrLoading.set(false);
+      })
+      .catch(() => this.shareQrLoading.set(false));
+  }
+
+  protected closeShare(): void {
+    this.shareRequest.set(null);
+    this.shareQrDataUrl.set(null);
+  }
+
+  protected copyPaymentLink(requestId: string): void {
+    navigator.clipboard?.writeText(this.paymentRequestLink(requestId)).then(() => {
+      this.toast.success('Link copiat în clipboard.');
+    });
+  }
+
+  protected cancelPaymentRequest(request: PaymentRequestView): void {
+    this.banking.cancelPaymentRequest(request.id).subscribe({
+      next: (updated) => {
+        this.paymentRequests.update((list) => list.map((r) => (r.id === updated.id ? updated : r)));
+        this.toast.success('Cerere de plată anulată.');
+        if (this.shareRequest()?.id === updated.id) this.closeShare();
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Anularea a eșuat.')),
+    });
   }
 
   protected selectBeneficiary(beneficiary: Beneficiary): void {
