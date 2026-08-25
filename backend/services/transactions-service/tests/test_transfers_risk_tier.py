@@ -63,6 +63,7 @@ def _make_token(user_id: str) -> str:
 
 
 AUTH_HEADER = {"Authorization": f"Bearer {_make_token(USER_ID)}"}
+DEST_AUTH_HEADER = {"Authorization": f"Bearer {_make_token(DEST_ACCOUNT['user_id'])}"}
 
 
 @pytest.fixture(autouse=True)
@@ -298,3 +299,46 @@ async def test_hold_band_under_shadow_mode_does_not_claim_held(
     assert body["status"] == "completed"  # NU a fost reținut cu adevărat
     assert body["risk"]["tier"] == "potentially_dangerous"
     assert body["risk"]["tier"] != "held"
+
+
+async def test_risk_field_hidden_from_the_receiving_side(client: AsyncClient, monkeypatch):
+    """`risk` descrie comportamentul EXPEDITORULUI — n-are ce căuta pe
+    partea destinatarului, care n-a făcut nimic neobișnuit. Seedăm direct
+    o tranzacție "completed" cu risk deja completat (ca și cum Guardian ar
+    fi rulat deja), fără să trecem prin create_transfer — testul ăsta
+    verifică STRICT ramura is_outgoing din to_transaction_view, nu fluxul
+    de creare (deja acoperit de celelalte teste din fișier)."""
+
+    async def fake_get_by_user(user_id: str) -> dict:
+        return dict(DEST_ACCOUNT) if user_id == DEST_ACCOUNT["user_id"] else dict(SOURCE_ACCOUNT)
+
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
+
+    tx_id = ObjectId()
+    await get_database().transactions.insert_one(
+        {
+            "_id": tx_id,
+            "from_account_id": SOURCE_ACCOUNT_ID,
+            "to_account_id": DEST_ACCOUNT_ID,
+            "from_iban": SOURCE_ACCOUNT["iban"],
+            "to_iban": DEST_ACCOUNT["iban"],
+            "amount_minor": 20_000,
+            "currency": "RON",
+            "description": "",
+            "category": "shopping",
+            "type": "transfer",
+            "status": "completed",
+            "recognized": False,
+            "reported": False,
+            "created_at": datetime.now(timezone.utc),
+            "risk": {"tier": "unusual", "phrase": "Acest transfer are o caracteristică neobișnuită.", "status": "ready"},
+        }
+    )
+
+    sender_view = await client.get(f"/transactions/{tx_id}", headers=AUTH_HEADER)
+    assert sender_view.status_code == 200
+    assert sender_view.json()["risk"]["tier"] == "unusual"
+
+    receiver_view = await client.get(f"/transactions/{tx_id}", headers=DEST_AUTH_HEADER)
+    assert receiver_view.status_code == 200
+    assert receiver_view.json()["risk"] is None

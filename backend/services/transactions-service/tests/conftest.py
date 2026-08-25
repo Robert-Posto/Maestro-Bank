@@ -7,6 +7,26 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 import app.database as db_module
 from app.config import settings
+from app.guardian import llm_client
+
+
+@pytest.fixture(autouse=True)
+def no_real_guardian_llm_calls(monkeypatch):
+    """Testele rulează în ACELAȘI container ca aplicația reală — dacă
+    .env are credențiale Azure OpenAI reale (pentru verificare manuală
+    live), fără gardă, orice test care trece prin create_transfer ar
+    declanșa un apel HTTP REAL către Azure, lent și nedeterminist,
+    indiferent de fișierul de test.
+
+    Blocăm la nivelul `_get_chat_client` (simulăm "neconfigurat" —
+    `complete_json` cade deja curat pe None, fără rețea, exact cum face
+    și fără credențiale reale), NU la nivelul `complete_json` însuși —
+    altfel test_guardian_llm_client.py, care testează chiar
+    `complete_json`, ar deveni imposibil de testat. Un test care vrea
+    explicit clientul fals (test_guardian_llm_client.py) sau un răspuns
+    LLM controlat (test_guardian_service.py) își suprascrie propriul
+    monkeypatch peste acesta, executat ulterior în corpul testului."""
+    monkeypatch.setattr(llm_client, "_get_chat_client", lambda: None)
 
 
 @pytest.fixture(autouse=True)

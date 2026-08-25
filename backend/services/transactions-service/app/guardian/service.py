@@ -68,7 +68,10 @@ def _validate_staff_explanation(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
     cleaned = value.strip()
-    if not cleaned:
+    # Analistul vede deja scorul/regulile separat, pe pagină — promptul
+    # cere explicit un paragraf natural, fără ID-uri — centură ȘI bretele,
+    # la fel ca la _validate_customer_phrase, niciodată doar politică.
+    if not cleaned or _RULE_ID_PATTERN.search(cleaned):
         return None
     return cleaned[:_STAFF_EXPLANATION_MAX_LEN]
 
