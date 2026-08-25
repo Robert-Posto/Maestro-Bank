@@ -461,11 +461,73 @@
   cursor: not-allowed;
 }
 
+/* Microfon — neutru (nu albastru, ca butonul de Trimite), roșu/pulsând
+   cât timp ascultă — vezi features/copilot/copilot.css pentru aceeași
+   componentă, stilizată identic aici (fiecare pagină stă pe propriul CSS
+   încapsulat, nu putem partaja regulile direct între componente). */
+.support-chat__composer .support-chat__mic-btn {
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  box-shadow: none;
+}
+
+.support-chat__composer .support-chat__mic-btn:not(:disabled):hover {
+  background: var(--mb-border);
+}
+
+.support-chat__composer .support-chat__mic-btn--active {
+  background: var(--mb-negative);
+  color: #fff;
+  animation: support-chat-mic-pulse 1.4s ease infinite;
+}
+
+@keyframes support-chat-mic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-chat__composer .support-chat__mic-btn--active {
+    animation: none;
+  }
+}
+
+/* "Ascultă" pe un răspuns al Support Agent. */
+.support-chat__listen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--mb-space-2);
+  padding: 4px 10px;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+  cursor: pointer;
+  transition: color var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.support-chat__listen-btn:hover {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
+.support-chat__listen-btn--active {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
 .support-chat__notice {
   color: var(--mb-text-tertiary);
   font-size: var(--mb-font-size-xs);
   text-align: center;
 }
+
 
 /* Ecran de bun-venit (stare goală) — IDENTIC ca structură/vizual cu
    MaestroAssistent (vezi features/copilot/copilot.css::.copilot-welcome),

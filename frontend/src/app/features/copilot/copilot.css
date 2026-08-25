@@ -410,12 +410,71 @@
   cursor: not-allowed;
 }
 
+/* Microfon — neutru (nu albastru, ca butonul de Trimite), roșu/pulsând
+   cât timp ascultă, ca să fie limpede că e activ. */
+.copilot-composer .copilot-mic-btn {
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+}
+
+.copilot-composer .copilot-mic-btn:not(:disabled):hover {
+  background: var(--mb-border);
+}
+
+.copilot-composer .copilot-mic-btn--active {
+  background: var(--mb-negative);
+  color: #fff;
+  animation: copilot-mic-pulse 1.4s ease infinite;
+}
+
+@keyframes copilot-mic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-composer .copilot-mic-btn--active {
+    animation: none;
+  }
+}
+
+/* "Ascultă" pe un răspuns — pastilă mică, discretă, nu un buton primar. */
+.copilot-listen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--mb-space-2);
+  padding: 4px 10px;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+  cursor: pointer;
+  transition: color var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.copilot-listen-btn:hover {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
+.copilot-listen-btn--active {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
 .copilot-notice {
   padding: 0 var(--mb-space-6) var(--mb-space-5);
   color: var(--mb-text-tertiary);
   font-size: var(--mb-font-size-xs);
   text-align: center;
 }
+
 
 /* --- Sidebar --- */
 
