@@ -10,15 +10,22 @@
       <span class="transfers-tabs__count">{{ scheduledTransfers().length }}</span>
     }
   </button>
-  <button type="button" [class.transfers-tab--active]="mainTab() === 'requests'" (click)="mainTab.set('requests')">
-    <app-icon name="send" [size]="15" /> Solicită plată
+</div>
+
+@if (mainTab() === 'new') {
+<div class="transfer-mode-toggle" role="tablist" aria-label="Trimite sau solicită bani">
+  <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'send'" (click)="sendMode.set('send')">
+    <app-icon name="transfer" [size]="14" /> Trimit
+  </button>
+  <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'request'" (click)="sendMode.set('request')">
+    <app-icon name="send" [size]="14" /> Solicit
     @if (paymentRequests().length > 0) {
       <span class="transfers-tabs__count">{{ paymentRequests().length }}</span>
     }
   </button>
 </div>
 
-@if (mainTab() === 'new') {
+@if (sendMode() === 'send') {
 <ol class="transfer-stepper">
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'form'" [class.transfer-stepper__step--done]="step() !== 'form'">
     <span class="transfer-stepper__dot">@if (step() !== 'form') {<app-icon name="check" [size]="12" />} @else {1}</span>
@@ -197,52 +204,7 @@
     </div>
   </div>
 }
-}
-
-@if (mainTab() === 'scheduled') {
-<section class="scheduled-section">
-  <div class="scheduled-section__header">
-    <div>
-      <h2>Transferuri programate</h2>
-      <p class="scheduled-section__subtitle">Automatizează plăți recurente — se execută singure, la data stabilită.</p>
-    </div>
-    <app-action-button variant="secondary" (pressed)="openScheduleModal()">
-      <app-icon name="plus" [size]="16" />
-      Transfer nou programat
-    </app-action-button>
-  </div>
-
-  @if (!scheduledLoading() && scheduledTransfers().length === 0) {
-    <app-empty-state
-      icon="calendar"
-      title="Niciun transfer programat"
-      description="Creează unul pentru chirie, abonamente sau orice plată recurentă."
-    />
-  } @else if (scheduledTransfers().length > 0) {
-    <div class="scheduled-list">
-      @for (schedule of scheduledTransfers(); track schedule.id) {
-        <div class="scheduled-row">
-          <div class="scheduled-row__info">
-            <span class="scheduled-row__iban">{{ schedule.to_iban }}</span>
-            @if (schedule.description) {
-              <span class="scheduled-row__desc">{{ schedule.description }}</span>
-            }
-          </div>
-          <span class="scheduled-row__amount">{{ schedule.amount_minor | money: account()?.currency }}</span>
-          <span class="scheduled-row__frequency">{{ frequencyLabel(schedule.frequency) }}</span>
-          <span class="scheduled-row__next">Următoarea: {{ schedule.next_run_at | date: 'dd MMM yyyy' }}</span>
-          <button type="button" class="scheduled-row__cancel" (click)="cancelSchedule(schedule)">
-            <app-icon name="trash" [size]="15" />
-          </button>
-        </div>
-      }
-    </div>
-  }
-</section>
-}
-
-@if (mainTab() === 'requests') {
-<section class="requests-section">
+} @else {
   <div class="transfer-wrap">
     <form class="transfer-card" (ngSubmit)="createPaymentRequest()">
       <h2 class="requests-form__title">Solicită o plată</h2>
@@ -343,6 +305,48 @@
       </div>
     }
   </div>
+}
+}
+
+@if (mainTab() === 'scheduled') {
+<section class="scheduled-section">
+  <div class="scheduled-section__header">
+    <div>
+      <h2>Transferuri programate</h2>
+      <p class="scheduled-section__subtitle">Automatizează plăți recurente — se execută singure, la data stabilită.</p>
+    </div>
+    <app-action-button variant="secondary" (pressed)="openScheduleModal()">
+      <app-icon name="plus" [size]="16" />
+      Transfer nou programat
+    </app-action-button>
+  </div>
+
+  @if (!scheduledLoading() && scheduledTransfers().length === 0) {
+    <app-empty-state
+      icon="calendar"
+      title="Niciun transfer programat"
+      description="Creează unul pentru chirie, abonamente sau orice plată recurentă."
+    />
+  } @else if (scheduledTransfers().length > 0) {
+    <div class="scheduled-list">
+      @for (schedule of scheduledTransfers(); track schedule.id) {
+        <div class="scheduled-row">
+          <div class="scheduled-row__info">
+            <span class="scheduled-row__iban">{{ schedule.to_iban }}</span>
+            @if (schedule.description) {
+              <span class="scheduled-row__desc">{{ schedule.description }}</span>
+            }
+          </div>
+          <span class="scheduled-row__amount">{{ schedule.amount_minor | money: account()?.currency }}</span>
+          <span class="scheduled-row__frequency">{{ frequencyLabel(schedule.frequency) }}</span>
+          <span class="scheduled-row__next">Următoarea: {{ schedule.next_run_at | date: 'dd MMM yyyy' }}</span>
+          <button type="button" class="scheduled-row__cancel" (click)="cancelSchedule(schedule)">
+            <app-icon name="trash" [size]="15" />
+          </button>
+        </div>
+      }
+    </div>
+  }
 </section>
 }
 

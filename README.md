@@ -37,7 +37,7 @@ Toate serviciile FastAPI rulează în containere separate, dar folosesc **aceea�
 | **gateway** | routing `/api/*` → microservicii, JWT, CORS, rate limiting, status agregat | — (doar ping) | 8000 (expus) |
 | **auth-service** | users, autentificare, JWT, hash parole (bcrypt), schimbare parolă, passkeys (WebAuthn), verificare email la onboarding, provizionare automată cont bancar | `auth_db` | 8001 |
 | **accounts-service** | conturi (curent + economii/depozit/student + eur/usd/gbp, pentru schimbul valutar real), IBAN demo, carduri virtuale demo + control card (freeze/settings/limite — vezi limitările de mai jos), beneficiari, pockets (obiective de economisire) | `accounts_db` | 8002 |
-| **transactions-service** | transferuri (inclusiv programate/recurente), screening determinist al descrierii (termeni asociați cu activități ilegale/violente), Financial Guardian (explicații LLM ale deciziilor motorului de fraudă), istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
+| **transactions-service** | transferuri (inclusiv programate/recurente + cereri de plată cu link/QR), screening determinist al descrierii (termeni asociați cu activități ilegale/violente), Financial Guardian (explicații LLM ale deciziilor motorului de fraudă), istoric tranzacții (filtre, export CSV, recognize/report), analytics (spending/cash-flow/forecast) | `tx_db` | 8003 |
 | **budgets-service** | bugete pe categorie + abonamente/plăți recurente (CRUD manual + detecție pasivă din istoricul de tranzacții) | `budgets_db` | 8004 |
 | **support-service** | tichete de suport + notificări persistente per user | `support_db` | 8005 |
 | **exchange-service** | schimb valutar — curs REAL (feed oficial BNR), execuție REALĂ (mută solduri între contul RON și conturile pe valută eur/usd/gbp); spread-ul și comisionul rămân politică simulată MaestroBank | `exchange_db` | 8006 |
@@ -103,6 +103,10 @@ Fără credențiale Azure OpenAI setate, serviciul tot pornește (health check t
 ## Financial Guardian (explicații AI pentru rețineri de fraudă)
 
 Trăiește în `transactions-service/app/guardian/` — când motorul de fraudă (determinist, 18 reguli) reține un transfer pentru revizuire, Guardian generează ASINCRON, printr-un apel separat la Azure OpenAI, o explicație în limbaj natural pentru personal ("de ce a fost reținut acest transfer") și o frază discretă pentru client. E strict un strat de EXPLICAȚIE peste o decizie deja luată determinist — Guardian nu decide NICIODATĂ dacă un transfer se reține sau nu, doar explică o decizie existentă. Fără credențiale Azure OpenAI, motorul de fraudă funcționează identic (scor + reținere), doar explicația LLM lipsește (fallback pe un șablon static).
+
+## Cereri de plată (link + cod QR)
+
+`/app/transfers` — pe lângă transferul clasic (tu trimiți), un user poate CERE bani ("Request Money", ca la Revolut): creează o cerere cu sumă + descriere, primește un link/pagină (`/app/pay/:id`, deschisă de oricine autentificat, nu doar de creatorul cererii) + un cod QR generat client-side (pachetul `qrcode`, nimic nou pe backend pentru generarea imaginii). Cine plătește reutilizează `create_transfer` — nicio logică de bani duplicată.
 
 ## Consolă separată pentru personal (`/admin`)
 
@@ -205,10 +209,10 @@ Copiază `.env.example` în `.env` și ajustează dacă e nevoie (`.env` e în `
 
 ## Ce lipsește față de planul complet (Cumpăna)
 
-- **RabbitMQ** — nu rulează încă în `docker-compose.yml`. Necesar pentru fluxul asincron (`transaction.created` → analiză Guardian în fundal, fără să blocheze userul).
-- **Financial Guardian** — zona vizuală există (Cardul meu, Detalii tranzacție), marcată explicit "Coming in AI phase" — fără detecție reală de anomalii.
+- **RabbitMQ** — decizie arhitecturală, nu o gaură: transferurile programate și expirarea reținerilor de fraudă rulează prin bucle `asyncio` simple, în-proces (`transactions-service/app/scheduler.py`), nu printr-o coadă de mesaje — documentat explicit în cod ca suficient pentru un demo cu un singur worker per serviciu.
 - **Validare IBAN MOD-97** — clienții pot avea IBAN-uri demo generate cu cifre de control pseudo-aleatoare; validarea reală MOD-97 la transferuri nu e încă aplicată.
-- Plăți reale, Visa/Mastercard, SEPA, Open Banking/PSD2, IBAN-uri bancare reale, schimb valutar real, PIN real de card — intenționat, niciodată planificate (proiect demo) — vezi butoanele marcate "Coming soon" din Cardul meu (Change PIN, Transaction alerts, Payment confirmation).
+- **Aplicarea reală a setărilor de securitate ale cardului** — freeze/toggle-uri se salvează, dar nu sunt verificate nicăieri (vezi "Limitări cunoscute" mai sus).
+- Plăți reale, Visa/Mastercard, SEPA, Open Banking/PSD2, IBAN-uri bancare reale, PIN real de card — intenționat, niciodată planificate (proiect demo) — vezi butoanele marcate "Coming soon" din Cardul meu (Change PIN, Transaction alerts, Payment confirmation).
 
 ## UI — MaestroBank
 

@@ -1,6 +1,6 @@
 <app-page-header title="Rețineri de fraudă" subtitle="Transferuri suspecte, oprite pentru revizuire manuală — sună clientul înainte de a decide.">
   <app-action-button variant="secondary" (pressed)="load()">
-    <app-icon name="reload" [size]="16" /> Reîmprospătează
+    <app-icon name="reload" [size]="16" /> Actualizează
   </app-action-button>
 </app-page-header>
 
@@ -43,7 +43,7 @@
             <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
             <div class="hold-card__rules">
               @for (ruleId of hold.fired_rule_ids; track ruleId) {
-                <span class="hold-card__rule-tag">{{ ruleId }}</span>
+                <span class="hold-card__rule-tag" [attr.data-tooltip]="ruleDescription(ruleId)">{{ ruleId }}</span>
               }
             </div>
           </div>
@@ -100,7 +100,7 @@
         <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
         <div class="analysis__rules">
           @for (ruleId of hold.fired_rule_ids; track ruleId) {
-            <span class="hold-card__rule-tag">{{ ruleId }}</span>
+            <span class="hold-card__rule-tag" [attr.data-tooltip]="ruleDescription(ruleId)">{{ ruleId }}</span>
           }
         </div>
       </div>

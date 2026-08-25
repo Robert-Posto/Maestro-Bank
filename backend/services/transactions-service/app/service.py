@@ -153,9 +153,11 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "risk": doc.get("risk") if is_outgoing else None,
         # Screening determinist al descrierii (termeni de terorism/violență
         # — vezi app/content_screening.py), SEPARAT de motorul de fraudă
-        # (app/fraud/) — pierdut accidental la merge-ul cu main (linia asta
-        # lipsea din to_transaction_view după fast-forward, deși câmpul
-        # tot era salvat în DB și tot era în TransactionOut/models.py).
+        # (app/fraud/). Spre deosebire de "risk" (comportamentul
+        # EXPEDITORULUI, irelevant pentru cine primește), descrierea e
+        # aceeași informație pe care o vede oricum și destinatarul (vezi
+        # câmpul "description" de mai sus) — deci vizibilă ambelor părți,
+        # nu doar expeditorului.
         "content_warning": doc.get("content_warning"),
     }
 
