@@ -133,7 +133,8 @@ async def test_llm_failure_falls_back_to_template(monkeypatch):
     assert evaluation["guardian"]["status"] == "template_fallback"
     assert evaluation["guardian"]["source"] == "template"
     assert evaluation["guardian"]["customer_phrase"]  # nu e gol
-    assert "AMT-01" in evaluation["guardian"]["staff_explanation"]  # șablonul numește regula
+    assert evaluation["guardian"]["staff_explanation"]  # nu e gol
+    assert "AMT-01" not in evaluation["guardian"]["staff_explanation"]  # fără ID-uri de regulă, vezi rule_hints.py
 
     transaction = await db.transactions.find_one({"_id": tx_id})
     assert transaction["risk"]["status"] == "template_fallback"

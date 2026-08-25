@@ -221,3 +221,55 @@ async def test_review_requires_staff_role(client: AsyncClient):
         headers=CUSTOMER_HEADER,
     )
     assert response.status_code == 403
+
+
+CUSTOMER_ACCOUNT_ID = str(ObjectId())
+OTHER_SENDER_ACCOUNT_ID = str(ObjectId())
+
+
+async def test_get_customer_transactions_shows_incomplete_incoming_transactions(client: AsyncClient, monkeypatch):
+    """Spre deosebire de ruta normală a clientului (vezi test_transfers.py
+    ::test_receiver_does_not_see_incoming_transaction_before_it_completes),
+    personalul care investighează un client are nevoie de imaginea
+    COMPLETĂ — inclusiv încercări primite care n-au ajuns la el (reținute
+    pentru fraudă, eșuate, anulate) — vezi service.py::_build_filter_query,
+    parametrul include_all_statuses."""
+
+    async def fake_get_by_user(user_id: str) -> dict:
+        return {
+            "id": CUSTOMER_ACCOUNT_ID,
+            "user_id": CUSTOMER_USER_ID,
+            "iban": "RO11MAES0000000000000009",
+            "currency": "RON",
+            "balance_minor": 0,
+            "status": "active",
+        }
+
+    monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
+
+    db = get_database()
+    await db.transactions.delete_many({})
+    for seeded_status in ("pending_review", "failed", "cancelled", "completed"):
+        await db.transactions.insert_one(
+            {
+                "from_account_id": OTHER_SENDER_ACCOUNT_ID,
+                "to_account_id": CUSTOMER_ACCOUNT_ID,
+                "from_iban": "RO22MAES0000000000000008",
+                "to_iban": "RO11MAES0000000000000009",
+                "amount_minor": 10_000,
+                "currency": "RON",
+                "description": "",
+                "category": "other",
+                "type": "transfer",
+                "status": seeded_status,
+                "recognized": False,
+                "reported": False,
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
+
+    response = await client.get(f"/transactions/staff/customers/{CUSTOMER_USER_ID}/transactions", headers=STAFF_HEADER)
+    assert response.status_code == 200
+    assert {item["status"] for item in response.json()} == {"pending_review", "failed", "cancelled", "completed"}
+
+    await db.transactions.delete_many({})

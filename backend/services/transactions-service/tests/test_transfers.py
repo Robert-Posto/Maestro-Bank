@@ -381,6 +381,36 @@ async def test_filter_by_direction(client: AsyncClient, mock_accounts_by_user):
     assert items[0]["direction"] == "incoming"
 
 
+async def test_receiver_does_not_see_incoming_transaction_before_it_completes(client: AsyncClient, mock_accounts_by_user):
+    """Destinatarul (SOURCE_ACCOUNT/USER_ID aici) NU are voie să afle că
+    cineva a ÎNCERCAT să-i trimită bani care nu au ajuns cu adevărat —
+    reținut pentru fraudă, eșuat sau anulat. Vede DOAR ce chiar a ajuns."""
+    await _seed_transaction(from_account_id=DEST_ACCOUNT_ID, to_account_id=SOURCE_ACCOUNT_ID, status="pending_review")
+    await _seed_transaction(from_account_id=DEST_ACCOUNT_ID, to_account_id=SOURCE_ACCOUNT_ID, status="failed")
+    await _seed_transaction(from_account_id=DEST_ACCOUNT_ID, to_account_id=SOURCE_ACCOUNT_ID, status="cancelled")
+    completed = await _seed_transaction(from_account_id=DEST_ACCOUNT_ID, to_account_id=SOURCE_ACCOUNT_ID, status="completed")
+
+    response = await client.get("/transactions", headers=AUTH_HEADER)
+    assert response.status_code == 200
+    items = response.json()
+    assert [item["id"] for item in items] == [str(completed["_id"])]
+
+    # La fel și pentru citirea unei singure tranzacții — 404, nu doar lipsă din listă.
+    detail = await client.get(f"/transactions/{(await _seed_transaction(from_account_id=DEST_ACCOUNT_ID, to_account_id=SOURCE_ACCOUNT_ID, status='pending_review'))['_id']}", headers=AUTH_HEADER)
+    assert detail.status_code == 404
+
+
+async def test_sender_sees_own_transactions_regardless_of_status(client: AsyncClient, mock_accounts_by_user):
+    """Spre deosebire de destinatar, expeditorul vede TOT istoricul
+    propriu — are nevoie să știe ce s-a întâmplat cu banii lui."""
+    for seeded_status in ("pending_review", "failed", "cancelled", "completed"):
+        await _seed_transaction(from_account_id=SOURCE_ACCOUNT_ID, to_account_id=DEST_ACCOUNT_ID, status=seeded_status)
+
+    response = await client.get("/transactions", headers=AUTH_HEADER)
+    assert response.status_code == 200
+    assert {item["status"] for item in response.json()} == {"pending_review", "failed", "cancelled", "completed"}
+
+
 async def test_filter_by_amount_range(client: AsyncClient, mock_accounts_by_user):
     await _seed_transaction(amount_minor=5_000)
     await _seed_transaction(amount_minor=50_000)
