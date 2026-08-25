@@ -180,7 +180,7 @@ async def test_create_virtual_card_with_design(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "aurora", "type": "virtual", "is_one_time": False},
+        json={"design": "aurora", "type": "virtual", "is_one_time": False, "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 201
@@ -219,7 +219,7 @@ async def test_create_physical_card_deducts_fee(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "graphite", "type": "physical"},
+        json={"design": "graphite", "type": "physical", "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 201
@@ -234,27 +234,34 @@ async def test_create_physical_card_insufficient_funds(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "graphite", "type": "physical"},
+        json={"design": "graphite", "type": "physical", "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 409
 
 
-async def test_reveal_card_requires_correct_password(client: AsyncClient, monkeypatch):
-    _, token, card_id = await _provision_with_card(client)
+async def test_reveal_card_requires_correct_pin(client: AsyncClient):
+    """Vezi tests/test_cards.py pentru acoperirea completă a PIN-ului de
+    card (creare, reveal, backfill) — testul ăsta rămâne aici doar ca
+    parte a fluxului "Cardul meu" existent din acest fișier."""
+    _, token, _ = await _provision_with_card(client)
+    created = await client.post(
+        "/cards",
+        json={"design": "midnight", "type": "virtual", "pin": "7777"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    card_id = created.json()["id"]
 
-    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(False))
     wrong = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "wrong-password"},
+        json={"pin": "0000"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert wrong.status_code == 401
 
-    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(True))
     correct = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "correct-password"},
+        json={"pin": "7777"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert correct.status_code == 200
@@ -263,22 +270,18 @@ async def test_reveal_card_requires_correct_password(client: AsyncClient, monkey
     assert len(body["cvv"]) == 3
 
 
-async def _async_bool(value: bool) -> bool:
-    return value
-
-
-async def test_reveal_card_rejects_both_password_and_webauthn(client: AsyncClient):
+async def test_reveal_card_rejects_both_pin_and_webauthn(client: AsyncClient):
     _, token, card_id = await _provision_with_card(client)
 
     response = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "whatever", "webauthn_challenge_id": "abc", "webauthn_assertion": {"id": "x"}},
+        json={"pin": "1234", "webauthn_challenge_id": "abc", "webauthn_assertion": {"id": "x"}},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 422
 
 
-async def test_reveal_card_rejects_neither_password_nor_webauthn(client: AsyncClient):
+async def test_reveal_card_rejects_neither_pin_nor_webauthn(client: AsyncClient):
     _, token, card_id = await _provision_with_card(client)
 
     response = await client.post(

@@ -58,6 +58,9 @@ export interface CardCreatePayload {
   design: CardDesign;
   type: CardType;
   is_one_time: boolean;
+  /** ALES de user chiar la deschiderea cardului (4 cifre) — folosit ulterior
+   * la reveal (vezi revealCard mai jos), NU parola contului. */
+  pin: string;
 }
 
 export interface CardRevealView {
@@ -242,10 +245,12 @@ export class BankingService {
     return this.http.post<CardView>(`${API_BASE_URL}/accounts/cards`, payload);
   }
 
-  /** `proof` e fie o parolă, fie un assertion WebAuthn (vezi
-   * WebauthnService.getStepUpAssertion) — accounts-service acceptă exact
-   * una dintre cele două metode, nu ambele. */
-  revealCard(cardId: string, proof: { password: string } | WebauthnStepUpProof): Observable<CardRevealView> {
+  /** `proof` e fie PIN-ul CARDULUI (ales la creare — vezi CardCreatePayload.pin),
+   * fie un assertion WebAuthn (vezi WebauthnService.getStepUpAssertion) —
+   * accounts-service acceptă exact una dintre cele două metode, nu ambele.
+   * NU mai e parola contului — schimbat la cererea userului, vezi
+   * accounts-service/app/models.py::CardRevealRequest. */
+  revealCard(cardId: string, proof: { pin: string } | WebauthnStepUpProof): Observable<CardRevealView> {
     return this.http.post<CardRevealView>(`${API_BASE_URL}/accounts/cards/${cardId}/reveal`, proof);
   }
 

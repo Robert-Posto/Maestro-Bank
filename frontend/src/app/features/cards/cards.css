@@ -502,6 +502,29 @@
   color: var(--mb-negative);
 }
 
+.add-card-pin-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mb-space-3);
+  margin-top: var(--mb-space-2);
+}
+
+.add-card-pin-row input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  letter-spacing: 0.3em;
+  padding: 0.6rem var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+  text-align: center;
+}
+
+.add-card-pin-row input:focus {
+  border-color: var(--mb-blue-500);
+}
+
 .design-picker {
   display: flex;
   gap: var(--mb-space-3);

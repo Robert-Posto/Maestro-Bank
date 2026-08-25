@@ -15,6 +15,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app import pin as pin_module
 from app.config import settings
 from app.database import get_database
 from app.iban_service import generate_unique_demo_iban
@@ -149,6 +150,40 @@ async def backfill_missing_account_types() -> None:
     )
     if result.modified_count:
         logger.info("accounts-service: backfill account_type=current aplicat pe %s conturi vechi", result.modified_count)
+
+
+async def backfill_missing_card_pins() -> None:
+    """Migrare idempotentă, rulată la fiecare pornire (vezi main.py::lifespan)
+    — la cererea userului: carduri emise ÎNAINTE de introducerea PIN-ului
+    (vezi CardCreateRequest.pin) nu au deloc `pin_hash` în Mongo, deci
+    reveal_card le-ar respinge mereu ("PIN incorect") — nimeni n-are cum să
+    introducă un PIN pentru un card care n-a avut niciodată unul ales.
+
+    Generăm un PIN ALEATOR (vezi app/pin.py::generate_random_pin) pentru
+    fiecare card afectat, salvăm DOAR hash-ul (niciodată clar în DB), și
+    logăm PIN-ul în clar O SINGURĂ DATĂ, la acest boot — e SINGURUL loc din
+    tot codul unde un PIN apare necriptat, exact ca userul să-l poată citi
+    din logurile serviciului și comunica userilor demo existenți (nu există
+    alt mod de a-l recupera după ce hash-ul e scris, bcrypt e ireversibil
+    intenționat). Cost neglijabil după prima rulare (0 carduri afectate).
+    """
+    db = get_database()
+    cards_without_pin = await db.cards.find({"pin_hash": {"$exists": False}}, {"_id": 1, "last_four": 1}).to_list(
+        length=None
+    )
+    if not cards_without_pin:
+        return
+
+    for card in cards_without_pin:
+        new_pin = pin_module.generate_random_pin()
+        await db.cards.update_one({"_id": card["_id"]}, {"$set": {"pin_hash": pin_module.hash_pin(new_pin)}})
+        logger.info(
+            "accounts-service: PIN generat la backfill (card_id=%s, ultimele4=%s, PIN=%s)",
+            card["_id"],
+            card.get("last_four", "????"),
+            new_pin,
+        )
+    logger.info("accounts-service: backfill PIN aplicat pe %s carduri vechi — vezi PIN-urile individuale mai sus", len(cards_without_pin))
 
 
 _FRAUD_HOLDING_ACCOUNT_USER_ID = "system:fraud-holding"
@@ -418,6 +453,7 @@ async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
         "pan": pan,
         "last_four": pan[-4:],
         "cvv": _generate_demo_cvv(),
+        "pin_hash": pin_module.hash_pin(payload.pin),
         "expiry_month": expiry_month,
         "expiry_year": expiry_year,
         "status": "active",
@@ -457,24 +493,6 @@ async def _notify_user(user_id: str, kind: str, text: str) -> None:
         logger.warning("accounts-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
 
 
-async def _verify_password_with_auth_service(user_id: str, password: str) -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                f"{settings.auth_service_url}/internal/auth/verify-password",
-                json={"user_id": user_id, "password": password},
-            )
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        logger.error("accounts-service: verificarea parolei a eșuat (user_id=%s): %s", user_id, exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nu am putut verifica parola — serviciul de autentificare este indisponibil.",
-        ) from exc
-
-    return bool(response.json().get("valid", False))
-
-
 async def _verify_webauthn_with_auth_service(user_id: str, card_id: str, challenge_id: str, assertion: dict) -> bool:
     """`card_id` e valoarea REZOLVATĂ server-side (din _get_card_for_user,
     apelat înainte de asta în reveal_card) — niciodată una trimisă de
@@ -507,15 +525,25 @@ async def _verify_webauthn_with_auth_service(user_id: str, card_id: str, challen
 
 async def reveal_card(card_id: str, user_id: str, payload: CardRevealRequest) -> dict:
     """Dezvăluie PAN + CVV pentru un card — DOAR după reconfirmarea
-    identității userului (parolă SAU passkey, vezi CardRevealRequest).
+    identității userului (PIN-ul CARDULUI SAU passkey, vezi CardRevealRequest).
     Acțiune sensibilă: nu se bazează doar pe JWT (care poate rămâne valid
     ore întregi), la fel ca la orice bancă reală care cere reautentificare
-    pentru date de card."""
+    pentru date de card.
+
+    PIN-ul se verifică LOCAL (bcrypt, vezi app/pin.py) — spre deosebire de
+    parolă/WebAuthn, care sunt secrete DEȚINUTE de auth-service, PIN-ul e un
+    secret al CARDULUI, deja aici, în accounts-service — nu are rost un
+    apel către alt serviciu ca să-l verificăm."""
     card = await _get_card_for_user(card_id, user_id)
 
-    if payload.password is not None:
-        ok = await _verify_password_with_auth_service(user_id, payload.password)
-        error_detail = "Parolă incorectă."
+    if payload.pin is not None:
+        pin_hash = card.get("pin_hash")
+        # Cardurile create ÎNAINTE de introducerea PIN-ului au fost
+        # completate la boot (vezi backfill_missing_card_pins) — dacă
+        # totuși lipsește (ex. serviciul nu a apucat încă să pornească
+        # migrarea), tratăm ca PIN incorect, nu ca eroare de server.
+        ok = pin_hash is not None and pin_module.verify_pin(payload.pin, pin_hash)
+        error_detail = "PIN incorect."
     else:
         ok = await _verify_webauthn_with_auth_service(
             user_id, card_id, payload.webauthn_challenge_id, payload.webauthn_assertion

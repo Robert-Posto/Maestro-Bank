@@ -386,6 +386,33 @@
         <app-toggle-control [checked]="addCardOneTime()" [disabled]="addCardType() === 'physical'" (toggled)="toggleOneTime($event)" />
       </div>
 
+      <div class="add-card-section">
+        <p class="add-card-section__label">Setează un PIN (4 cifre)</p>
+        <p class="add-card-section__hint">Îl vei folosi ca să vezi numărul complet și CVV-ul cardului — nu parola contului.</p>
+        <div class="add-card-pin-row">
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="PIN nou"
+            [ngModel]="addCardPin()"
+            (ngModelChange)="addCardPin.set($event)"
+            name="addCardPin"
+          />
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="Confirmă PIN"
+            [ngModel]="addCardPinConfirm()"
+            (ngModelChange)="addCardPinConfirm.set($event)"
+            name="addCardPinConfirm"
+          />
+        </div>
+      </div>
+
       <app-action-button [fullWidth]="true" [loading]="addCardSaving()" [disabled]="physicalFeeShortfall()" (pressed)="saveNewCard()">
         {{ addCardType() === 'physical' ? 'Comandă card fizic' : 'Emite card virtual' }}
       </app-action-button>
@@ -404,23 +431,25 @@
         <app-action-button [fullWidth]="true" [loading]="revealBiometricBusy()" (pressed)="submitRevealWithBiometrics()">
           <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
         </app-action-button>
-        <div class="reveal-divider"><span>sau introdu parola</span></div>
+        <div class="reveal-divider"><span>sau introdu PIN-ul cardului</span></div>
       }
 
       <form (ngSubmit)="submitReveal()">
         <label>
-          <span>Parolă</span>
+          <span>PIN card</span>
           <input
             type="password"
-            autocomplete="current-password"
-            placeholder="Parola contului"
-            [ngModel]="revealPassword()"
-            (ngModelChange)="revealPassword.set($event)"
-            name="revealPassword"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="••••"
+            [ngModel]="revealPin()"
+            (ngModelChange)="revealPin.set($event)"
+            name="revealPin"
           />
         </label>
         <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="revealBusy()">
-          Confirmă cu parola
+          Confirmă cu PIN
         </app-action-button>
       </form>
     </div>
