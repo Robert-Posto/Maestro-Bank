@@ -426,3 +426,114 @@ app-empty-state {
     animation: none;
   }
 }
+
+/* --- Sugestii de abonamente (detectate din istoricul de tranzacții) --- */
+
+.suggestions-panel {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-blue-100);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-5);
+  margin-bottom: var(--mb-space-5);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.suggestions-panel__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-4);
+  color: var(--mb-blue-600);
+}
+
+.suggestions-panel__header strong {
+  display: block;
+  color: var(--mb-text-primary);
+  font-size: var(--mb-font-size-sm);
+}
+
+.suggestions-panel__header p {
+  margin-top: 2px;
+  color: var(--mb-text-secondary);
+  font-size: var(--mb-font-size-xs);
+  line-height: var(--mb-line-height-base);
+}
+
+.suggestions-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+}
+
+.suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface-muted);
+}
+
+.suggestion-row__info {
+  min-width: 0;
+  flex: 1;
+}
+
+.suggestion-row__name {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-row__meta {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: 2px;
+}
+
+.suggestion-row__amount {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.suggestion-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  flex-shrink: 0;
+}
+
+.suggestion-row__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.suggestion-row__dismiss:hover {
+  background: var(--mb-border);
+  color: var(--mb-text-primary);
+}
+
+@media (max-width: 640px) {
+  .suggestion-row {
+    flex-wrap: wrap;
+  }
+  .suggestion-row__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

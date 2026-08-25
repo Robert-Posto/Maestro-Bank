@@ -6,12 +6,15 @@ atinge `db.budgets` / `db.subscriptions` direct.
 """
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
 
+import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app.config import settings
 from app.database import get_database
 from app.models import BudgetCreate, BudgetUpdate, SubscriptionCreate, SubscriptionUpdate
 
@@ -136,3 +139,92 @@ async def get_active_subscriptions_for_user_internal(user_id: str) -> list[dict]
         {"name": doc["name"], "amount_minor": doc["amount_minor"], "billing_day": doc["billing_day"], "active": True}
         for doc in docs
     ]
+
+
+# --- Detecție pasivă de abonamente (sugestii, din istoricul de tranzacții) --
+#
+# Heuristic determinist, NU ML — aceeași filozofie ca content_screening.py
+# din transactions-service: rezultat instant, verificabil, ușor de explicat
+# ("de ce mi-a sugerat asta?" -> "pentru că a văzut N plăți la cadență
+# lunară, sumă aproape identică"). O sugestie NU devine automat abonament —
+# userul confirmă explicit (POST /subscriptions, reutilizat ca la creare
+# manuală), exact ca la orice altă acțiune care implică bani/date ale lui.
+
+_MIN_OCCURRENCES = 2
+_AMOUNT_TOLERANCE = 0.1  # ±10% — un abonament poate avea taxe/conversii ușor variabile
+_MIN_GAP_DAYS = 20
+_MAX_GAP_DAYS = 40
+
+
+def _parse_transaction_datetime(value: str) -> datetime:
+    normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(normalized)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+async def _fetch_user_transactions(user_id: str) -> list[dict]:
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(f"{settings.transactions_service_url}/internal/transactions/by-user/{user_id}")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError:
+        logger.warning("budgets-service: nu am putut prelua tranzacțiile userului %s pentru detecție.", user_id)
+        return []
+
+
+async def detect_recurring_payments(user_id: str) -> list[dict]:
+    """Grupează plățile de ieșire, reușite, după descriere normalizată —
+    userul recunoaște un abonament după numele comerciantului ("Netflix"),
+    nu după IBAN-ul lui, deci descrierea e cheia de grupare potrivită, nu
+    contrapartida brută. Un grup devine sugestie doar dacă are cel puțin
+    2 apariții, sumă aproape identică ȘI cadență lunară reală (20-40 zile
+    între FIECARE pereche consecutivă, nu doar în medie) — pragurile astea
+    țin rata de fals-pozitive mică (ex. 2 cumpărături întâmplătoare de la
+    același magazin, la 3 zile distanță, NU trec)."""
+    transactions = await _fetch_user_transactions(user_id)
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for tx in transactions:
+        description = (tx.get("description") or "").strip()
+        if not description or tx.get("direction") != "outgoing" or tx.get("status") != "completed":
+            continue
+        groups[description.lower()].append(tx)
+
+    existing = await list_subscriptions_for_user(user_id)
+    existing_names = {doc["name"].strip().lower() for doc in existing}
+
+    suggestions: list[dict] = []
+    for description_key, txs in groups.items():
+        if len(txs) < _MIN_OCCURRENCES:
+            continue
+
+        txs_sorted = sorted(txs, key=lambda t: t["created_at"])
+        amounts = [t["amount_minor"] for t in txs_sorted]
+        avg_amount = sum(amounts) / len(amounts)
+        if avg_amount <= 0 or any(abs(a - avg_amount) / avg_amount > _AMOUNT_TOLERANCE for a in amounts):
+            continue
+
+        dates = [_parse_transaction_datetime(t["created_at"]) for t in txs_sorted]
+        gaps_days = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
+        if not gaps_days or any(not (_MIN_GAP_DAYS <= gap <= _MAX_GAP_DAYS) for gap in gaps_days):
+            continue
+
+        latest = txs_sorted[-1]
+        display_name = (latest.get("counterparty_name") or latest["description"]).strip()
+        if display_name.lower() in existing_names:
+            continue
+
+        suggestions.append(
+            {
+                "name": display_name,
+                "amount_minor": round(avg_amount),
+                "currency": latest.get("currency", "RON"),
+                "billing_day": dates[-1].day,
+                "occurrences": len(txs_sorted),
+                "last_seen": latest["created_at"],
+            }
+        )
+
+    suggestions.sort(key=lambda s: s["occurrences"], reverse=True)
+    return suggestions
