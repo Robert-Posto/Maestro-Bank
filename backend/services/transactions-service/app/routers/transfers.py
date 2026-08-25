@@ -29,6 +29,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 
 from app import service
 from app.models import (
+    DescriptionCheckRequest,
+    DescriptionCheckResponse,
     ReportTransactionRequest,
     TransactionFilters,
     TransactionOut,
@@ -68,6 +70,17 @@ def get_transaction_filters(
 @router.post("/transfers", response_model=TransactionOut, response_model_by_alias=False, status_code=201)
 async def create_transfer(payload: TransferRequest, background_tasks: BackgroundTasks, user_id: str = CurrentUserId):
     return await service.create_transfer(payload, user_id, background_tasks)
+
+
+@router.post("/transfers/screen-description", response_model=DescriptionCheckResponse)
+async def screen_description(payload: DescriptionCheckRequest, user_id: str = CurrentUserId):
+    """Verificare LIVE, apelată de frontend pe măsură ce userul scrie
+    descrierea (debounced — vezi features/transfers/transfers.ts) — ÎNAINTE
+    de a trimite transferul, nu doar după. `user_id` e cerut DOAR pentru
+    autentificare (nu accesează niciun cont) — la fel ca restul rutelor
+    protejate din acest router, tocmai ca să nu poată fi apelată neautentificat."""
+    warning = service.check_description_content(payload.description)
+    return DescriptionCheckResponse(warning=warning)
 
 
 @router.get("", response_model=list[TransactionOut], response_model_by_alias=False)
