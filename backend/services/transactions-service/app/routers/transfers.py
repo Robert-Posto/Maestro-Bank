@@ -25,7 +25,7 @@ cu wildcard-ul de 1 segment, dar păstrăm ordinea oricum, pentru claritate.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 
 from app import service
 from app.models import (
@@ -66,8 +66,8 @@ def get_transaction_filters(
 
 
 @router.post("/transfers", response_model=TransactionOut, response_model_by_alias=False, status_code=201)
-async def create_transfer(payload: TransferRequest, user_id: str = CurrentUserId):
-    return await service.create_transfer(payload, user_id)
+async def create_transfer(payload: TransferRequest, background_tasks: BackgroundTasks, user_id: str = CurrentUserId):
+    return await service.create_transfer(payload, user_id, background_tasks)
 
 
 @router.get("", response_model=list[TransactionOut], response_model_by_alias=False)

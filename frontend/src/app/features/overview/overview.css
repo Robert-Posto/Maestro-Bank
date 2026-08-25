@@ -334,8 +334,9 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--mb-navy-900);
-  color: #fff;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;

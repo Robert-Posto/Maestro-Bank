@@ -4,10 +4,11 @@ import { DatePipe } from '@angular/common';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { categoryLabel } from '../../categories';
 import { transactionDisplayName } from '../../transaction-display';
-import { StatusBadge } from '../status-badge/status-badge';
+import { StatusBadge, type BadgeTone } from '../status-badge/status-badge';
 import { ActionButton } from '../action-button/action-button';
 import { Icon } from '../icon/icon';
 import { MerchantAvatar } from '../merchant-avatar/merchant-avatar';
+import type { TransactionRisk } from '../../../services/banking.service';
 
 export interface TransactionDetail {
   id: string;
@@ -23,13 +24,28 @@ export interface TransactionDetail {
   reported: boolean;
   created_at: string;
   hold?: { expires_at: string; resolution: string | null } | null;
+  risk?: TransactionRisk | null;
 }
+
+const RISK_TONE: Record<TransactionRisk['tier'], BadgeTone> = {
+  safe: 'success',
+  unusual: 'warning',
+  potentially_dangerous: 'error',
+  held: 'error',
+};
+
+const RISK_LABEL: Record<TransactionRisk['tier'], string> = {
+  safe: 'Sigur',
+  unusual: 'Neobișnuit',
+  potentially_dangerous: 'Potențial riscant',
+  held: 'Reținut',
+};
 
 /**
  * Panoul lateral "Detalii tranzacție" (vezi UI reference/Transactions.png).
- * Zona "Financial Guardian" e păstrată vizual, dar marcată explicit
- * "Coming in AI phase" — nu simulăm o analiză AI reală (vezi task-ul
- * MaestroBank, secțiunea 11).
+ * Zona "Financial Guardian" arată evaluarea REALĂ de risc (vezi
+ * app/guardian/ din backend) — tier + frază, niciodată ID-uri de regulă
+ * sau alte detalii care ar putea "învăța" pragurile motorului.
  */
 @Component({
   selector: 'app-transaction-details-panel',
@@ -56,4 +72,13 @@ export class TransactionDetailsPanel {
   protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
   protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));
   protected readonly signedAmount = computed(() => (this.transaction().direction === 'outgoing' ? -1 : 1) * this.transaction().amount_minor);
+
+  protected readonly riskTone = computed<BadgeTone>(() => {
+    const risk = this.transaction().risk;
+    return risk ? RISK_TONE[risk.tier] : 'neutral';
+  });
+  protected readonly riskLabel = computed(() => {
+    const risk = this.transaction().risk;
+    return risk ? RISK_LABEL[risk.tier] : '';
+  });
 }

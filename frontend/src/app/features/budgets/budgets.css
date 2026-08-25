@@ -345,8 +345,8 @@ app-empty-state {
 }
 
 .subscription-card__due--soon {
-  background: #fff7e6;
-  color: #b45309;
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
 }
 
 .subscription-card__due--urgent {

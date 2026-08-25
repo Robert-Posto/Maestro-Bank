@@ -21,12 +21,13 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 
 from app import holds
 from app.config import settings
 from app.database import get_database
 from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
+from app.guardian import service as guardian_service
 from app.money import format_minor_amount
 from app.models import (
     ReportTransactionRequest,
@@ -133,10 +134,23 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "reported": doc.get("reported", False),
         "created_at": doc["created_at"],
         "hold": doc.get("hold"),
+        "risk": doc.get("risk"),
     }
 
 
-async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
+async def create_transfer(
+    payload: TransferRequest, user_id: str, background_tasks: BackgroundTasks | None = None
+) -> dict:
+    # `background_tasks` vine din routers/transfers.py (Starlette îl
+    # rulează automat DUPĂ ce răspunsul e trimis) când apelul pornește
+    # dintr-o cerere HTTP reală. run_due_scheduled_transfers (mai jos, în
+    # acest fișier) apelează create_transfer DIN INTERIORUL unui loop de
+    # fundal, fără nicio cerere HTTP — acolo nu există niciun ciclu de
+    # răspuns ASGI care să-l ruleze automat, deci ne creăm propria instanță
+    # și o așteptăm explicit înainte de return.
+    owns_background_tasks = background_tasks is None
+    if owns_background_tasks:
+        background_tasks = BackgroundTasks()
     db = get_database()
 
     # 1-2. user autentificat (garantat de CurrentUserId) + cont sursă există
@@ -224,6 +238,31 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
         )
 
     is_held = decision_band == "hold"
+
+    # Guardian (app/guardian/) — explicația LLM a deciziei de mai sus, NU
+    # o a doua decizie. `informational_band` e citit din fraud_evaluations
+    # (scris NECONDIȚIONAT de audit.py, indiferent de shadow mode) — spre
+    # deosebire de `decision_band` de mai sus, care rămâne mereu None sub
+    # shadow mode, prin garanția proprie a evaluate_and_record_transfer_
+    # risk (nemodificată aici). Cele două servesc scopuri diferite: `is_held`
+    # gatează banii (deja calculat mai sus), `informational_band` gatează
+    # DOAR ce vede clientul despre risc — vezi guardian/service.py pentru
+    # de ce nu sunt același lucru sub shadow mode.
+    if settings.guardian_enabled:
+        evaluation_doc = await db.fraud_evaluations.find_one({"transaction_id": insert_result.inserted_id})
+        informational_band = evaluation_doc.get("decision_would_apply") if evaluation_doc else None
+
+        risk = guardian_service.compute_customer_risk(informational_band, is_held)
+        await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"risk": risk}})
+
+        guardian_scope = guardian_service._CUSTOMER_PHRASE_BANDS | set(settings.guardian_staff_report_bands)
+        if informational_band in guardian_scope:
+            background_tasks.add_task(
+                guardian_service.generate_guardian_explanations,
+                transaction_id=insert_result.inserted_id,
+                user_id=user_id,
+            )
+
     try:
         if is_held:
             await holds.create_hold(
@@ -266,6 +305,17 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
             f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
         )
 
+        # Destinatarul primea bani fără NICIO notificare — doar expeditorul
+        # era anunțat mai sus. Excepție: transfer între propriile conturi
+        # (destination["user_id"] == user_id) — notificarea de mai sus e
+        # deja suficientă, a doua ar fi doar zgomot ("ai primit de la tine").
+        if destination["user_id"] != user_id:
+            await _notify_user(
+                destination["user_id"],
+                "transfer_received",
+                f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+            )
+
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
         # actualizează DOAR la transferuri efectiv "completed" — vezi
         # app/fraud/profile.py. Best-effort, la fel ca _notify_user: un
@@ -280,7 +330,15 @@ async def create_transfer(payload: TransferRequest, user_id: str) -> dict:
             )
 
     final_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
-    return to_transaction_view(final_doc, viewer_account_id=source["id"])
+    view = to_transaction_view(final_doc, viewer_account_id=source["id"])
+
+    if owns_background_tasks:
+        # Niciun ciclu de răspuns ASGI care să ruleze background_tasks
+        # automat aici (vezi comentariul de la începutul funcției) — îl
+        # rulăm noi explicit, DUPĂ ce documentul final e deja citit.
+        await background_tasks()
+
+    return view
 
 
 async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:

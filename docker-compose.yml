@@ -126,6 +126,16 @@ services:
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
       - AUTH_SERVICE_URL=http://auth-service:8000
       - SUPPORT_SERVICE_URL=http://support-service:8000
+      # Guardian (app/guardian/) — explicații LLM ale deciziilor motorului
+      # de fraudă. Aceleași variabile Azure OpenAI ca ai-orchestrator-service
+      # (vezi .env), dar client propriu, izolat — vezi app/guardian/llm_client.py.
+      - GUARDIAN_ENABLED=${GUARDIAN_ENABLED:-true}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-5-mini}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-10-21}
+      - GUARDIAN_LLM_TIMEOUT_SECONDS=${GUARDIAN_LLM_TIMEOUT_SECONDS:-8.0}
+      - GUARDIAN_STAFF_REPORT_BANDS=${GUARDIAN_STAFF_REPORT_BANDS:-hold}
     volumes:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
@@ -211,6 +221,9 @@ services:
       # Curs valutar real (BNR) — vezi app/bnr_rates.py. Reîmprospătat la
       # fiecare N secunde (implicit 6h); BNR publică o dată/zi lucrătoare.
       - RATES_REFRESH_INTERVAL_SECONDS=${RATES_REFRESH_INTERVAL_SECONDS:-21600}
+      # Adresă INTERNĂ Docker — schimbul valutar chiar mută solduri acum
+      # (POST /exchange/execute), prin accounts-service/internal/accounts/exchange.
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
     volumes:
       - ./backend/services/exchange-service/app:/app/app
       - ./backend/services/exchange-service/tests:/app/tests

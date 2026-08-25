@@ -1,18 +1,23 @@
 """Logica de business a exchange-service — motor FX cu curs REAL (BNR) +
-politică de business SIMULATĂ.
+politică de business SIMULATĂ (spread/comision).
 
-⚠️ Simularea e doar la nivelul spread/comision și al execuției
-(POST /exchange/demo NU mută fonduri reale — vezi app/config.py). Cursul
-de bază (mid_rate) e cel oficial publicat zilnic de Banca Națională a
-României (vezi app/bnr_rates.py), cu fallback pe un curs demo static dacă
+Cursul de bază (mid_rate) e cel oficial publicat zilnic de Banca Națională
+a României (vezi app/bnr_rates.py), cu fallback pe un curs demo static dacă
 BNR e indisponibil. Formula de cost: cost total = cost de spread +
 comision fix, aplicat pe suma trimisă; suma primită = (sumă - comision) /
 curs aplicat.
+
+Execuția (execute_exchange) chiar mută solduri — cheamă accounts-service
+(POST /internal/accounts/exchange), care debitează contul sursă și
+creditează contul destinație ale userului. Necesită ca userul să aibă deja
+deschis contul pe valuta țintă (eur/usd/gbp) — la fel cum orice cont
+suplimentar (economii/depozit/student) se deschide explicit, nu automat.
 """
 
 import logging
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import HTTPException, status
 
 from app.bnr_rates import fetch_bnr_rates
@@ -22,6 +27,7 @@ from app.config import (
     DEMO_MID_RATES,
     DEMO_SPREAD_PERCENT,
     SUPPORTED_FOREIGN_CURRENCIES,
+    settings,
 )
 from app.database import get_database
 from app.models import QuoteRequest
@@ -76,7 +82,6 @@ async def get_current_rates() -> list[dict]:
                 "spread_percent": DEMO_SPREAD_PERCENT[currency],
                 "commission_minor": DEMO_COMMISSION_MINOR[currency],
                 "source": source,
-                "is_demo": True,
             }
         )
     return rates
@@ -137,17 +142,54 @@ async def compute_quote(payload: QuoteRequest) -> dict:
         "total_cost_minor": total_cost_minor,
         "total_cost_percent": total_cost_percent,
         "source": source,
-        "is_demo": True,
         "generated_at": datetime.now(timezone.utc),
     }
 
 
-async def execute_demo_exchange(user_id: str, payload: QuoteRequest) -> dict:
-    """Înregistrează o simulare de schimb valutar. NU mută fonduri reale —
-    accounts-service NU e apelat aici, intenționat (vezi task-ul
-    MaestroBank, secțiunea 15: "Nu avem integrare FX reală").
-    """
+def _account_type_for_currency(currency: str) -> str:
+    """RON -> "current" (contul unic RON al userului); altfel valuta
+    străină, lowercase — "EUR" -> "eur" etc., exact tipurile de cont
+    creabile din accounts-service (vezi acolo app/models.py::AccountType)."""
+    return "current" if currency == BASE_CURRENCY else currency.lower()
+
+
+async def _apply_exchange_in_accounts_service(
+    user_id: str, from_currency: str, to_currency: str, debit_minor: int, credit_minor: int
+) -> None:
+    """Cheamă accounts-service să debiteze/crediteze efectiv soldurile —
+    vezi accounts-service/app/routers/internal.py::apply_internal_exchange.
+    Traduce eșecurile (404 = cont lipsă, 409 = sold insuficient) în
+    HTTPException-uri cu mesajul original, transparent pentru user."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(
+            f"{settings.accounts_service_url}/internal/accounts/exchange",
+            json={
+                "user_id": user_id,
+                "from_account_type": _account_type_for_currency(from_currency),
+                "to_account_type": _account_type_for_currency(to_currency),
+                "debit_minor": debit_minor,
+                "credit_minor": credit_minor,
+            },
+        )
+
+    if response.status_code == status.HTTP_404_NOT_FOUND:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=response.json().get("detail"))
+    if response.status_code == status.HTTP_409_CONFLICT:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=response.json().get("detail"))
+    response.raise_for_status()
+
+
+async def execute_exchange(user_id: str, payload: QuoteRequest) -> dict:
+    """Execută un schimb valutar REAL — mută solduri între contul RON al
+    userului și contul lui pe valuta țintă (sau invers), prin
+    accounts-service. Dacă userul nu are încă deschis contul pe valuta
+    respectivă, accounts-service întoarce 404, tradus mai jos într-un 400
+    cu mesaj clar (userul trebuie să-l deschidă întâi, din pagina Conturi)."""
     quote = await compute_quote(payload)
+
+    await _apply_exchange_in_accounts_service(
+        user_id, quote["from_currency"], quote["to_currency"], quote["amount_minor"], quote["received_minor"]
+    )
 
     db = get_database()
     doc = {
@@ -159,12 +201,11 @@ async def execute_demo_exchange(user_id: str, payload: QuoteRequest) -> dict:
         "applied_rate": quote["applied_rate"],
         "commission_minor": quote["commission_minor"],
         "total_cost_minor": quote["total_cost_minor"],
-        "is_demo": True,
         "created_at": datetime.now(timezone.utc),
     }
     result = await db.demo_exchanges.insert_one(doc)
     logger.info(
-        "exchange-service: simulare înregistrată (id=%s, user_id=%s, %s->%s, amount_minor=%s)",
+        "exchange-service: schimb executat (id=%s, user_id=%s, %s->%s, amount_minor=%s)",
         result.inserted_id,
         user_id,
         quote["from_currency"],
@@ -174,7 +215,7 @@ async def execute_demo_exchange(user_id: str, payload: QuoteRequest) -> dict:
     return await db.demo_exchanges.find_one({"_id": result.inserted_id})
 
 
-async def list_demo_exchanges_for_user(user_id: str) -> list[dict]:
+async def list_exchanges_for_user(user_id: str) -> list[dict]:
     db = get_database()
     cursor = db.demo_exchanges.find({"user_id": user_id}).sort("created_at", -1)
     return await cursor.to_list(length=100)

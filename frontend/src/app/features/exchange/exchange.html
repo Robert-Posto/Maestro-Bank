@@ -2,7 +2,7 @@
 
 <div class="fx-demo-banner">
   <app-icon name="info" [size]="16" />
-  <span>Cursul de bază e cel oficial, publicat zilnic de Banca Națională a României. Spread-ul, comisionul și execuția schimbului sunt o simulare MaestroBank pentru acest prototip — NU se mută fonduri reale.</span>
+  <span>Cursul de bază e cel oficial, publicat zilnic de Banca Națională a României. Spread-ul și comisionul sunt o politică MaestroBank simulată, dar schimbul CHIAR mută soldul — între contul tău curent (RON) și contul tău pe valuta țintă.</span>
 </div>
 
 <div class="fx-layout">
@@ -12,17 +12,13 @@
         <span class="fx-label">Schimbi</span>
         <div class="fx-field__row">
           <input class="fx-amount" type="number" min="1" [ngModel]="amount()" (ngModelChange)="amount.set($event); onInputChange()" />
-          <label class="fx-currency-select">
-            <span class="fx-currency-badge" [style.background]="'var(' + currencyColor(fromCurrency()) + ')'">{{ fromCurrency() }}</span>
-            <select [ngModel]="fromCurrency()" (ngModelChange)="fromCurrency.set($event); onInputChange()">
-              @for (c of fromOptions(); track c) {
-                <option [value]="c">{{ c }}</option>
-              }
-            </select>
-            <app-icon name="chevron-down" [size]="14" />
-          </label>
+          <app-select class="fx-currency-select" [options]="fromOptions()" [value]="fromCurrency()" variant="bare" (changed)="onFromCurrencyChange($event)" />
         </div>
-        <span class="fx-hint">Sold disponibil: {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</span>
+        @if (fromAccount()) {
+          <span class="fx-hint">Sold disponibil: {{ fromAccount()!.balance_minor | money: fromAccount()!.currency }}</span>
+        } @else {
+          <span class="fx-hint fx-hint--warning">Nu ai încă un cont în {{ fromCurrency() }}.</span>
+        }
       </div>
 
       <button type="button" class="fx-swap" aria-label="Inversează monedele" (click)="swapCurrencies()">
@@ -33,22 +29,26 @@
         <span class="fx-label">Vei primi (estimat)</span>
         <div class="fx-field__row fx-field__row--readonly">
           <span class="fx-amount fx-amount--result">{{ quote() ? (quote()!.received_minor | money: toCurrency() : false) : '—' }}</span>
-          <label class="fx-currency-select">
-            <span class="fx-currency-badge" [style.background]="'var(' + currencyColor(toCurrency()) + ')'">{{ toCurrency() }}</span>
-            <select [ngModel]="toCurrency()" (ngModelChange)="toCurrency.set($event); onInputChange()">
-              @for (c of toOptions(); track c) {
-                <option [value]="c">{{ c }}</option>
-              }
-            </select>
-            <app-icon name="chevron-down" [size]="14" />
-          </label>
+          <app-select class="fx-currency-select" [options]="toOptions()" [value]="toCurrency()" variant="bare" (changed)="onToCurrencyChange($event)" />
         </div>
-        <span class="fx-hint">Estimat la cursul BNR al zilei</span>
+        @if (toAccount()) {
+          <span class="fx-hint">Sold curent: {{ toAccount()!.balance_minor | money: toAccount()!.currency }}</span>
+        } @else {
+          <span class="fx-hint fx-hint--warning">Nu ai încă un cont în {{ toCurrency() }} — deschide unul înainte de a confirma.</span>
+        }
       </div>
     </div>
 
     @if (quoteError()) {
       <p class="fx-error">{{ quoteError() }}</p>
+    }
+
+    @if (quote() && !toAccount()) {
+      <div class="fx-missing-account">
+        <app-icon name="info" [size]="16" />
+        <span>Ca să primești {{ toCurrency() }}, ai nevoie de un cont pe valuta asta.</span>
+        <app-action-button variant="secondary" (pressed)="goToOpenAccount()">Deschide cont {{ toCurrency() }}</app-action-button>
+      </div>
     }
 
     @if (quote(); as q) {
@@ -90,11 +90,11 @@
 
     @if (confirmed()) {
       <p class="fx-confirmed">
-        <app-icon name="check" [size]="16" /> Simulare înregistrată — fără mutare reală de fonduri.
+        <app-icon name="check" [size]="16" /> Schimb realizat — soldurile s-au actualizat.
       </p>
     } @else {
-      <app-action-button [fullWidth]="true" [disabled]="!quote()" [loading]="confirming()" (pressed)="confirmExchange()">
-        Confirmă schimbul (Demo)
+      <app-action-button [fullWidth]="true" [disabled]="!canExecute()" [loading]="confirming()" (pressed)="confirmExchange()">
+        Confirmă schimbul
       </app-action-button>
     }
   </div>
@@ -120,7 +120,7 @@
         </li>
         <li>
           <span class="fx-steps__icon"><app-icon name="check" [size]="14" /></span>
-          <p>Rezultă costul total estimat — exact cât te costă schimbul, în simulare.</p>
+          <p>Rezultă costul total estimat — exact cât te costă schimbul.</p>
         </li>
       </ol>
     </div>

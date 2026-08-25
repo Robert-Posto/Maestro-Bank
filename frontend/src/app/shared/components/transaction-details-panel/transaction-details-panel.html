@@ -94,14 +94,20 @@
     <p class="details-panel__reported-note">Tranzacția a fost raportată echipei de suport MaestroBank.</p>
   }
 
-  <div class="details-panel__guardian">
-    <div class="details-panel__guardian-header">
-      <span class="details-panel__guardian-icon"><app-icon name="shield" [size]="18" /></span>
-      <strong>Financial Guardian</strong>
-      <span class="details-panel__coming-soon">Coming in AI phase</span>
+  @if (transaction().risk; as risk) {
+    <div class="details-panel__guardian" [class]="'details-panel__guardian--' + riskTone()">
+      <div class="details-panel__guardian-header">
+        <span class="details-panel__guardian-icon"><app-icon name="shield" [size]="18" /></span>
+        <strong>Financial Guardian</strong>
+        <app-status-badge status="risk" [toneOverride]="riskTone()" [labelOverride]="riskLabel()" />
+      </div>
+      @if (risk.status === 'pending') {
+        <p>Se analizează tranzacția…</p>
+      } @else {
+        <p>{{ risk.phrase }}</p>
+      }
     </div>
-    <p>Detectarea automată a tranzacțiilor neobișnuite va fi disponibilă într-o etapă viitoare (AI).</p>
-  </div>
+  }
 
   <div class="details-panel__support">
     <p>Ai nevoie de ajutor cu această tranzacție?</p>

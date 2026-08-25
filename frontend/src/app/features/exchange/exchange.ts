@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 
 import { AccountView, BankingService } from '../../services/banking.service';
@@ -11,18 +12,20 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { currencyColorVar } from '../../shared/currencies';
+import { Select, SelectOption } from '../../shared/components/select/select';
 
 /**
  * Schimb valutar — vezi UI reference/Exchange.png și task-ul MaestroBank,
  * secțiunea 15. Cursul de bază (mid_rate) e REAL — preluat zilnic de la
- * BNR de către exchange-service. ⚠️ Spread-ul, comisionul și execuția
- * (confirmarea schimbului) rămân o simulare MaestroBank — fără mutare
- * reală de fonduri, "is_demo: true" pe fiecare răspuns.
+ * BNR de către exchange-service. Spread-ul și comisionul rămân o politică
+ * simulată MaestroBank, dar execuția CHIAR mută solduri, între contul RON
+ * și contul userului pe valuta țintă — necesită acel cont deschis deja
+ * (vezi accounts-service::apply_internal_exchange).
  */
 @Component({
   selector: 'app-exchange',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe],
+  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, Select],
   templateUrl: './exchange.html',
   styleUrl: './exchange.css',
 })
@@ -30,9 +33,10 @@ export class Exchange implements OnInit {
   private readonly exchangeApi = inject(ExchangeService);
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
   private readonly quoteTrigger = new Subject<void>();
 
-  protected readonly account = signal<AccountView | null>(null);
+  protected readonly accounts = signal<AccountView[]>([]);
   protected readonly rates = signal<ExchangeRate[]>([]);
   protected readonly loadingRates = signal(true);
 
@@ -57,11 +61,15 @@ export class Exchange implements OnInit {
    * nu poată alege manual o pereche imposibilă (ex. EUR -> USD) — partea
    * de RON se schimbă doar prin butonul de inversare (swap).
    */
-  protected readonly fromOptions = computed(() =>
-    this.toCurrency() === 'RON' ? this.foreignCurrencies() : ['RON'],
+  private toSelectOptions(codes: string[]): SelectOption[] {
+    return codes.map((code) => ({ value: code, label: code, colorVar: currencyColorVar(code) }));
+  }
+
+  protected readonly fromOptions = computed<SelectOption[]>(() =>
+    this.toSelectOptions(this.toCurrency() === 'RON' ? this.foreignCurrencies() : ['RON']),
   );
-  protected readonly toOptions = computed(() =>
-    this.fromCurrency() === 'RON' ? this.foreignCurrencies() : ['RON'],
+  protected readonly toOptions = computed<SelectOption[]>(() =>
+    this.toSelectOptions(this.fromCurrency() === 'RON' ? this.foreignCurrencies() : ['RON']),
   );
 
   /** Culoarea insignei fiecărei monede (selectoare + lista de cursuri) — vezi shared/currencies.ts. */
@@ -69,8 +77,25 @@ export class Exchange implements OnInit {
     return currencyColorVar(code);
   }
 
+  /** "RON" -> contul curent; altfel contul pe valuta respectivă (eur/usd/gbp)
+   * — exact maparea folosită și de exchange-service (_account_type_for_currency). */
+  private accountTypeForCurrency(code: string): string {
+    return code === 'RON' ? 'current' : code.toLowerCase();
+  }
+
+  protected readonly fromAccount = computed(
+    () => this.accounts().find((a) => a.account_type === this.accountTypeForCurrency(this.fromCurrency())) ?? null,
+  );
+  protected readonly toAccount = computed(
+    () => this.accounts().find((a) => a.account_type === this.accountTypeForCurrency(this.toCurrency())) ?? null,
+  );
+  /** Cursul se poate afișa oricum (nu cere niciun cont) — dar EXECUȚIA
+   * chiar mută solduri, deci userul trebuie să aibă deja contul destinație
+   * deschis (vezi ExchangeService, doc-comment). */
+  protected readonly canExecute = computed(() => !!this.quote() && !!this.toAccount());
+
   ngOnInit(): void {
-    this.banking.getMyAccount().subscribe({ next: (account) => this.account.set(account) });
+    this.loadAccounts();
     this.exchangeApi.getRates().subscribe({
       next: (rates) => {
         this.rates.set(rates);
@@ -83,9 +108,27 @@ export class Exchange implements OnInit {
     this.quoteTrigger.pipe(debounceTime(350), distinctUntilChanged()).subscribe(() => this.fetchQuote());
   }
 
+  private loadAccounts(): void {
+    this.banking.getAllAccounts().subscribe({ next: (accounts) => this.accounts.set(accounts) });
+  }
+
+  protected goToOpenAccount(): void {
+    this.router.navigate(['/app/accounts']);
+  }
+
   protected onInputChange(): void {
     this.confirmed.set(false);
     this.quoteTrigger.next();
+  }
+
+  protected onFromCurrencyChange(code: string): void {
+    this.fromCurrency.set(code);
+    this.onInputChange();
+  }
+
+  protected onToCurrencyChange(code: string): void {
+    this.toCurrency.set(code);
+    this.onInputChange();
   }
 
   protected swapCurrencies(): void {
@@ -128,17 +171,20 @@ export class Exchange implements OnInit {
   }
 
   protected confirmExchange(): void {
-    if (!this.quote()) return;
+    if (!this.canExecute()) return;
     this.confirming.set(true);
-    this.exchangeApi.confirmDemoExchange(this.fromCurrency(), this.toCurrency(), Math.round(this.amount() * 100)).subscribe({
+    this.exchangeApi.confirmExchange(this.fromCurrency(), this.toCurrency(), Math.round(this.amount() * 100)).subscribe({
       next: () => {
         this.confirming.set(false);
         this.confirmed.set(true);
-        this.toast.success('Simulare de schimb valutar înregistrată (demo — fără mutare reală de fonduri).');
+        this.toast.success('Schimb valutar realizat — soldurile s-au actualizat.');
+        // Soldurile ambelor conturi (sursă + destinație) s-au schimbat efectiv —
+        // reîncărcăm ca fx-hint-urile ("Sold disponibil") să reflecte realitatea.
+        this.loadAccounts();
       },
       error: (err) => {
         this.confirming.set(false);
-        this.toast.error(extractErrorMessage(err, 'Simularea a eșuat.'));
+        this.toast.error(extractErrorMessage(err, 'Schimbul valutar a eșuat.'));
       },
     });
   }

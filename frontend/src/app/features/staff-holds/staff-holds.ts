@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loadin
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
+import { Modal } from '../../shared/components/modal/modal';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
@@ -26,7 +27,7 @@ type PendingAction = { hold: StaffHoldView; kind: 'approve' | 'reject' };
 @Component({
   selector: 'app-staff-holds',
   standalone: true,
-  imports: [DatePipe, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Icon, MoneyPipe],
+  imports: [DatePipe, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Modal, Icon, MoneyPipe],
   templateUrl: './staff-holds.html',
   styleUrl: './staff-holds.css',
 })
@@ -41,6 +42,8 @@ export class StaffHolds implements OnInit {
 
   protected readonly pendingAction = signal<PendingAction | null>(null);
   protected readonly resolving = signal(false);
+
+  protected readonly analysisTarget = signal<StaffHoldView | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -78,6 +81,14 @@ export class StaffHolds implements OnInit {
   protected viewCustomer(hold: StaffHoldView): void {
     if (!hold.user_id) return;
     this.router.navigate(['/admin/customers', hold.user_id]);
+  }
+
+  protected openAnalysis(hold: StaffHoldView): void {
+    this.analysisTarget.set(hold);
+  }
+
+  protected closeAnalysis(): void {
+    this.analysisTarget.set(null);
   }
 
   protected askApprove(hold: StaffHoldView): void {

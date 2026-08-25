@@ -75,7 +75,7 @@
 
           <div class="budget-card__header">
             <div class="budget-card__identity">
-              <span class="budget-card__category-icon" [style.color]="'var(' + categoryColorVar(b.category) + ')'" [style.background]="'color-mix(in srgb, var(' + categoryColorVar(b.category) + ') 14%, white)'">
+              <span class="budget-card__category-icon" [style.color]="'var(' + categoryColorVar(b.category) + ')'" [style.background]="'color-mix(in srgb, var(' + categoryColorVar(b.category) + ') 14%, var(--mb-surface))'">
                 <app-icon name="budgets" [size]="19" />
               </span>
               <div>
@@ -171,11 +171,7 @@
       </label>
       <label>
         <span>Categorie</span>
-        <select [ngModel]="budgetCategory()" (ngModelChange)="budgetCategory.set($event)">
-          @for (cat of categories; track cat.value) {
-            <option [value]="cat.value">{{ cat.label }}</option>
-          }
-        </select>
+        <app-select [options]="categoryOptions" [value]="budgetCategory()" (changed)="budgetCategory.set($event)" />
       </label>
       <label>
         <span>Limită (lei)</span>
