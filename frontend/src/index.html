@@ -6,6 +6,10 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- Logo-ul apare în overlay-ul de tranziție între rute (vezi
+         shared/components/route-loader) — îl preîncărcăm ca să fie deja în
+         cache la prima navigare, altfel s-ar vedea un spațiu gol în locul lui. -->
+    <link rel="preload" as="image" href="logo-mb.png" />
   </head>
   <body>
     <app-root></app-root>
