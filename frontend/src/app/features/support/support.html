@@ -1,6 +1,4 @@
-<app-page-header title="Suport" subtitle="Suntem aici să te ajutăm.">
-  <app-action-button (pressed)="openModal()"><app-icon name="plus" [size]="16" /> Solicitare nouă</app-action-button>
-</app-page-header>
+<app-page-header title="Suport" subtitle="Suntem aici să te ajutăm." />
 
 <div class="support-layout">
   <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" aria-label="Chat cu Support Agent">
@@ -53,6 +51,19 @@
                 <div class="support-chat__context-account">
                   <span class="support-chat__context-account-iban">{{ account.iban }}</span>
                   <span class="support-chat__context-account-balance">{{ account.balance_minor | money: account.currency }}</span>
+                </div>
+              }
+              @if (chatMessage.context?.accounts; as accounts) {
+                <div class="support-chat__context-card">
+                  @for (a of accounts; track a.iban) {
+                    <div class="support-chat__context-account support-chat__context-account--row">
+                      <div>
+                        <span class="support-chat__context-account-type">{{ accountTypeLabel(a.account_type) }}</span>
+                        <span class="support-chat__context-account-iban">{{ a.iban }}</span>
+                      </div>
+                      <span class="support-chat__context-account-balance">{{ a.balance_minor | money: a.currency }}</span>
+                    </div>
+                  }
                 </div>
               }
               @if (chatMessage.context?.card; as card) {
@@ -142,18 +153,6 @@
   </section>
 
   <aside class="support-sidebar">
-    <section class="support-panel">
-      <h2>Întrebări frecvente</h2>
-      <div class="support-faq">
-        @for (item of faqItems; track item.q) {
-          <details class="support-faq-item">
-            <summary>{{ item.q }}<app-icon class="support-faq-item__chevron" name="chevron-down" [size]="16" /></summary>
-            <p>{{ item.a }}</p>
-          </details>
-        }
-      </div>
-    </section>
-
     <section class="support-panel support-panel--agent">
       <div class="support-agent">
         <span class="support-agent__icon"><app-icon name="support" [size]="16" /></span>

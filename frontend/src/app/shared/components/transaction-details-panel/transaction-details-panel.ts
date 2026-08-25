@@ -25,6 +25,9 @@ export interface TransactionDetail {
   created_at: string;
   hold?: { expires_at: string; resolution: string | null } | null;
   risk?: TransactionRisk | null;
+  /** Screening determinist al descrierii — vezi app/content_screening.py,
+   * SEPARAT de `risk` (motorul de fraudă). */
+  content_warning?: string | null;
 }
 
 const RISK_TONE: Record<TransactionRisk['tier'], BadgeTone> = {

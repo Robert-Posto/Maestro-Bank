@@ -56,7 +56,12 @@ class RecommendedAction(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
-    history: list[ChatMessage] = Field(default_factory=list)
+    # Limitat și aici (nu doar server-side în agent, vezi
+    # app/agents/support.py::_MAX_HISTORY_MESSAGES) — evită context
+    # nemărginit (cost/latență) indiferent ce trimite clientul. Acum că
+    # frontend-ul persistă conversația (sessionStorage), istoricul poate
+    # deveni lung în timp — mai important ca oricând să fie plafonat.
+    history: list[ChatMessage] = Field(default_factory=list, max_length=40)
     pending_action: PendingAction | None = None
 
 

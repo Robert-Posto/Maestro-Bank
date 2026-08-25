@@ -226,6 +226,32 @@
   margin: 0;
 }
 
+/* Screening determinist al descrierii (vezi app/content_screening.py) —
+   SEPARAT de Financial Guardian de mai sus (alt sistem, altă etichetă),
+   informativ, nu semnalează un transfer blocat. */
+.details-panel__content-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  padding: var(--mb-space-4);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-warning-bg);
+  color: var(--mb-warning);
+  margin-bottom: var(--mb-space-5);
+}
+
+.details-panel__content-warning app-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.details-panel__content-warning p {
+  margin: 0;
+  font-size: var(--mb-font-size-xs);
+  line-height: var(--mb-line-height-base);
+  color: inherit;
+}
+
 .details-panel__support {
   border-top: 1px solid var(--mb-border);
   padding-top: var(--mb-space-4);

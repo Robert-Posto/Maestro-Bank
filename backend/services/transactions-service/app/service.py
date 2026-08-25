@@ -23,7 +23,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import BackgroundTasks, HTTPException, status
 
-from app import holds
+from app import content_screening, holds
 from app.config import settings
 from app.database import get_database
 from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
@@ -113,6 +113,16 @@ async def _apply_transfer(from_account_id: str, to_account_id: str, amount_minor
     return response.json()
 
 
+def check_description_content(description: str) -> str | None:
+    """Verificare LIVE, apelată de frontend pe măsură ce userul scrie în
+    câmpul de descriere (vezi app/routers/transfers.py, POST
+    /transfers/screen-description) — ACELAȘI screening determinist ca la
+    crearea reală a transferului (vezi content_screening.py), dar fără
+    NICIUN efect secundar (nu scrie nimic în DB, nu creează nimic). Nu
+    necesită user_id — nu accesează date de cont, doar textul primit."""
+    return content_screening.screen_description(description)
+
+
 def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
     is_outgoing = doc["from_account_id"] == viewer_account_id
     return {
@@ -135,6 +145,7 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         "created_at": doc["created_at"],
         "hold": doc.get("hold"),
         "risk": doc.get("risk"),
+        "content_warning": doc.get("content_warning"),
     }
 
 
@@ -196,6 +207,15 @@ async def create_transfer(
     )
 
     now = datetime.now(timezone.utc)
+    # Screening determinist al descrierii (termeni de terorism/violență —
+    # vezi app/content_screening.py) — NU blochează transferul, doar
+    # informează userul; complet separat de motorul de fraudă (app/fraud/).
+    content_warning = content_screening.screen_description(payload.description)
+    if content_warning:
+        logger.warning(
+            "transactions-service: descriere transfer cu termeni marcați (user_id=%s) — transferul continuă normal",
+            user_id,
+        )
     transaction_doc = {
         "from_account_id": source["id"],
         "to_account_id": destination["id"],
@@ -212,6 +232,7 @@ async def create_transfer(
         "recognized": False,
         "reported": False,
         "created_at": now,
+        "content_warning": content_warning,
     }
     insert_result = await db.transactions.insert_one(transaction_doc)
 

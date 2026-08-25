@@ -254,6 +254,31 @@
   color: var(--mb-text-primary);
 }
 
+/* Listă de conturi (vezi get_my_accounts) — variantă în interiorul unui
+   .support-chat__context-card, un rând per cont, fără chenar propriu. */
+.support-chat__context-account--row {
+  padding: var(--mb-space-2) 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.support-chat__context-account--row:not(:last-child) {
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.support-chat__context-account--row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.support-chat__context-account-type {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+}
+
 .support-chat__context-card-status {
   padding: var(--mb-space-4);
   border: 1px solid var(--mb-border);
@@ -602,14 +627,6 @@
   box-shadow: 0 3px 12px rgba(16, 24, 48, 0.04);
 }
 
-.support-panel h2 {
-  margin: calc(var(--mb-space-5) * -1) calc(var(--mb-space-5) * -1) var(--mb-space-4);
-  padding: var(--mb-space-4) var(--mb-space-5);
-  border-bottom: 1px solid var(--mb-border);
-  font-size: var(--mb-font-size-sm);
-  color: var(--mb-text-primary);
-}
-
 .support-panel--agent {
   background: linear-gradient(145deg, var(--mb-surface), #fcfdff);
 }
@@ -643,56 +660,6 @@
   color: var(--mb-text-secondary);
   font-size: var(--mb-font-size-xs);
   line-height: 1.5;
-}
-
-.support-faq {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mb-space-2);
-}
-
-.support-faq-item {
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-md);
-  padding: var(--mb-space-3);
-  background: var(--mb-surface-muted);
-}
-
-.support-faq-item[open] {
-  border-color: var(--mb-blue-100);
-  background: var(--mb-surface);
-}
-
-.support-faq-item summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--mb-space-2);
-  cursor: pointer;
-  font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-medium);
-  list-style: none;
-}
-
-.support-faq-item summary::-webkit-details-marker {
-  display: none;
-}
-
-.support-faq-item__chevron {
-  flex-shrink: 0;
-  color: var(--mb-text-tertiary);
-  transition: transform var(--mb-transition-base);
-}
-
-.support-faq-item[open] .support-faq-item__chevron {
-  transform: rotate(180deg);
-}
-
-.support-faq-item p {
-  margin-top: var(--mb-space-3);
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-text-secondary);
-  line-height: var(--mb-line-height-base);
 }
 
 /* --- Modal "Solicitare nouă" --- */
