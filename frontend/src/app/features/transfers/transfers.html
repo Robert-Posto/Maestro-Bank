@@ -243,7 +243,7 @@
 
 @if (mainTab() === 'requests') {
 <section class="requests-section">
-  <div class="transfer-layout">
+  <div class="transfer-wrap">
     <form class="transfer-card" (ngSubmit)="createPaymentRequest()">
       <h2 class="requests-form__title">Solicită o plată</h2>
       <p class="requests-form__subtitle">
@@ -286,6 +286,10 @@
         <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ requestFormError() }}</p>
       }
 
+      <p class="transfer-safety-note">
+        <app-icon name="shield" [size]="14" /> Tu stabilești suma fixă — cel care primește link-ul n-o poate modifica, iar link-ul expiră automat după 7 zile.
+      </p>
+
       <app-action-button
         type="submit"
         [fullWidth]="true"
@@ -295,20 +299,6 @@
         <app-icon name="send" [size]="16" /> Generează link de plată
       </app-action-button>
     </form>
-
-    <aside class="transfer-side">
-      <div class="transfer-side-card">
-        <div class="transfer-side-card__header">
-          <app-icon name="shield" [size]="16" />
-          <strong>Cum funcționează</strong>
-        </div>
-        <ul class="transfer-explain-list">
-          <li>Tu stabilești suma fixă — cel care primește link-ul n-o poate modifica.</li>
-          <li>Trebuie să aibă cont MaestroBank și să fie autentificat ca să plătească.</li>
-          <li>Link-ul expiră automat după 7 zile dacă nu e folosit.</li>
-        </ul>
-      </div>
-    </aside>
   </div>
 
   <div class="requests-list-section">

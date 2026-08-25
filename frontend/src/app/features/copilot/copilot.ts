@@ -1,7 +1,8 @@
-import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AiCopilotService, ChatHistoryMessage, SpendingForecastResponse } from '../../services/ai-copilot.service';
+import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
@@ -50,8 +51,9 @@ function formatChatTime(date: Date): string {
   templateUrl: './copilot.html',
   styleUrl: './copilot.css',
 })
-export class Copilot {
+export class Copilot implements OnDestroy {
   private readonly copilotApi = inject(AiCopilotService);
+  protected readonly speech = inject(SpeechService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
   protected readonly suggestedQuestions = SUGGESTED_QUESTIONS;
@@ -84,11 +86,43 @@ export class Copilot {
     });
   }
 
+  ngOnDestroy(): void {
+    // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
+    // plecat de pe pagină (ex. a navigat spre Transferuri în timp ce
+    // MaestroAssistent încă citea un răspuns).
+    this.speech.stopSpeaking();
+  }
+
   protected sendMessage(): void {
     const text = this.chatInput().trim();
     if (!text || this.sending()) return;
     this.chatInput.set('');
     this.ask(text);
+  }
+
+  /** Microfon — pornește/oprește recunoașterea vocală (ro-RO). Textul
+   * recunoscut apare în caseta de input, NU se trimite automat — userul
+   * apasă Trimite manual, ca să poată verifica/corecta ce a recunoscut
+   * motorul înainte de a pleca mesajul. */
+  protected toggleListening(): void {
+    if (this.speech.listening()) {
+      this.speech.stopListening();
+      return;
+    }
+    this.speech.startListening((text) => {
+      if (text) this.chatInput.set(text);
+    });
+  }
+
+  /** "Ascultă" pe un răspuns — citește cu voce tare textul mesajului (fără
+   * sintaxa Markdown-lite brută, vezi stripMarkdownForSpeech). Apăsat din
+   * nou pe ACELAȘI mesaj oprește citirea (buton devine "Stop"). */
+  protected toggleSpeak(message: ChatMessage): void {
+    if (this.speech.speakingMessageId() === message.id) {
+      this.speech.stopSpeaking();
+      return;
+    }
+    this.speech.speak(stripMarkdownForSpeech(message.text), message.id);
   }
 
   /** Întrebare din chip-urile de sugestii (stare goală sau sub input). */

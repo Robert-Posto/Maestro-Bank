@@ -151,6 +151,12 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         # "Financial Guardian" despre o tranzacție la care n-a făcut
         # nimic neobișnuit. Vizibil DOAR pe partea de expeditor.
         "risk": doc.get("risk") if is_outgoing else None,
+        # Screening determinist al descrierii (termeni de terorism/violență
+        # — vezi app/content_screening.py), SEPARAT de motorul de fraudă
+        # (app/fraud/) — pierdut accidental la merge-ul cu main (linia asta
+        # lipsea din to_transaction_view după fast-forward, deși câmpul
+        # tot era salvat în DB și tot era în TransactionOut/models.py).
+        "content_warning": doc.get("content_warning"),
     }
 
 
@@ -692,7 +698,7 @@ async def cancel_payment_request(request_id: str, user_id: str) -> dict:
     return _to_payment_request_view(doc, now)
 
 
-def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> dict:
+def _build_filter_query(source_account_id: str, filters: TransactionFilters, *, include_all_statuses: bool = False) -> dict:
     """Construiește filtrul Mongo pentru lista/exportul de tranzacții ale
     userului curent. TOATĂ filtrarea se face aici, în backend — nu doar
     în frontend — astfel încât paginarea și exportul CSV să rămână
