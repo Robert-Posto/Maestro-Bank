@@ -17,6 +17,7 @@ from app.database import close_database_connection, ping_database
 from app.fraud.indexes import ensure_fraud_indexes
 from app.holds import ensure_hold_indexes
 from app.routers.internal import router as internal_router
+from app.routers.payment_requests import router as payment_requests_router
 from app.routers.scheduled_transfers import router as scheduled_transfers_router
 from app.routers.staff import router as staff_router
 from app.routers.transfers import router as transfers_router
@@ -51,6 +52,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MaestroBank Transactions Service", lifespan=lifespan)
 app.include_router(scheduled_transfers_router)
+app.include_router(payment_requests_router)
 app.include_router(transfers_router)
 app.include_router(staff_router)
 app.include_router(internal_router)

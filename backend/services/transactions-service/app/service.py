@@ -30,6 +30,7 @@ from app.fraud.service import evaluate_and_record_transfer_risk, record_complete
 from app.guardian import service as guardian_service
 from app.money import format_minor_amount
 from app.models import (
+    PaymentRequestCreate,
     ReportTransactionRequest,
     ScheduledTransferCreate,
     TransactionFilters,
@@ -492,6 +493,199 @@ async def run_due_scheduled_transfers() -> None:
 
         next_run = _advance_schedule(schedule["next_run_at"], schedule["frequency"])
         await db.scheduled_transfers.update_one({"_id": schedule["_id"]}, {"$set": {"next_run_at": next_run}})
+
+
+# --- Cereri de plată (link/QR de tip "Request Money", ca la Revolut) ------
+#
+# Vezi PaymentRequestCreate/PaymentRequestOut din app/models.py pentru
+# designul complet. Plata efectivă (pay_payment_request) REFOLOSEȘTE
+# create_transfer de mai sus — aceeași validare, screening de conținut,
+# motor de fraudă, Guardian — nu duplică nimic din fluxul de bani.
+
+_PAYMENT_REQUEST_EXPIRY_DAYS = 7
+
+
+def _payment_request_effective_status(doc: dict, now: datetime) -> str:
+    """Starea REALĂ, calculată la citire — două cazuri unde câmpul brut din
+    DB nu reflectă direct realitatea:
+
+    - "processing" e o stare TRANZITORIE internă (vezi pay_payment_request,
+      claim atomic anti-double-spend) — invizibilă în afara acestui modul,
+      arătată clientului tot ca "open" (din perspectiva lui, cererea încă
+      se poate plăti, doar că o altă plată e chiar acum în curs).
+    - Expirarea e LENEȘĂ (calculată aici, fără loop de fundal) — spre
+      deosebire de hold-uri (app/holds.py), o cerere de plată expirată nu
+      mișcă bani, deci nu e nimic de "rezolvat" la expirare, doar de
+      ascuns din UI ca opțiune de plată.
+    """
+    status_value = doc["status"]
+    if status_value == "processing":
+        return "open"
+    # Motor/PyMongo întoarce datetime-urile citite din Mongo NAIVE (fără
+    # tzinfo, chiar dacă valoarea e UTC) — spre deosebire de `now`, mereu
+    # tz-aware aici. Comparația directă ar arunca TypeError; normalizăm
+    # înainte de comparat (vezi și app/holds.py, care evită complet
+    # problema comparând server-side, în query-ul Mongo).
+    expires_at = doc["expires_at"]
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if status_value == "open" and now > expires_at:
+        return "expired"
+    return status_value
+
+
+def _to_payment_request_view(doc: dict, now: datetime | None = None) -> dict:
+    view = dict(doc)
+    view["status"] = _payment_request_effective_status(doc, now or datetime.now(timezone.utc))
+    return view
+
+
+async def create_payment_request(user_id: str, payload: PaymentRequestCreate) -> dict:
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+    if source["status"] != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul tău nu este activ.")
+
+    # Același screening determinist ca la un transfer (vezi
+    # content_screening.py) — dar aici BLOCĂM crearea, nu doar avertizăm
+    # (vezi comentariul de la PaymentRequestOut din models.py pentru de
+    # ce): o cerere de plată e un link/QR menit să fie trimis mai departe,
+    # nu o tranzacție privată deja consumată.
+    if content_screening.screen_description(payload.description):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Descrierea conține termeni asociați cu activități ilegale/violente — reformuleaz-o ca să poți crea cererea.",
+        )
+
+    requester_name = await _get_user_name(user_id)
+    now = datetime.now(timezone.utc)
+
+    doc = {
+        "requester_user_id": user_id,
+        "requester_account_id": source["id"],
+        "requester_iban": source["iban"],
+        "requester_name": requester_name,
+        "amount_minor": payload.amount_minor,
+        "currency": source["currency"],
+        "description": payload.description,
+        "status": "open",
+        "created_at": now,
+        "expires_at": now + timedelta(days=_PAYMENT_REQUEST_EXPIRY_DAYS),
+        "paid_at": None,
+        "paid_by_user_id": None,
+        "paid_by_name": None,
+        "transaction_id": None,
+    }
+    result = await db.payment_requests.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    logger.info("transactions-service: cerere de plată creată (id=%s, user_id=%s)", doc["_id"], user_id)
+    return _to_payment_request_view(doc, now)
+
+
+async def list_my_payment_requests(user_id: str) -> list[dict]:
+    db = get_database()
+    cursor = db.payment_requests.find({"requester_user_id": user_id}).sort("created_at", -1)
+    docs = await cursor.to_list(length=200)
+    now = datetime.now(timezone.utc)
+    return [_to_payment_request_view(doc, now) for doc in docs]
+
+
+async def _get_payment_request_doc(request_id: str) -> dict:
+    db = get_database()
+    try:
+        object_id = ObjectId(request_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.") from exc
+    doc = await db.payment_requests.find_one({"_id": object_id})
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.")
+    return doc
+
+
+async def get_payment_request(request_id: str, user_id: str) -> dict:
+    """Vizualizabilă de ORICE user autentificat, nu doar de cel care a
+    creat-o — vezi routers/payment_requests.py (așa poate cineva care a
+    primit link-ul să vadă suma/descrierea înainte de a plăti)."""
+    doc = await _get_payment_request_doc(request_id)
+    return _to_payment_request_view(doc)
+
+
+async def pay_payment_request(
+    request_id: str, user_id: str, background_tasks: BackgroundTasks | None = None
+) -> dict:
+    db = get_database()
+    doc = await _get_payment_request_doc(request_id)
+    now = datetime.now(timezone.utc)
+
+    if _payment_request_effective_status(doc, now) != "open":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+    if doc["requester_user_id"] == user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu poți plăti propria cerere de plată.")
+
+    # Claim atomic ÎNAINTE de a muta bani — altfel două plăți concurente pe
+    # ACEEAȘI cerere ar putea trece amândouă prin create_transfer (double-
+    # spend). Dacă find_one_and_update nu găsește nimic, altcineva a apucat
+    # deja cererea (sau a fost anulată chiar acum) — 409, nu se continuă.
+    claimed = await db.payment_requests.find_one_and_update(
+        {"_id": doc["_id"], "status": "open"},
+        {"$set": {"status": "processing"}},
+    )
+    if claimed is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată tocmai a fost plătită sau anulată."
+        )
+
+    try:
+        transfer_payload = TransferRequest(
+            to_iban=doc["requester_iban"],
+            amount_minor=doc["amount_minor"],
+            description=doc["description"] or "Cerere de plată",
+        )
+        transaction_view = await create_transfer(transfer_payload, user_id, background_tasks)
+    except Exception:
+        # Revenim la "open" pe orice eșec (ex. sold insuficient) — altfel
+        # cererea ar rămâne blocată în "processing" pentru totdeauna, fără
+        # ca userul să mai poată reîncerca.
+        await db.payment_requests.update_one({"_id": doc["_id"], "status": "processing"}, {"$set": {"status": "open"}})
+        raise
+
+    payer_name = await _get_user_name(user_id)
+    await db.payment_requests.update_one(
+        {"_id": doc["_id"]},
+        {
+            "$set": {
+                "status": "paid",
+                "paid_at": now,
+                "paid_by_user_id": user_id,
+                "paid_by_name": payer_name,
+                "transaction_id": ObjectId(transaction_view["_id"]),
+            }
+        },
+    )
+    logger.info("transactions-service: cerere de plată achitată (id=%s, plătitor=%s)", doc["_id"], user_id)
+    return transaction_view
+
+
+async def cancel_payment_request(request_id: str, user_id: str) -> dict:
+    doc = await _get_payment_request_doc(request_id)
+    if doc["requester_user_id"] != user_id:
+        # 404, nu 403 — nu confirmăm existența unei cereri a altcuiva.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.")
+
+    now = datetime.now(timezone.utc)
+    if _payment_request_effective_status(doc, now) != "open":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+
+    db = get_database()
+    result = await db.payment_requests.update_one(
+        {"_id": doc["_id"], "status": "open"}, {"$set": {"status": "cancelled"}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+
+    doc["status"] = "cancelled"
+    logger.info("transactions-service: cerere de plată anulată (id=%s)", doc["_id"])
+    return _to_payment_request_view(doc, now)
 
 
 def _build_filter_query(source_account_id: str, filters: TransactionFilters) -> dict:
