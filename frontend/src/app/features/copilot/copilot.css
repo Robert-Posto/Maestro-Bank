@@ -880,7 +880,12 @@
   min-height: 92px;
   padding: var(--mb-space-3);
   border: 1px solid var(--mb-border);
-  background: var(--mb-surface);
+  /* var(--mb-surface-muted), NU var(--mb-surface) — la fel ca
+     .support-chat__context-card, tile-ul trebuie să se distingă de
+     cardul-părinte (care e deja --mb-surface) și prin nuanță, nu doar
+     prin bordura subțire — altfel arată "descentrat"/inconsecvent
+     față de restul cardurilor cu conținut imbricat din aplicație. */
+  background: var(--mb-surface-muted);
 }
 
 .copilot-context-tile app-icon {

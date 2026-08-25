@@ -28,7 +28,8 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 type TransferStep = 'form' | 'review' | 'success';
-type MainTab = 'new' | 'scheduled' | 'requests';
+type MainTab = 'new' | 'scheduled';
+type SendMode = 'send' | 'request';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -58,6 +59,11 @@ export class Transfers implements OnInit {
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
   protected readonly mainTab = signal<MainTab>('new');
+  /** Trimit vs. Solicit — switch în interiorul tabului "Transfer nou", nu
+   * mai e un tab separat (vezi discuția cu userul: cardul lung din dreapta
+   * n-avea sens, iar un tab la același nivel cu "Programate" pentru o
+   * acțiune care e tot despre bani ce circulă pe contul tău era ciudat). */
+  protected readonly sendMode = signal<SendMode>('send');
 
   protected readonly account = signal<AccountView | null>(null);
   protected readonly beneficiaries = signal<Beneficiary[]>([]);

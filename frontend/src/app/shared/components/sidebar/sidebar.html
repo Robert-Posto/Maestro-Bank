@@ -5,14 +5,13 @@
 
   <nav class="sidebar__nav">
     @for (group of navGroups; track $index) {
-      <div class="sidebar__group">
+      <div class="sidebar__group" [class.sidebar__group--highlight]="group.highlight">
         @if (group.label) {
           <p class="sidebar__group-label">{{ group.label }}</p>
         }
         @for (item of group.items; track item.route) {
           <a
             class="sidebar__link"
-            [class.sidebar__link--accent]="item.accent"
             [routerLink]="item.route"
             routerLinkActive="sidebar__link--active"
           >

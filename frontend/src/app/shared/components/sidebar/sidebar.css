@@ -52,6 +52,23 @@
   text-transform: uppercase;
 }
 
+/* Zonă întreagă evidențiată (ex. "Asistenți AI") — un container tinted în
+   jurul ÎNTREGULUI grup (etichetă + toate link-urile), nu doar un singur
+   rând (asta arăta inconsecvent — vezi sidebar__link--accent, eliminat).
+   Fundal translucid albastru-violet peste gradientul navy al sidebar-ului
+   — suficient de contrastant ca zona să iasă în evidență dintr-o privire,
+   fără să șteargă contrastul text/fundal al link-urilor din interior. */
+.sidebar__group--highlight {
+  padding: var(--mb-space-3) var(--mb-space-2);
+  border-radius: var(--mb-radius-md);
+  background: linear-gradient(165deg, rgba(94, 124, 255, 0.18), rgba(168, 116, 255, 0.1));
+  border: 1px solid rgba(158, 150, 255, 0.32);
+}
+
+.sidebar__group--highlight .sidebar__group-label {
+  color: #c9d1ff;
+}
+
 .sidebar__link {
   display: flex;
   align-items: center;
@@ -107,7 +124,13 @@
   flex: 0 0 auto;
   padding: 0.15rem 0.45rem;
   border-radius: var(--mb-radius-pill);
-  background: rgba(255, 255, 255, 0.14);
+  /* Userul a cerut eliminarea highlight-ului de pe TOT rândul (gradient +
+     border pe .sidebar__link--accent, eliminat) — dar a vrut păstrată
+     culoarea care marchează "e AI" undeva. Insigna e singurul loc rămas
+     pentru asta: gradient albastru-violet solid, fără shimmer/animație
+     (mișcarea era parte din ce arăta "ciudat"), doar pe eticheta mică, nu
+     pe rândul întreg. */
+  background: linear-gradient(120deg, #5e7cff, #a874ff);
   color: #fff;
   font-size: 0.62rem;
   font-weight: var(--mb-font-weight-semibold);
@@ -115,40 +138,7 @@
 }
 
 .sidebar__link--active .sidebar__link-badge {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-/* Intrare cu tratament vizual distinct (MaestroAgent) — altfel se pierde
-   într-o listă de 9 link-uri identice utilitare, deși e singura bazată pe
-   AI. Gradient discret + iconiță/etichetă în nuanțe albastru-violet, ca
-   să se recunoască dintr-o privire, fără să pară un buton spart sau un
-   element care nu se potrivește cu restul. */
-.sidebar__link--accent:not(.sidebar__link--active) {
-  background: linear-gradient(100deg, rgba(94, 124, 255, 0.16), rgba(168, 116, 255, 0.1));
-}
-
-.sidebar__link--accent:not(.sidebar__link--active):hover {
-  background: linear-gradient(100deg, rgba(94, 124, 255, 0.24), rgba(168, 116, 255, 0.16));
-  color: #fff;
-}
-
-.sidebar__link--accent:not(.sidebar__link--active) app-icon {
-  color: #b3c2ff;
-}
-
-.sidebar__link--accent .sidebar__link-badge {
-  background: linear-gradient(120deg, #5e7cff, #a874ff, #5e7cff);
-  background-size: 200% 100%;
-  color: #fff;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
-  /* Un "shimmer" lent — semnal discret, dar recognoscibil, de "e o
-     funcționalitate AI", fără să distragă atenția de la restul navigării. */
-  animation: sidebar-badge-shimmer 3.5s ease-in-out infinite;
-}
-
-@keyframes sidebar-badge-shimmer {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  background: linear-gradient(120deg, #7c93ff, #bd94ff);
 }
 
 /* Cascadă la încărcarea sidebar-ului — fiecare link intră puțin decalat
