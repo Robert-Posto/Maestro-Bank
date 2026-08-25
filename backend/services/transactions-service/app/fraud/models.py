@@ -94,6 +94,8 @@ class WindowFacts(BaseModel):
     beneficiary: BeneficiaryWindow = BeneficiaryWindow()
     identical_amount_distinct_beneficiaries_60min: int = 0
     recent_incoming_credit_minor: int | None = None  # cel mai recent credit intrat, în fereastră, pt BEH-03
+    new_beneficiaries_last_60min: int = 0  # VEL-03
+    near_threshold_count_last_24h: int = 0  # STR-01
 
 
 class DeviceFacts(BaseModel):

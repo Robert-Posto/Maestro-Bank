@@ -1,12 +1,14 @@
-"""Descrieri în limbaj simplu, românesc, pentru fiecare din cele 18 reguli
-implementate în app/fraud/catalogue.py — singura sursă de "ce înseamnă
-regula X", refolosită atât de prompt.py (pentru LLM), cât și de
+"""Descrieri în limbaj simplu, românesc, pentru fiecare din cele 20 de
+reguli implementate în app/fraud/catalogue.py — singura sursă de "ce
+înseamnă regula X", refolosită atât de prompt.py (pentru LLM), cât și de
 templates.py (fallback fără LLM). NU acoperă toate ID-urile din catalogul
-complet al spec-ului (guardian-claude-code-prompt.md) — doar cele 18 chiar
+complet al spec-ului (guardian-claude-code-prompt.md) — doar cele 20 chiar
 construite (vezi app/fraud/rules_*.py pentru care lipsesc și de ce)."""
 
 RULE_DESCRIPTIONS: dict[str, str] = {
     "AMT-01": "Suma e de peste 2 ori mai mare decât percentila 95 a sumelor obișnuite ale userului.",
+    "VEL-03": "Cel puțin 3 beneficiari noi (niciodată plătiți înainte) în ultimele 60 de minute.",
+    "STR-01": "Cel puțin 3 tranzacții în 24 de ore, fiecare între 90% și 99% dintr-un prag de raportare configurabil (50.000 RON implicit).",
     "AMT-02": "Suma e de peste 4 ori mai mare decât suma tipică a userului pentru această categorie.",
     "AMT-03": "Suma depășește 70% din soldul disponibil al contului.",
     "AMT-04": "Suma reprezintă aproape întregul sold disponibil al contului — golire de cont.",
