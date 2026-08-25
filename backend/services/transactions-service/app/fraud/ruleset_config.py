@@ -10,7 +10,7 @@ să încapă mai târziu fără să atingă context.py/scoring.py.
 
 from dataclasses import dataclass
 
-RULESET_VERSION = "2026-08-20.1"
+RULESET_VERSION = "2026-08-25.1"
 COLD_START_MIN_TRANSACTIONS = 20
 
 
@@ -50,6 +50,10 @@ class RulesetConfig:
     vel05_weight: int = 40
     vel05_min_sequence: int = 3  # include tranzacția curentă
 
+    vel03_weight: int = 25
+    vel03_min_new_beneficiaries: int = 3
+    vel03_window_minutes: int = 60
+
     # --- Beneficiary --------------------------------------------------------
     ben01_weight: int = 15
     ben03_weight: int = 20
@@ -78,6 +82,17 @@ class RulesetConfig:
     str02_weight: int = 35
     str02_min_distinct_beneficiaries: int = 3
     str02_window_minutes: int = 60
+
+    # STR-01 — prag de "raportare" ALES pentru acest demo (electronic, nu
+    # numerar — nu există un regim AML real de urmărit aici), NU un prag
+    # legal real. Configurabil, ca să poată fi recalibrat fără să atingă
+    # logica regulii.
+    str01_weight: int = 40
+    str01_reporting_threshold_minor: int = 5_000_000  # 50.000 RON
+    str01_min_count_24h: int = 3
+    str01_window_hours: int = 24
+    str01_lower_ratio: float = 0.90
+    str01_upper_ratio: float = 0.99
 
     # --- Scoring --------------------------------------------------------------
     diminishing_multipliers: tuple[float, ...] = (1.0, 0.6, 0.3)  # a 3-a+ regulă dintr-o familie = ultima valoare

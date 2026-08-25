@@ -26,3 +26,8 @@ async def ensure_fraud_indexes() -> None:
     # <50ms p99 din plan.
     await db.transactions.create_index([("from_account_id", 1), ("created_at", -1)])
     await db.transactions.create_index([("to_account_id", 1), ("created_at", -1)])
+    # BEN-01/VEL-03/VEL-05 filtrează toate pe (from_account_id, to_iban) —
+    # fără index dedicat, "seen_before" (BEN-01) plătea deja costul unei
+    # scanări neacoperite o dată per transfer; VEL-03 multiplică exact
+    # acel cost de N ori (N = beneficiari noi-candidați din fereastră).
+    await db.transactions.create_index([("from_account_id", 1), ("to_iban", 1), ("created_at", -1)])

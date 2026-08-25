@@ -22,9 +22,9 @@ from app.fraud.rules_amount import check_amt_01, check_amt_02, check_amt_03, che
 from app.fraud.rules_behaviour import check_beh_01, check_beh_02, check_beh_03
 from app.fraud.rules_beneficiary import check_ben_01, check_ben_03, check_ben_05
 from app.fraud.rules_device import check_dev_03
-from app.fraud.rules_structuring import check_str_02
+from app.fraud.rules_structuring import check_str_01, check_str_02
 from app.fraud.rules_temporal import check_time_01, check_time_02
-from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_05
+from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_03, check_vel_05
 
 RULESET = RulesetConfig()
 EVALUATED_AT = datetime(2026, 8, 20, 12, 0, 0)  # naiv-UTC, ca tot ce circulă în fraud/ (vezi timeutil.py)
@@ -184,6 +184,16 @@ def test_vel_05_fires_on_escalating_sequence():
 def test_vel_05_no_fire_on_non_increasing_sequence():
     window = WindowFacts(beneficiary=BeneficiaryWindow(recent_amounts_same_beneficiary=(3_000, 1_000, 2_000)))
     assert check_vel_05(_ctx(window=window), RULESET) is None
+
+
+def test_vel_03_fires_at_exactly_3_new_beneficiaries():
+    ctx = _ctx(window=WindowFacts(new_beneficiaries_last_60min=3))
+    assert check_vel_03(ctx, RULESET) is not None
+
+
+def test_vel_03_no_fire_below_threshold():
+    ctx = _ctx(window=WindowFacts(new_beneficiaries_last_60min=2))
+    assert check_vel_03(ctx, RULESET) is None
 
 
 # --- BEN ------------------------------------------------------------------
@@ -346,6 +356,16 @@ def test_beh_03_no_fire_without_recent_incoming_credit():
 
 
 # --- STR --------------------------------------------------------------------
+
+
+def test_str_01_fires_at_exactly_3_near_threshold_transactions():
+    ctx = _ctx(window=WindowFacts(near_threshold_count_last_24h=3))
+    assert check_str_01(ctx, RULESET) is not None
+
+
+def test_str_01_no_fire_below_threshold():
+    ctx = _ctx(window=WindowFacts(near_threshold_count_last_24h=2))
+    assert check_str_01(ctx, RULESET) is None
 
 
 def test_str_02_fires_for_3_distinct_beneficiaries():

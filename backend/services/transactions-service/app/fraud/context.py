@@ -150,6 +150,13 @@ async def _build_window_facts(
         },
     )
 
+    new_beneficiaries_60min = await _count_new_beneficiaries_last_60min(
+        db, account_id=account_id, evaluated_at=evaluated_at, ruleset=ruleset
+    )
+    near_threshold_24h = await _count_near_threshold_last_24h(
+        db, account_id=account_id, evaluated_at=evaluated_at, ruleset=ruleset
+    )
+
     incoming_cutoff = evaluated_at - timedelta(hours=ruleset.beh03_window_hours)
     incoming_rows = await (
         db.transactions.find(
@@ -172,6 +179,77 @@ async def _build_window_facts(
         ),
         identical_amount_distinct_beneficiaries_60min=len(distinct_beneficiaries),
         recent_incoming_credit_minor=recent_incoming,
+        new_beneficiaries_last_60min=new_beneficiaries_60min,
+        near_threshold_count_last_24h=near_threshold_24h,
+    )
+
+
+_VEL03_WINDOW_ROWS_CAP = 500  # gardă — VEL-01 (>5/10min) s-ar fi declanșat deja cu mult înainte de acest plafon
+
+
+def _first_seen_per_iban(rows: list[dict]) -> dict[str, datetime]:
+    """Pură — prima apariție a fiecărui to_iban distinct, presupunând
+    `rows` deja sortate crescător după created_at."""
+    first_seen: dict[str, datetime] = {}
+    for row in rows:
+        first_seen.setdefault(row["to_iban"], row["created_at"])
+    return first_seen
+
+
+async def _count_new_beneficiaries_last_60min(
+    db, *, account_id: str, evaluated_at: datetime, ruleset: RulesetConfig
+) -> int:
+    """VEL-03 — reia forma EXACTĂ a lui seen_before_count de mai sus
+    (BEN-01), aplicată o dată per beneficiar DISTINCT din fereastra de 60
+    min, nu doar pentru beneficiarul tranzacției curente. NU e un
+    $lookup — vezi planul fazei pentru motiv (context.py face doar
+    agregări cu un singur stagiu azi; N-ul practic e mic, tiparul vizat e
+    diversificarea de beneficiari, nu volumul brut — ăla îl prinde deja
+    VEL-01)."""
+    window_start = evaluated_at - timedelta(minutes=ruleset.vel03_window_minutes)
+    rows = await (
+        db.transactions.find(
+            {"from_account_id": account_id, "status": _NOT_FAILED, "created_at": {"$gte": window_start}},
+            {"to_iban": 1, "created_at": 1},
+        )
+        .sort("created_at", 1)
+        .to_list(length=_VEL03_WINDOW_ROWS_CAP)
+    )
+    first_seen = _first_seen_per_iban(rows)
+
+    new_count = 0
+    for iban, first_seen_at in first_seen.items():
+        # NU filtrăm status aici — reutilizăm semantica EXACTĂ a lui
+        # BEN-01 ("a mai plătit userul acest beneficiar VREODATĂ înainte").
+        # $lt first_seen_at exclude implicit tranzacțiile din fereastra
+        # curentă (niciuna nu poate avea created_at < propria ei primă
+        # apariție), deci nu mai e nevoie de o excludere explicită pe _id.
+        seen_before = await db.transactions.count_documents(
+            {"from_account_id": account_id, "to_iban": iban, "created_at": {"$lt": first_seen_at}}, limit=1
+        )
+        if seen_before == 0:
+            new_count += 1
+    return new_count
+
+
+async def _count_near_threshold_last_24h(
+    db, *, account_id: str, evaluated_at: datetime, ruleset: RulesetConfig
+) -> int:
+    """STR-01 — tranzacții proprii, ultimele 24h, sumă în banda
+    [90%, 99%] a unui prag de "raportare" configurabil (implicit 50.000
+    RON — decizie de PRODUS pentru acest demo, NU un prag legal real, vezi
+    ruleset_config.py). Ambele capete ale benzii sunt INCLUSIVE — citire
+    literală a "90-99%", ca AMT-04, nu strict ca AMT-03 (niciun precedent
+    unic în acest fișier pentru un interval închis ca ăsta)."""
+    lower_bound = round(ruleset.str01_reporting_threshold_minor * ruleset.str01_lower_ratio)
+    upper_bound = round(ruleset.str01_reporting_threshold_minor * ruleset.str01_upper_ratio)
+    return await db.transactions.count_documents(
+        {
+            "from_account_id": account_id,
+            "status": _NOT_FAILED,
+            "amount_minor": {"$gte": lower_bound, "$lte": upper_bound},
+            "created_at": {"$gte": evaluated_at - timedelta(hours=ruleset.str01_window_hours)},
+        }
     )
 
 
