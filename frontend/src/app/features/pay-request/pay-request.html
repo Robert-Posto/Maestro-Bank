@@ -1,0 +1,84 @@
+<app-page-header title="Cerere de plată" subtitle="Cineva ți-a trimis acest link ca să-i plătești o sumă fixă." />
+
+<div class="pay-wrap">
+  @if (loading()) {
+    <div class="pay-card pay-card--loading">
+      <p class="pay-loading">Se încarcă...</p>
+    </div>
+  } @else if (notFound()) {
+    <div class="pay-card">
+      <app-empty-state
+        icon="info"
+        title="Cerere de plată inexistentă"
+        description="Link-ul e greșit sau cererea a fost ștearsă. Verifică-l cu persoana care ți l-a trimis."
+      />
+      <a routerLink="/app/overview" class="pay-back-link">‹ Înapoi la cont</a>
+    </div>
+  } @else if (paidTransaction(); as tx) {
+    <div class="pay-card pay-success">
+      <div class="pay-success__icon"><app-icon name="check" [size]="28" /></div>
+      <h2>Plată efectuată</h2>
+      <p class="pay-success__amount">{{ tx.amount_minor | money: tx.currency }}</p>
+      <p class="pay-success__meta">către {{ tx.counterparty_name || tx.counterparty_iban }}</p>
+      @if (tx.content_warning) {
+        <p class="pay-content-warning"><app-icon name="info" [size]="15" /> {{ tx.content_warning }}</p>
+      }
+      <a routerLink="/app/transactions" class="pay-back-link">Vezi în tranzacții ›</a>
+    </div>
+  } @else if (request(); as req) {
+    @if (req.status !== 'open') {
+      <div class="pay-card pay-status-card">
+        <div class="pay-status-badge" [class]="'pay-status-badge--' + req.status">
+          {{ statusLabel(req.status) }}
+        </div>
+        <p class="pay-status-amount">{{ req.amount_minor | money: req.currency }}</p>
+        @if (req.description) {
+          <p class="pay-status-desc">{{ req.description }}</p>
+        }
+        @if (req.status === 'paid') {
+          <p class="pay-status-note">Această cerere a fost deja plătită{{ req.paid_by_name ? ' de ' + req.paid_by_name : '' }}.</p>
+        } @else if (req.status === 'cancelled') {
+          <p class="pay-status-note">Această cerere a fost anulată de {{ req.requester_name || 'solicitant' }}.</p>
+        } @else {
+          <p class="pay-status-note">Link-ul a expirat — cere-i persoanei să genereze unul nou.</p>
+        }
+        <a routerLink="/app/overview" class="pay-back-link">‹ Înapoi la cont</a>
+      </div>
+    } @else if (isOwnRequest()) {
+      <div class="pay-card">
+        <p class="pay-own-badge">Aceasta este cererea ta</p>
+        <p class="pay-status-amount">{{ req.amount_minor | money: req.currency }}</p>
+        @if (req.description) {
+          <p class="pay-status-desc">{{ req.description }}</p>
+        }
+        <p class="pay-own-hint">Nu poți plăti propria cerere — trimite link-ul altcuiva, sau gestionează-ți cererile din Plăți &amp; Transferuri.</p>
+        <div class="pay-own-actions">
+          <app-action-button variant="secondary" [loading]="cancelling()" (pressed)="cancelOwnRequest()">Anulează cererea</app-action-button>
+          <a routerLink="/app/transfers" class="pay-back-link">Vezi toate cererile mele ›</a>
+        </div>
+      </div>
+    } @else {
+      <div class="pay-card">
+        <p class="pay-requester">
+          <span class="pay-requester__avatar">{{ (req.requester_name || '?').charAt(0) }}</span>
+          <span>
+            <strong>{{ req.requester_name || 'Un user MaestroBank' }}</strong> îți cere o plată
+          </span>
+        </p>
+        <p class="pay-status-amount">{{ req.amount_minor | money: req.currency }}</p>
+        @if (req.description) {
+          <p class="pay-status-desc">{{ req.description }}</p>
+        }
+
+        @if (payError()) {
+          <p class="pay-error"><app-icon name="info" [size]="14" /> {{ payError() }}</p>
+        }
+
+        <app-action-button [fullWidth]="true" [loading]="paying()" (pressed)="pay()">
+          Plătește {{ req.amount_minor | money: req.currency }}
+        </app-action-button>
+        <p class="pay-disclaimer">Suma e fixă, stabilită de solicitant — plata se face din contul tău curent MaestroBank.</p>
+      </div>
+    }
+  }
+</div>

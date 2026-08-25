@@ -174,6 +174,61 @@ class ScheduledTransferOut(BaseModel):
         return str(value)
 
 
+# --- Cereri de plată (link/QR de tip "Request Money", ca la Revolut) ------
+#
+# Userul A generează o cerere cu o SUMĂ FIXĂ (stabilită de A, la creare —
+# la fel ca la Revolut, nu userul B alege cât plătește). Link-ul rezultat
+# (frontend: /app/pay/{id}) poate fi trimis oricui — dar vizualizarea ȘI
+# plata cer login în MaestroBank (nu există procesare de plăți externe în
+# acest demo — vezi task-ul, "no real Visa/Mastercard/SEPA/PSD2/FX
+# integration"), ca să NU fie nevoie să facem PUBLICĂ nicio rută nouă în
+# Gateway (toate rutele /api/transactions/* rămân protejate uniform, la
+# fel ca până acum — vezi backend/gateway/app/routers/proxy.py).
+#
+# Plata efectivă REFOLOSEȘTE create_transfer (exact aceeași validare,
+# screening de conținut, motor de fraudă, Guardian — vezi
+# app/service.py::pay_payment_request), nu duplică nimic.
+#
+# Screening-ul de conținut (app/content_screening.py) e mai STRICT aici
+# decât la un transfer normal — la un transfer (deja finalizat, între doi
+# useri autentificați) doar AVERTIZĂM (vezi content_warning din
+# TransactionOut). O cerere de plată e altceva: un link/cod QR generat ca
+# să fie trimis mai departe, către oricine — un "anunț public" de facto,
+# nu o tranzacție privată deja consumată. De-aia BLOCĂM crearea (vezi
+# app/service.py::create_payment_request) dacă descrierea conține termeni
+# marcați, în loc doar să avertizăm — nu există niciodată o cerere de
+# plată creată cu conținut marcat, deci PaymentRequestOut nu mai are
+# nevoie de un câmp content_warning (spre deosebire de TransactionOut).
+
+PaymentRequestStatus = Literal["open", "paid", "cancelled", "expired"]
+
+
+class PaymentRequestCreate(BaseModel):
+    amount_minor: int = Field(gt=0, le=100_000_000)
+    description: str = Field(default="", max_length=140)
+
+
+class PaymentRequestOut(BaseModel):
+    id: str = Field(alias="_id")
+    requester_name: str | None = None
+    requester_iban: str
+    amount_minor: int
+    currency: str
+    description: str
+    status: PaymentRequestStatus
+    created_at: datetime
+    expires_at: datetime
+    paid_at: datetime | None = None
+    paid_by_name: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str:
+        return str(value)
+
+
 # --- Personal — revizuire evaluări fraud (vezi routers/staff.py) -----------
 #
 # DOAR pentru personal (RequireStaff, app/security.py). Evaluarea automată

@@ -26,6 +26,19 @@ export class Login {
   protected readonly error = signal<string | null>(null);
   protected readonly sessionExpired = this.route.snapshot.queryParamMap.get('sessionExpired') === '1';
 
+  /** Unde ajunge userul DUPĂ login — implicit /app/overview, dar dacă a
+   * fost trimis aici de authGuard (ex. a deschis un link de "Cerere de
+   * plată" neautentificat, vezi auth.guard.ts), îl ducem înapoi EXACT unde
+   * voia să ajungă, nu pe overview. Validăm că e o rută internă `/app/*`
+   * — niciodată un URL extern (open-redirect) — `returnUrl` vine dintr-un
+   * query param, deci e tehnic controlabil de oricine construiește linkul. */
+  private readonly returnUrl = this.resolveReturnUrl();
+
+  private resolveReturnUrl(): string {
+    const raw = this.route.snapshot.queryParamMap.get('returnUrl');
+    return raw && raw.startsWith('/app/') ? raw : '/app/overview';
+  }
+
   protected readonly passkeySupported = this.webauthn.isSupported();
   protected readonly passkeyBusy = signal(false);
 
@@ -40,7 +53,7 @@ export class Login {
     this.auth.login({ email: this.email().trim(), password: this.password() }).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        this.router.navigate(['/app/overview']);
+        this.router.navigateByUrl(this.returnUrl);
       },
       error: (err) => {
         this.isSubmitting.set(false);
@@ -60,7 +73,7 @@ export class Login {
     try {
       await this.webauthn.loginWithPasskey(this.email().trim());
       this.passkeyBusy.set(false);
-      this.router.navigate(['/app/overview']);
+      this.router.navigateByUrl(this.returnUrl);
     } catch (err) {
       this.passkeyBusy.set(false);
       if ((err as { name?: string })?.name === 'NotAllowedError') {

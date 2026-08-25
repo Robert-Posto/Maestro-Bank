@@ -10,6 +10,12 @@
       <span class="transfers-tabs__count">{{ scheduledTransfers().length }}</span>
     }
   </button>
+  <button type="button" [class.transfers-tab--active]="mainTab() === 'requests'" (click)="mainTab.set('requests')">
+    <app-icon name="send" [size]="15" /> Solicită plată
+    @if (paymentRequests().length > 0) {
+      <span class="transfers-tabs__count">{{ paymentRequests().length }}</span>
+    }
+  </button>
 </div>
 
 @if (mainTab() === 'new') {
@@ -233,6 +239,151 @@
     </div>
   }
 </section>
+}
+
+@if (mainTab() === 'requests') {
+<section class="requests-section">
+  <div class="transfer-layout">
+    <form class="transfer-card" (ngSubmit)="createPaymentRequest()">
+      <h2 class="requests-form__title">Solicită o plată</h2>
+      <p class="requests-form__subtitle">
+        Generează un link (cu cod QR) pe care îl trimiți oricui — plătește direct din contul lui MaestroBank, ca la Revolut.
+      </p>
+
+      <label class="transfer-field transfer-field--amount">
+        <span>Sumă</span>
+        <div class="transfer-input-line transfer-input-line--amount">
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="0.00"
+            [ngModel]="requestAmount()"
+            (ngModelChange)="requestAmount.set($event)"
+            name="requestAmount"
+          />
+          <span class="transfer-input-line__currency">{{ account()?.currency ?? 'RON' }}</span>
+        </div>
+      </label>
+
+      <label class="transfer-field">
+        <span>Descriere (opțional)</span>
+        <input
+          type="text"
+          placeholder="Ex: Cina de aseară"
+          [ngModel]="requestDescription()"
+          (ngModelChange)="requestDescription.set($event)"
+          name="requestDescription"
+          maxlength="140"
+        />
+      </label>
+
+      @if (requestDescriptionWarning(); as warning) {
+        <p class="transfer-content-warning"><app-icon name="info" [size]="15" /> {{ warning }}</p>
+      }
+
+      @if (requestFormError()) {
+        <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ requestFormError() }}</p>
+      }
+
+      <app-action-button
+        type="submit"
+        [fullWidth]="true"
+        [loading]="requestCreating()"
+        [disabled]="!!requestDescriptionWarning()"
+      >
+        <app-icon name="send" [size]="16" /> Generează link de plată
+      </app-action-button>
+    </form>
+
+    <aside class="transfer-side">
+      <div class="transfer-side-card">
+        <div class="transfer-side-card__header">
+          <app-icon name="shield" [size]="16" />
+          <strong>Cum funcționează</strong>
+        </div>
+        <ul class="transfer-explain-list">
+          <li>Tu stabilești suma fixă — cel care primește link-ul n-o poate modifica.</li>
+          <li>Trebuie să aibă cont MaestroBank și să fie autentificat ca să plătească.</li>
+          <li>Link-ul expiră automat după 7 zile dacă nu e folosit.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="requests-list-section">
+    <h2 class="requests-list-section__title">Cererile mele</h2>
+    @if (!paymentRequestsLoading() && paymentRequests().length === 0) {
+      <app-empty-state
+        icon="send"
+        title="Nicio cerere de plată"
+        description="Creează una mai sus ca să primești bani rapid de la altcineva."
+      />
+    } @else if (paymentRequests().length > 0) {
+      <div class="scheduled-list">
+        @for (request of paymentRequests(); track request.id) {
+          <div class="scheduled-row requests-row">
+            <div class="scheduled-row__info">
+              <span class="scheduled-row__iban">{{ request.description || 'Fără descriere' }}</span>
+              <span class="scheduled-row__desc">Creată {{ request.created_at | date: 'dd MMM yyyy' }}</span>
+            </div>
+            <span class="scheduled-row__amount">{{ request.amount_minor | money: request.currency }}</span>
+            <span class="requests-row__status" [class]="'requests-row__status--' + request.status">
+              {{ paymentRequestStatusLabel(request.status) }}
+            </span>
+            @if (request.status === 'paid') {
+              <span class="scheduled-row__next">Plătit de {{ request.paid_by_name || 'un user' }}</span>
+            } @else if (request.status === 'open') {
+              <span class="scheduled-row__next">Expiră {{ request.expires_at | date: 'dd MMM yyyy' }}</span>
+            } @else {
+              <span class="scheduled-row__next"></span>
+            }
+            <div class="requests-row__actions">
+              @if (request.status === 'open') {
+                <button type="button" class="scheduled-row__cancel" title="Distribuie link/QR" (click)="openShare(request)">
+                  <app-icon name="send" [size]="15" />
+                </button>
+                <button type="button" class="scheduled-row__cancel" title="Anulează" (click)="cancelPaymentRequest(request)">
+                  <app-icon name="trash" [size]="15" />
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</section>
+}
+
+@if (shareRequest(); as shared) {
+  <app-modal title="Cerere de plată" (closed)="closeShare()">
+    <div class="share-request">
+      <p class="share-request__amount">{{ shared.amount_minor | money: shared.currency }}</p>
+      @if (shared.description) {
+        <p class="share-request__desc">{{ shared.description }}</p>
+      }
+
+      <div class="share-request__qr">
+        @if (shareQrDataUrl(); as qr) {
+          <img [src]="qr" alt="Cod QR pentru plată" width="224" height="224" />
+        } @else {
+          <div class="share-request__qr-placeholder"></div>
+        }
+      </div>
+
+      <div class="share-request__link">
+        <input type="text" readonly [value]="paymentRequestLink(shared.id)" />
+        <button type="button" title="Copiază link-ul" (click)="copyPaymentLink(shared.id)">
+          <app-icon name="copy" [size]="15" />
+        </button>
+      </div>
+
+      <p class="share-request__hint">
+        Trimite link-ul sau codul QR persoanei care trebuie să-ți plătească — va avea nevoie de un cont MaestroBank ca să finalizeze plata.
+      </p>
+    </div>
+  </app-modal>
 }
 
 @if (scheduleModalOpen()) {
