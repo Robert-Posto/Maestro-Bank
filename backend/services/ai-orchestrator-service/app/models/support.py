@@ -61,8 +61,14 @@ class ChatRequest(BaseModel):
     # nemărginit (cost/latență) indiferent ce trimite clientul. Acum că
     # frontend-ul persistă conversația (sessionStorage), istoricul poate
     # deveni lung în timp — mai important ca oricând să fie plafonat.
+    # Populat de router DIN Mongo (vezi conversation_service.to_history_dicts),
+    # NU de client — clientul trimite conversation_id în loc (mai jos).
+    # Rămâne aici (nu doar parametru de funcție, ca la spending_forecast)
+    # pentru că support_service.handle_chat citește payload.history direct.
     history: list[ChatMessage] = Field(default_factory=list, max_length=40)
     pending_action: PendingAction | None = None
+    # None = pornește o conversație nouă (titlu din acest mesaj).
+    conversation_id: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -72,3 +78,6 @@ class ChatResponse(BaseModel):
     recommended_actions: list[RecommendedAction] = Field(default_factory=list)
     requires_confirmation: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Setat de router DUPĂ ce support_service.handle_chat întoarce — niciodată
+    # de handle_chat însuși.
+    conversation_id: str = ""
