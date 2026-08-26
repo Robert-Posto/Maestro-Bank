@@ -12,6 +12,7 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { Icon } from '../../shared/components/icon/icon';
 import { AccountCard, AccountRowData } from '../../shared/components/account-card/account-card';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
+import { TransactionDetailsPanel, TransactionDetail } from '../../shared/components/transaction-details-panel/transaction-details-panel';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 /**
@@ -24,7 +25,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-staff-customer',
   standalone: true,
-  imports: [PageHeader, LoadingSkeleton, EmptyState, ActionButton, Icon, AccountCard, TransactionRow],
+  imports: [PageHeader, LoadingSkeleton, EmptyState, ActionButton, Icon, AccountCard, TransactionRow, TransactionDetailsPanel],
   templateUrl: './staff-customer.html',
   styleUrl: './staff-customer.css',
 })
@@ -52,6 +53,9 @@ export class StaffCustomer implements OnInit {
   );
 
   protected readonly transactionRows = computed<TransactionRowData[]>(() => this.transactions());
+
+  /** Tranzacția deschisă în modalul de detalii (read-only) — vezi openDetails. */
+  protected readonly selectedTransaction = signal<TransactionDetail | null>(null);
 
   ngOnInit(): void {
     if (!this.userId) {
@@ -83,5 +87,14 @@ export class StaffCustomer implements OnInit {
 
   protected back(): void {
     this.router.navigate(['/admin/holds']);
+  }
+
+  protected openDetails(transactionId: string): void {
+    const tx = this.transactions().find((t) => t.id === transactionId) ?? null;
+    this.selectedTransaction.set(tx);
+  }
+
+  protected closeDetails(): void {
+    this.selectedTransaction.set(null);
   }
 }

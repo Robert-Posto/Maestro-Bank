@@ -73,12 +73,14 @@
         }
       </div>
     </div>
-    <div class="details-panel__actions">
-      <app-action-button variant="danger" [fullWidth]="true" [loading]="cancellingHold()" (pressed)="cancelHold.emit()">
-        <app-icon name="close" [size]="17" /> Anulează transferul
-      </app-action-button>
-    </div>
-  } @else {
+    @if (!readonly()) {
+      <div class="details-panel__actions">
+        <app-action-button variant="danger" [fullWidth]="true" [loading]="cancellingHold()" (pressed)="cancelHold.emit()">
+          <app-icon name="close" [size]="17" /> Anulează transferul
+        </app-action-button>
+      </div>
+    }
+  } @else if (!readonly()) {
     <div class="details-panel__actions">
       <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
         <app-icon name="shield" [size]="17" /> Nu recunosc această tranzacție
@@ -122,10 +124,12 @@
     </div>
   }
 
-  <div class="details-panel__support">
-    <p>Ai nevoie de ajutor cu această tranzacție?</p>
-    <button type="button" class="details-panel__support-link" (click)="contactSupport.emit()">
-      Contactează suportul MaestroBank →
-    </button>
-  </div>
+  @if (!readonly()) {
+    <div class="details-panel__support">
+      <p>Ai nevoie de ajutor cu această tranzacție?</p>
+      <button type="button" class="details-panel__support-link" (click)="contactSupport.emit()">
+        Contactează suportul MaestroBank →
+      </button>
+    </div>
+  }
 </aside>

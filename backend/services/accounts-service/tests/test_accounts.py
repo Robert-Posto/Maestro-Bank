@@ -180,7 +180,7 @@ async def test_create_virtual_card_with_design(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "aurora", "type": "virtual", "is_one_time": False},
+        json={"design": "aurora", "type": "virtual", "is_one_time": False, "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 201
@@ -219,7 +219,7 @@ async def test_create_physical_card_deducts_fee(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "graphite", "type": "physical"},
+        json={"design": "graphite", "type": "physical", "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 201
@@ -234,27 +234,34 @@ async def test_create_physical_card_insufficient_funds(client: AsyncClient):
 
     response = await client.post(
         "/cards",
-        json={"design": "graphite", "type": "physical"},
+        json={"design": "graphite", "type": "physical", "pin": "1234"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 409
 
 
-async def test_reveal_card_requires_correct_password(client: AsyncClient, monkeypatch):
-    _, token, card_id = await _provision_with_card(client)
+async def test_reveal_card_requires_correct_pin(client: AsyncClient):
+    """Vezi tests/test_cards.py pentru acoperirea completă a PIN-ului de
+    card (creare, reveal, backfill) — testul ăsta rămâne aici doar ca
+    parte a fluxului "Cardul meu" existent din acest fișier."""
+    _, token, _ = await _provision_with_card(client)
+    created = await client.post(
+        "/cards",
+        json={"design": "midnight", "type": "virtual", "pin": "7777"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    card_id = created.json()["id"]
 
-    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(False))
     wrong = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "wrong-password"},
+        json={"pin": "0000"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert wrong.status_code == 401
 
-    monkeypatch.setattr(service_module, "_verify_password_with_auth_service", lambda user_id, password: _async_bool(True))
     correct = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "correct-password"},
+        json={"pin": "7777"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert correct.status_code == 200
@@ -263,22 +270,18 @@ async def test_reveal_card_requires_correct_password(client: AsyncClient, monkey
     assert len(body["cvv"]) == 3
 
 
-async def _async_bool(value: bool) -> bool:
-    return value
-
-
-async def test_reveal_card_rejects_both_password_and_webauthn(client: AsyncClient):
+async def test_reveal_card_rejects_both_pin_and_webauthn(client: AsyncClient):
     _, token, card_id = await _provision_with_card(client)
 
     response = await client.post(
         f"/cards/{card_id}/reveal",
-        json={"password": "whatever", "webauthn_challenge_id": "abc", "webauthn_assertion": {"id": "x"}},
+        json={"pin": "1234", "webauthn_challenge_id": "abc", "webauthn_assertion": {"id": "x"}},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 422
 
 
-async def test_reveal_card_rejects_neither_password_nor_webauthn(client: AsyncClient):
+async def test_reveal_card_rejects_neither_pin_nor_webauthn(client: AsyncClient):
     _, token, card_id = await _provision_with_card(client)
 
     response = await client.post(
@@ -475,3 +478,61 @@ async def test_beneficiary_crud_and_isolation(client: AsyncClient):
 
     own_delete = await client.delete(f"/beneficiaries/{beneficiary_id}", headers={"Authorization": f"Bearer {token}"})
     assert own_delete.status_code == 204
+
+
+# --- GET /internal/accounts/{account_id}/for-user/{user_id} ----------------
+# Folosit de transactions-service pentru extrasul de cont per-cont (vezi
+# generate_account_statement) — userul alege ORICE cont al lui, nu doar
+# "current". Reutilizează EXACT service.get_account_by_id_for_user, care
+# există deja pentru ruta PUBLICĂ GET /accounts/{account_id} — testăm aici
+# doar wiring-ul rutei /internal/, comportamentul funcției e deja acoperit
+# mai jos (secțiunea "GET /accounts/{account_id}").
+
+
+async def test_get_account_by_id_for_user_returns_own_account(client: AsyncClient):
+    user_id, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+    response = await client.get(f"/internal/accounts/{account_id}/for-user/{user_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == account_id
+    assert response.json()["account_type"] == "current"
+
+
+async def test_get_account_by_id_for_user_rejects_other_users_account(client: AsyncClient):
+    _, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+    other_user_id = str(ObjectId())
+    response = await client.get(f"/internal/accounts/{account_id}/for-user/{other_user_id}")
+    assert response.status_code == 404
+
+
+# --- GET /accounts/{account_id} (rută publică) ------------------------------
+# Regresie: exista deja o funcție `get_account_by_id_for_user` (service.py)
+# folosită de ruta asta — o coliziune de nume în timpul dezvoltării
+# extrasului de cont a suprascris-o temporar cu alta, incompatibilă ca
+# response_model (lipseau `balance`/`created_at`), rupând ruta publică cu
+# 500 fără ca vreun test existent s-o prindă. Fixat prin redenumire (vezi
+# app/routers/internal.py::get_account_by_id_internal), dar rămâne
+# netestată direct înainte de asta — acoperim golul aici.
+
+
+async def test_get_account_by_id_public_route_returns_full_account(client: AsyncClient):
+    user_id, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+    # NOTĂ: routers/accounts.py n-are prefix propriu — devine "/accounts"
+    # DOAR prin Gateway (/api/accounts/...); direct pe app, ruta e "/{id}"
+    # la rădăcină, la fel ca restul testelor din acest fișier ("/me", "/all"...).
+    response = await client.get(f"/{account_id}", headers={"Authorization": f"Bearer {_make_token(user_id)}"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == account_id
+    assert "balance" in body
+    assert "created_at" in body
+
+
+async def test_get_account_by_id_public_route_rejects_other_users_account(client: AsyncClient):
+    _, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+    other_user_id = str(ObjectId())
+    response = await client.get(f"/{account_id}", headers={"Authorization": f"Bearer {_make_token(other_user_id)}"})
+    assert response.status_code == 404

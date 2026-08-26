@@ -10,6 +10,7 @@ import {
   CardRevealView,
   CardType,
   CardView,
+  PAYMENT_CONFIRMATION_THRESHOLD_MINOR,
   PHYSICAL_CARD_FEE_MINOR,
 } from '../../services/banking.service';
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
@@ -28,7 +29,13 @@ import { Icon } from '../../shared/components/icon/icon';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
-type ToggleKey = 'online_payments_enabled' | 'contactless_enabled' | 'atm_withdrawals_enabled' | 'international_payments_enabled';
+type ToggleKey =
+  | 'online_payments_enabled'
+  | 'contactless_enabled'
+  | 'atm_withdrawals_enabled'
+  | 'international_payments_enabled'
+  | 'transaction_alerts_enabled'
+  | 'payment_confirmation_enabled';
 type AccordionSection = 'details' | 'control' | 'security';
 
 const REVEAL_AUTO_HIDE_MS = 20_000;
@@ -122,14 +129,19 @@ export class Cards implements OnInit, OnDestroy {
   protected readonly addCardDesign = signal<CardDesign>('midnight');
   protected readonly addCardType = signal<CardType>('virtual');
   protected readonly addCardOneTime = signal(false);
+  /** PIN-ul ALES de user chiar la deschiderea cardului (ca la un card real
+   * fizic emis de bancă) — folosit ulterior la reveal (vezi mai jos, secțiunea
+   * "Vezi date card + CVV"), NU parola contului. */
+  protected readonly addCardPin = signal('');
+  protected readonly addCardPinConfirm = signal('');
 
   protected readonly physicalFeeShortfall = computed(
     () => this.addCardType() === 'physical' && (this.account()?.balance_minor ?? 0) < PHYSICAL_CARD_FEE_MINOR,
   );
 
-  // --- Vezi date card + CVV (passkey, cu fallback pe parolă) -----------
+  // --- Vezi date card + CVV (passkey, cu fallback pe PIN-ul cardului) --
   protected readonly revealModalOpen = signal(false);
-  protected readonly revealPassword = signal('');
+  protected readonly revealPin = signal('');
   protected readonly revealBusy = signal(false);
   protected readonly revealBiometricBusy = signal(false);
   protected readonly revealTarget = signal<CardView | null>(null);
@@ -139,6 +151,15 @@ export class Cards implements OnInit, OnDestroy {
 
   private readonly hasPasskey = signal(false);
   protected readonly passkeyAvailable = computed(() => this.webauthn.isSupported() && this.hasPasskey());
+
+  // --- Security settings — Change PIN (passkey, cu fallback pe PIN-ul curent) --
+  protected readonly changePinModalOpen = signal(false);
+  protected readonly changePinCurrent = signal('');
+  protected readonly changePinNew = signal('');
+  protected readonly changePinNewConfirm = signal('');
+  protected readonly changePinBusy = signal(false);
+  protected readonly changePinBiometricBusy = signal(false);
+  protected readonly paymentConfirmationThreshold = PAYMENT_CONFIRMATION_THRESHOLD_MINOR;
 
   ngOnInit(): void {
     this.load();
@@ -284,6 +305,8 @@ export class Cards implements OnInit, OnDestroy {
     this.addCardDesign.set('midnight');
     this.addCardType.set('virtual');
     this.addCardOneTime.set(false);
+    this.addCardPin.set('');
+    this.addCardPinConfirm.set('');
     this.addCardModalOpen.set(true);
   }
 
@@ -306,11 +329,20 @@ export class Cards implements OnInit, OnDestroy {
       this.toast.error('Sold insuficient pentru taxa de emitere a cardului fizic.');
       return;
     }
+    if (!/^\d{4}$/.test(this.addCardPin())) {
+      this.toast.error('PIN-ul trebuie să conțină exact 4 cifre.');
+      return;
+    }
+    if (this.addCardPin() !== this.addCardPinConfirm()) {
+      this.toast.error('PIN-urile introduse nu coincid.');
+      return;
+    }
 
     const payload: CardCreatePayload = {
       design: this.addCardDesign(),
       type: this.addCardType(),
       is_one_time: this.addCardOneTime(),
+      pin: this.addCardPin(),
     };
 
     this.addCardSaving.set(true);
@@ -346,30 +378,30 @@ export class Cards implements OnInit, OnDestroy {
       return;
     }
     this.revealTarget.set(card);
-    this.revealPassword.set('');
+    this.revealPin.set('');
     this.revealModalOpen.set(true);
   }
 
   protected closeRevealModal(): void {
     this.revealModalOpen.set(false);
-    this.revealPassword.set('');
+    this.revealPin.set('');
     this.revealTarget.set(null);
   }
 
   protected submitReveal(): void {
     const target = this.revealTarget();
     if (!target) return;
-    if (!this.revealPassword().trim()) {
-      this.toast.error('Introdu parola contului.');
+    if (!/^\d{4}$/.test(this.revealPin())) {
+      this.toast.error('Introdu PIN-ul cardului (4 cifre).');
       return;
     }
 
     this.revealBusy.set(true);
-    this.banking.revealCard(target.id, { password: this.revealPassword() }).subscribe({
+    this.banking.revealCard(target.id, { pin: this.revealPin() }).subscribe({
       next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBusy.set(false)),
       error: (err) => {
         this.revealBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Parolă incorectă.'));
+        this.toast.error(extractErrorMessage(err, 'PIN incorect.'));
       },
     });
   }
@@ -385,15 +417,15 @@ export class Cards implements OnInit, OnDestroy {
         next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBiometricBusy.set(false)),
         error: (err) => {
           this.revealBiometricBusy.set(false);
-          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi parola.'));
+          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi PIN-ul.'));
         },
       });
     } catch (err) {
       this.revealBiometricBusy.set(false);
       // Userul a anulat prompt-ul biometric (NotAllowedError) — nu e o
-      // eroare de afișat, câmpul parolei rămâne oricum disponibil mai jos.
+      // eroare de afișat, câmpul PIN-ului rămâne oricum disponibil mai jos.
       if ((err as { name?: string })?.name !== 'NotAllowedError') {
-        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi parola.');
+        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi PIN-ul.');
       }
     }
   }
@@ -403,7 +435,7 @@ export class Cards implements OnInit, OnDestroy {
     this.revealedCardId.set(cardId);
     clearBusy();
     this.revealModalOpen.set(false);
-    this.revealPassword.set('');
+    this.revealPin.set('');
     this.revealTarget.set(null);
     this.scheduleAutoHide();
   }
@@ -428,6 +460,81 @@ export class Cards implements OnInit, OnDestroy {
 
   protected formatPan(pan: string): string {
     return pan.match(/.{1,4}/g)?.join(' ') ?? pan;
+  }
+
+  // --- Security settings — Change PIN --------------------------------------
+
+  protected openChangePinModal(): void {
+    this.changePinCurrent.set('');
+    this.changePinNew.set('');
+    this.changePinNewConfirm.set('');
+    this.changePinModalOpen.set(true);
+  }
+
+  protected closeChangePinModal(): void {
+    this.changePinModalOpen.set(false);
+    this.changePinCurrent.set('');
+    this.changePinNew.set('');
+    this.changePinNewConfirm.set('');
+  }
+
+  private validateNewPin(): boolean {
+    if (!/^\d{4}$/.test(this.changePinNew())) {
+      this.toast.error('PIN-ul nou trebuie să conțină exact 4 cifre.');
+      return false;
+    }
+    if (this.changePinNew() !== this.changePinNewConfirm()) {
+      this.toast.error('PIN-urile introduse nu coincid.');
+      return false;
+    }
+    return true;
+  }
+
+  protected submitChangePin(): void {
+    const target = this.activeCard();
+    if (!target || !this.validateNewPin()) return;
+    if (!/^\d{4}$/.test(this.changePinCurrent())) {
+      this.toast.error('Introdu PIN-ul curent (4 cifre).');
+      return;
+    }
+
+    this.changePinBusy.set(true);
+    this.banking.changeCardPin(target.id, { current_pin: this.changePinCurrent(), new_pin: this.changePinNew() }).subscribe({
+      next: (updated) => this.applyChangePinSuccess(updated, () => this.changePinBusy.set(false)),
+      error: (err) => {
+        this.changePinBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'PIN curent incorect.'));
+      },
+    });
+  }
+
+  protected async submitChangePinWithBiometrics(): Promise<void> {
+    const target = this.activeCard();
+    if (!target || !this.validateNewPin()) return;
+
+    this.changePinBiometricBusy.set(true);
+    try {
+      const assertion = await this.webauthn.getStepUpAssertion('card_reveal', target.id);
+      this.banking.changeCardPin(target.id, { ...assertion, new_pin: this.changePinNew() }).subscribe({
+        next: (updated) => this.applyChangePinSuccess(updated, () => this.changePinBiometricBusy.set(false)),
+        error: (err) => {
+          this.changePinBiometricBusy.set(false);
+          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi PIN-ul curent.'));
+        },
+      });
+    } catch (err) {
+      this.changePinBiometricBusy.set(false);
+      if ((err as { name?: string })?.name !== 'NotAllowedError') {
+        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi PIN-ul curent.');
+      }
+    }
+  }
+
+  private applyChangePinSuccess(updated: CardView, clearBusy: () => void): void {
+    this.replaceCard(updated);
+    clearBusy();
+    this.closeChangePinModal();
+    this.toast.success('PIN-ul cardului a fost schimbat.');
   }
 
   private designOption(design: CardDesign): CardDesignOption | undefined {

@@ -25,6 +25,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [accounts-service] %
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await service.backfill_missing_account_types()
+    await service.backfill_missing_card_pins()
     await service.ensure_fraud_holding_account()
     yield
     await close_database_connection()

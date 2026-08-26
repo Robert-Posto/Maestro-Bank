@@ -4,8 +4,8 @@ Doar validare (Pydantic) și delegare către app/service.py — logica de
 business (acces la bază, hashing, provisioning) trăiește acolo.
 
 Extern (prin Gateway) acestea devin: /api/auth/register, /api/auth/login,
-/api/auth/me, /api/auth/verify-email, /api/auth/resend-verification-email
-— vezi backend/gateway/app/routers/proxy.py.
+/api/auth/me, /api/auth/me/profile-picture, /api/auth/verify-email,
+/api/auth/resend-verification-email — vezi backend/gateway/app/routers/proxy.py.
 """
 
 from fastapi import APIRouter, Depends, Header, Request, status
@@ -47,6 +47,11 @@ async def get_me(authorization: str | None = Header(default=None)):
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(payload: ChangePasswordRequest, authorization: str | None = Header(default=None)):
     await service.change_password(authorization, payload)
+
+
+@router.patch("/me/profile-picture", response_model=UserMeOut, response_model_by_alias=False)
+async def update_profile_picture(payload: ProfilePictureUpdate, authorization: str | None = Header(default=None)):
+    return await service.update_profile_picture(authorization, payload)
 
 
 @router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)

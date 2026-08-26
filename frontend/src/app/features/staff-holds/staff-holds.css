@@ -113,6 +113,7 @@
 }
 
 .hold-card__rule-tag {
+  position: relative;
   font-size: 0.68rem;
   font-weight: var(--mb-font-weight-medium);
   padding: 0.1rem 0.45rem;
@@ -120,6 +121,70 @@
   background: var(--mb-surface-muted);
   color: var(--mb-text-secondary);
   border: 1px solid var(--mb-border);
+  cursor: help;
+}
+
+/* Tooltip propriu, NU `title` nativ (arăta "clasic"/urât — casetă de
+   sistem, fără stil) — cutie flotantă în stilul aplicației, cu fade +
+   alunecare scurtă. Text din data-tooltip (vezi staff-holds.ts::
+   ruleDescription), citit prin CSS attr(), fără nicio librărie/JS de
+   poziționare. Apare deasupra tag-ului; presupune spațiu liber deasupra
+   (rezonabil aici — rândurile din listă, nu chiar primul din pagină). */
+.hold-card__rule-tag::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  width: max-content;
+  max-width: 240px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-navy-950);
+  color: #fff;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-regular);
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: var(--mb-shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
+  z-index: 30;
+}
+
+.hold-card__rule-tag::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--mb-navy-950);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 160ms ease, visibility 160ms;
+  z-index: 30;
+}
+
+.hold-card__rule-tag:hover::after,
+.hold-card__rule-tag:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+.hold-card__rule-tag:hover::after {
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-card__rule-tag::after,
+  .hold-card__rule-tag::before {
+    transition: none;
+  }
 }
 
 .hold-card__meta {

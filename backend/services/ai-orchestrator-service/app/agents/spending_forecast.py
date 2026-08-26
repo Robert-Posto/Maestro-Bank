@@ -45,7 +45,7 @@ from app.models.spending_forecast import (
 from app.prompts.spending_forecast_prompt import build_system_prompt
 from app.rag.retriever import Chunk, get_retriever
 from app.security import AuthContext
-from app.services import affordability_service, forecast_service, moderation_service
+from app.services import affordability_service, forecast_service, moderation_service, safety_guard
 from app.tools.errors import ToolError
 from app.tools.registry import TOOL_SCHEMAS, ToolResultCache, ensure_core_data, execute_tool
 
@@ -137,16 +137,27 @@ async def handle_message(
     cache = ToolResultCache()
     auth_header = auth.authorization_header
 
-    # Limbaj jignitor/injurii -> NU trecem deloc prin GPT (vezi
-    # app/services/moderation_service.py) — răspuns determinist, cerem
-    # reformularea. Verificare făcută ÎNAINTE de RAG/tool-calling, ca să nu
+    # Limbaj jignitor/injurii, date sensibile de card (PIN/CVV/număr complet)
+    # sau încercări de a scoate promptul de sistem -> NU trecem deloc prin
+    # GPT (vezi moderation_service.py / safety_guard.py) — răspuns
+    # determinist. Verificare făcută ÎNAINTE de RAG/tool-calling, ca să nu
     # irosim niciun apel real (feedback: "la injurii vreau sa nu raspunda,
-    # sa roage sa reformulezez").
+    # sa roage sa reformulezez" / "nu ma lasa sa ii dau date personale").
     if moderation_service.contains_profanity(message):
         logger.info("agent: mesaj cu limbaj jignitor — răspuns determinist, fără apel GPT")
         final_text = moderation_service.REPHRASE_REQUEST_ANSWER
         relevant_cards: list[str] = []
         rag_hits: list[tuple[Chunk, float]] = []
+    elif safety_guard.detect_sensitive_data(message):
+        logger.info("agent: mesaj cu date sensibile de card — răspuns determinist, fără apel GPT")
+        final_text = safety_guard.SENSITIVE_DATA_WARNING
+        relevant_cards = []
+        rag_hits = []
+    elif safety_guard.detect_prompt_extraction_attempt(message):
+        logger.info("agent: încercare de extragere a promptului — răspuns determinist, fără apel GPT")
+        final_text = safety_guard.PROMPT_EXTRACTION_REFUSAL
+        relevant_cards = []
+        rag_hits = []
     else:
         rag_message, rag_hits = await _rag_context(message)
 
@@ -222,6 +233,11 @@ async def handle_message(
 
         if final_text is None:
             final_text = _FALLBACK_ANSWER
+        # Apărare suplimentară — vezi safety_guard.py::redact_if_sensitive.
+        # Nu ar trebui să se întâmple niciodată (niciun tool nu-i oferă
+        # PIN/CVV/PAN), dar costă puțin să verificăm și ce a GENERAT GPT,
+        # nu doar mesajul userului (verificat mai sus, înainte de apel).
+        final_text = safety_guard.redact_if_sensitive(final_text)
 
         # Citim called_tools ÎNAINTE de ensure_core_data — vezi
         # _CARD_TRIGGERS mai sus, relevanța cardurilor reflectă DOAR

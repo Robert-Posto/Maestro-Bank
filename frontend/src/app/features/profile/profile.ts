@@ -31,6 +31,88 @@ export class Profile implements OnInit {
 
   protected readonly currentUser = this.auth.currentUser;
 
+  // --- Poză de profil (opțională, la cererea userului) ---------------------
+  protected readonly profilePictureBusy = signal(false);
+
+  protected onProfilePictureSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = ''; // reset — re-selectarea ACELUIAȘI fișier trebuie să declanșeze din nou (change)
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Alege un fișier imagine (JPEG, PNG etc.).');
+      return;
+    }
+
+    this.profilePictureBusy.set(true);
+    this.resizeImageToDataUri(file, 200, 200, 0.85)
+      .then((dataUri) =>
+        this.auth.updateProfilePicture(dataUri).subscribe({
+          next: () => {
+            this.profilePictureBusy.set(false);
+            this.toast.success('Poza de profil a fost actualizată.');
+          },
+          error: (err) => {
+            this.profilePictureBusy.set(false);
+            this.toast.error(extractErrorMessage(err, 'Nu am putut salva poza de profil.'));
+          },
+        }),
+      )
+      .catch(() => {
+        this.profilePictureBusy.set(false);
+        this.toast.error('Nu am putut procesa imaginea — încearcă alt fișier.');
+      });
+  }
+
+  protected removeProfilePicture(): void {
+    this.profilePictureBusy.set(true);
+    this.auth.updateProfilePicture(null).subscribe({
+      next: () => {
+        this.profilePictureBusy.set(false);
+        this.toast.success('Poza de profil a fost ștearsă.');
+      },
+      error: (err) => {
+        this.profilePictureBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge poza de profil.'));
+      },
+    });
+  }
+
+  /** Redimensionează + comprimă imaginea ÎN BROWSER (canvas) înainte de a o
+   * trimite — backend-ul o stochează direct în Mongo, fără storage extern
+   * (vezi auth-service/app/models.py::ProfilePictureUpdate), deci ținem
+   * poza mică intenționat (crop pătrat centrat, ~200x200, JPEG). */
+  private resizeImageToDataUri(file: File, targetWidth: number, targetHeight: number, quality: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Imagine invalidă.'));
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas indisponibil.'));
+            return;
+          }
+          // Crop pătrat centrat, apoi scalare la dimensiunea țintă — poza
+          // nu apare distorsionată dacă originalul nu e deja pătrat.
+          const side = Math.min(img.width, img.height);
+          const sx = (img.width - side) / 2;
+          const sy = (img.height - side) / 2;
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, targetWidth, targetHeight);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   protected readonly currentPassword = signal('');
   protected readonly newPassword = signal('');
   protected readonly confirmPassword = signal('');

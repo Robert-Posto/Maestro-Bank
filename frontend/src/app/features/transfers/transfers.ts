@@ -28,7 +28,8 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 type TransferStep = 'form' | 'review' | 'success';
-type MainTab = 'new' | 'scheduled' | 'requests';
+type MainTab = 'new' | 'scheduled';
+type SendMode = 'send' | 'request';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -58,6 +59,11 @@ export class Transfers implements OnInit {
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
   protected readonly mainTab = signal<MainTab>('new');
+  /** Trimit vs. Solicit — switch în interiorul tabului "Transfer nou", nu
+   * mai e un tab separat (vezi discuția cu userul: cardul lung din dreapta
+   * n-avea sens, iar un tab la același nivel cu "Programate" pentru o
+   * acțiune care e tot despre bani ce circulă pe contul tău era ciudat). */
+  protected readonly sendMode = signal<SendMode>('send');
 
   protected readonly account = signal<AccountView | null>(null);
   protected readonly beneficiaries = signal<Beneficiary[]>([]);
@@ -368,23 +374,51 @@ export class Transfers implements OnInit {
   }
 
   protected backToForm(): void {
+    this.needsCardPin.set(false);
+    this.cardPin.set('');
+    this.cardPinRequiredMessage.set('');
     this.step.set('form');
   }
 
   protected confirmTransfer(): void {
     this.submitting.set(true);
     this.formError.set(null);
+    this.sendTransfer(undefined, () => this.submitting.set(false));
+  }
 
+  /** "Payment confirmation" (Security settings, Cardul meu) — backend-ul
+   * respinge cu 428 dacă transferul depășește pragul și contul sursă
+   * cere confirmare (vezi transactions-service/app/service.py). Rămânem
+   * pe pasul "review", arătăm caseta de PIN — userul NU reface tot
+   * formularul, doar confirmă cu PIN-ul cardului. */
+  protected readonly needsCardPin = signal(false);
+  protected readonly cardPin = signal('');
+  protected readonly cardPinBusy = signal(false);
+  protected readonly cardPinRequiredMessage = signal('');
+
+  protected submitCardPinConfirmation(): void {
+    if (!/^\d{4}$/.test(this.cardPin())) {
+      this.toast.error('Introdu PIN-ul cardului (4 cifre).');
+      return;
+    }
+    this.cardPinBusy.set(true);
+    this.sendTransfer(this.cardPin(), () => this.cardPinBusy.set(false), /* isPinRetry */ true);
+  }
+
+  private sendTransfer(cardPin: string | undefined, clearBusy: () => void, isPinRetry = false): void {
     this.banking
       .createTransfer({
         to_iban: this.toIban(),
         amount_minor: this.amountMinor(),
         description: this.description().trim(),
         category: this.category(),
+        card_pin: cardPin,
       })
       .subscribe({
         next: (transaction) => {
-          this.submitting.set(false);
+          clearBusy();
+          this.needsCardPin.set(false);
+          this.cardPin.set('');
           this.completedTransaction.set(transaction);
           this.step.set('success');
           this.toast.success('Transfer efectuat cu succes.');
@@ -392,7 +426,21 @@ export class Transfers implements OnInit {
           this.maybeSaveBeneficiary();
         },
         error: (err) => {
-          this.submitting.set(false);
+          clearBusy();
+          if (err instanceof HttpErrorResponse && err.status === 428) {
+            this.needsCardPin.set(true);
+            const detail = err.error?.detail;
+            this.cardPinRequiredMessage.set(
+              typeof detail === 'string' ? detail : 'Acest transfer necesită confirmare cu PIN-ul cardului.',
+            );
+            return;
+          }
+          if (isPinRetry && err instanceof HttpErrorResponse && err.status === 401) {
+            this.toast.error('PIN incorect.');
+            this.cardPin.set('');
+            return;
+          }
+          this.needsCardPin.set(false);
           this.formError.set(this.mapTransferError(err));
           this.step.set('form');
         },
@@ -431,6 +479,9 @@ export class Transfers implements OnInit {
     this.saveAsBeneficiary.set(false);
     this.saveBeneficiaryName.set('');
     this.completedTransaction.set(null);
+    this.needsCardPin.set(false);
+    this.cardPin.set('');
+    this.cardPinRequiredMessage.set('');
     this.step.set('form');
   }
 }

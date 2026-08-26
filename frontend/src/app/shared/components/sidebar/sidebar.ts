@@ -7,17 +7,16 @@ interface NavItem {
   label: string;
   route: string;
   icon: string;
-  /** Insignă mică opțională lângă etichetă (ex. "AI") — vezi sidebar.css::sidebar__link-badge. */
-  badge?: string;
-  /** Tratament vizual distinct (gradient discret) — pentru intrarea AI, ca
-   * să nu se piardă în lista de navigare utilitară. Vezi sidebar__link--accent. */
-  accent?: boolean;
 }
 
 interface NavGroup {
   /** Etichetă mică, opțională, deasupra grupului (ex. "BANCAR") — omisă
    * pentru primul și ultimul grup, ca să nu pară "etichetate" inutil. */
   label?: string;
+  /** Fundal/border distinct pe TOT grupul (nu doar pe un link) — pentru
+   * "Asistenți AI", ca zona întreagă să iasă în evidență ca un bloc
+   * coerent, nu un singur rând ciudat. Vezi sidebar__group--highlight. */
+  highlight?: boolean;
   items: NavItem[];
 }
 
@@ -51,11 +50,18 @@ const NAV_GROUPS: NavGroup[] = [
     // vizual, deși cele două intrări sunt deja rudă (ambele agenți AI
     // găzduiți de ai-orchestrator-service).
     label: 'Asistenți AI',
+    highlight: true,
     items: [
       // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
       // Spending + Forecast, peste GPT-5-mini), deci e o intrare normală
       // de navigare, ca oricare alta — NU mai e un card promo în footer.
-      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot', badge: 'AI', accent: true },
+      // Fără tratament vizual distinct (gradient/border/glow) — userul l-a
+      // vrut eliminat, arăta ca un element rupt/inconsecvent față de restul
+      // sidebar-ului. Fără insignă "AI" — Support e la fel de mult un
+      // agent AI și nu are una, deci ar fi inconsecvent să aibă doar
+      // MaestroAgent; grupul ("Asistenți AI") spune deja asta o dată,
+      // pentru amândouă, nu are nevoie s-o repete per-element.
+      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot' },
       { label: 'Support', route: '/app/support', icon: 'support' },
     ],
   },

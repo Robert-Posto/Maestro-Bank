@@ -257,29 +257,37 @@
         </button>
         <div class="accordion-body" [class.accordion-body--open]="openSection() === 'security'">
           <div class="accordion-body__inner">
-            <div class="card-control card-control--muted">
+            <div class="card-control">
               <app-icon name="lock" [size]="18" />
               <div class="card-control__info">
                 <p class="card-control__title">Change PIN</p>
                 <p class="card-control__desc">Schimbă codul PIN al cardului.</p>
               </div>
-              <span class="card-control__soon">Coming soon</span>
+              <button type="button" class="card-control__link" (click)="openChangePinModal()">Schimbă</button>
             </div>
-            <div class="card-control card-control--muted">
+            <div class="card-control">
               <app-icon name="bell" [size]="18" />
               <div class="card-control__info">
                 <p class="card-control__title">Transaction alerts</p>
                 <p class="card-control__desc">Notificări la fiecare tranzacție cu cardul.</p>
               </div>
-              <span class="card-control__soon">Coming soon</span>
+              <app-toggle-control
+                [checked]="activeCard()!.transaction_alerts_enabled"
+                [disabled]="settingsBusy() === 'transaction_alerts_enabled'"
+                (toggled)="toggleSetting('transaction_alerts_enabled', $event)"
+              />
             </div>
-            <div class="card-control card-control--muted">
+            <div class="card-control">
               <app-icon name="shield" [size]="18" />
               <div class="card-control__info">
                 <p class="card-control__title">Payment confirmation</p>
-                <p class="card-control__desc">Confirmare suplimentară pentru plăți mari.</p>
+                <p class="card-control__desc">Confirmare suplimentară (PIN-ul cardului) pentru transferuri peste {{ paymentConfirmationThreshold | money: 'RON' }} din contul asociat.</p>
               </div>
-              <span class="card-control__soon">Coming soon</span>
+              <app-toggle-control
+                [checked]="activeCard()!.payment_confirmation_enabled"
+                [disabled]="settingsBusy() === 'payment_confirmation_enabled'"
+                (toggled)="toggleSetting('payment_confirmation_enabled', $event)"
+              />
             </div>
           </div>
         </div>
@@ -309,15 +317,6 @@
             <app-transaction-row [transaction]="tx" />
           }
         }
-      </div>
-
-      <div class="card-panel cards-guardian">
-        <div class="cards-guardian__header">
-          <app-icon name="shield" [size]="18" />
-          <strong>Financial Guardian</strong>
-          <span class="card-control__soon">Coming in AI phase</span>
-        </div>
-        <p>Monitorizarea automată a tranzacțiilor neobișnuite va fi disponibilă într-o etapă viitoare.</p>
       </div>
     </aside>
   </div>
@@ -386,6 +385,33 @@
         <app-toggle-control [checked]="addCardOneTime()" [disabled]="addCardType() === 'physical'" (toggled)="toggleOneTime($event)" />
       </div>
 
+      <div class="add-card-section">
+        <p class="add-card-section__label">Setează un PIN (4 cifre)</p>
+        <p class="add-card-section__hint">Îl vei folosi ca să vezi numărul complet și CVV-ul cardului — nu parola contului.</p>
+        <div class="add-card-pin-row">
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="PIN nou"
+            [ngModel]="addCardPin()"
+            (ngModelChange)="addCardPin.set($event)"
+            name="addCardPin"
+          />
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="Confirmă PIN"
+            [ngModel]="addCardPinConfirm()"
+            (ngModelChange)="addCardPinConfirm.set($event)"
+            name="addCardPinConfirm"
+          />
+        </div>
+      </div>
+
       <app-action-button [fullWidth]="true" [loading]="addCardSaving()" [disabled]="physicalFeeShortfall()" (pressed)="saveNewCard()">
         {{ addCardType() === 'physical' ? 'Comandă card fizic' : 'Emite card virtual' }}
       </app-action-button>
@@ -404,23 +430,87 @@
         <app-action-button [fullWidth]="true" [loading]="revealBiometricBusy()" (pressed)="submitRevealWithBiometrics()">
           <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
         </app-action-button>
-        <div class="reveal-divider"><span>sau introdu parola</span></div>
+        <div class="reveal-divider"><span>sau introdu PIN-ul cardului</span></div>
       }
 
       <form (ngSubmit)="submitReveal()">
         <label>
-          <span>Parolă</span>
+          <span>PIN card</span>
           <input
             type="password"
-            autocomplete="current-password"
-            placeholder="Parola contului"
-            [ngModel]="revealPassword()"
-            (ngModelChange)="revealPassword.set($event)"
-            name="revealPassword"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="••••"
+            [ngModel]="revealPin()"
+            (ngModelChange)="revealPin.set($event)"
+            name="revealPin"
           />
         </label>
         <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="revealBusy()">
-          Confirmă cu parola
+          Confirmă cu PIN
+        </app-action-button>
+      </form>
+    </div>
+  </app-modal>
+}
+
+@if (changePinModalOpen()) {
+  <app-modal title="Schimbă PIN-ul cardului" [maxWidth]="400" (closed)="closeChangePinModal()">
+    <div class="reveal-form">
+      <p class="reveal-form__desc">
+        Confirmă identitatea, apoi alege noul PIN pentru cardul **** {{ activeCard()?.last_four }}.
+      </p>
+
+      @if (passkeyAvailable()) {
+        <app-action-button [fullWidth]="true" [loading]="changePinBiometricBusy()" (pressed)="submitChangePinWithBiometrics()">
+          <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
+        </app-action-button>
+        <div class="reveal-divider"><span>sau introdu PIN-ul curent</span></div>
+      }
+
+      <form (ngSubmit)="submitChangePin()">
+        <label>
+          <span>PIN curent</span>
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="••••"
+            [ngModel]="changePinCurrent()"
+            (ngModelChange)="changePinCurrent.set($event)"
+            name="changePinCurrent"
+          />
+        </label>
+        <label>
+          <span>PIN nou</span>
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="PIN nou"
+            [ngModel]="changePinNew()"
+            (ngModelChange)="changePinNew.set($event)"
+            name="changePinNew"
+          />
+        </label>
+        <label>
+          <span>Confirmă PIN nou</span>
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="Confirmă PIN nou"
+            [ngModel]="changePinNewConfirm()"
+            (ngModelChange)="changePinNewConfirm.set($event)"
+            name="changePinNewConfirm"
+          />
+        </label>
+        <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="changePinBusy()">
+          Schimbă PIN-ul
         </app-action-button>
       </form>
     </div>

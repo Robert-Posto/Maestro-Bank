@@ -15,12 +15,16 @@ from fastapi import APIRouter, status
 
 from app import service
 from app.models import (
+    AccountPublicOut,
     FraudHoldingAccountView,
     InternalAccountView,
+    InternalCardSettingsView,
     InternalExchangeRequest,
     InternalExchangeResponse,
     InternalTransferRequest,
     InternalTransferResponse,
+    InternalVerifyPinRequest,
+    InternalVerifyPinResponse,
     ProvisionRequest,
     ProvisionResponse,
 )
@@ -49,9 +53,40 @@ async def get_account_by_iban(iban: str):
     return await service.get_account_by_iban(iban)
 
 
+@router.get("/{account_id}/for-user/{user_id}", response_model=AccountPublicOut)
+async def get_account_by_id_internal(account_id: str, user_id: str):
+    """Apelat de transactions-service pentru extrasul de cont per-cont
+    (userul poate alege orice cont al lui, nu doar "current" — vezi
+    generate_account_statement). Reutilizează EXACT
+    app/service.py::get_account_by_id_for_user — funcția care deja există
+    și e folosită de ruta PUBLICĂ GET /accounts/{account_id} — NU o
+    duplică; există special această rută /internal/ doar pentru că
+    transactions-service n-are JWT-ul userului, ca să poată apela ruta
+    publică direct."""
+    return await service.get_account_by_id_for_user(account_id, user_id)
+
+
 @router.post("/transfer", response_model=InternalTransferResponse)
 async def apply_internal_transfer(payload: InternalTransferRequest):
     return await service.apply_internal_transfer(payload.from_account_id, payload.to_account_id, payload.amount_minor)
+
+
+@router.get("/{account_id}/card-settings", response_model=InternalCardSettingsView)
+async def get_account_card_settings(account_id: str):
+    """Apelat de transactions-service — vezi
+    app/service.py::get_account_card_settings pentru raționamentul
+    agregării "oricare card" (alertele/confirmarea la plăți sunt setate
+    per-card, dar transferurile MaestroBank sunt cont-la-cont, nu
+    card-la-card)."""
+    return await service.get_account_card_settings(account_id)
+
+
+@router.post("/cards/{card_id}/verify-pin", response_model=InternalVerifyPinResponse)
+async def verify_card_pin(card_id: str, payload: InternalVerifyPinRequest):
+    """Apelat DOAR de transactions-service, cu un `card_id` deja rezolvat
+    de get_account_card_settings de mai sus — vezi
+    app/service.py::verify_card_pin_internal."""
+    return InternalVerifyPinResponse(valid=await service.verify_card_pin_internal(card_id, payload.pin))
 
 
 @router.post("/exchange", response_model=InternalExchangeResponse)

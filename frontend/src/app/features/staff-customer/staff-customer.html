@@ -18,7 +18,7 @@
       @if (accountRows().length === 0) {
         <app-empty-state icon="wallet" title="Niciun cont" description="Acest client nu are conturi active." />
       } @else {
-        <div class="staff-customer__list">
+        <div class="staff-customer__accounts-grid">
           @for (account of accountRows(); track account.id) {
             <app-account-card [account]="account" [showChevron]="false" />
           }
@@ -36,10 +36,18 @@
       } @else {
         <div class="staff-customer__list">
           @for (tx of transactionRows(); track tx.id) {
-            <app-transaction-row [transaction]="tx" />
+            <app-transaction-row [transaction]="tx" (opened)="openDetails(tx.id)" />
           }
         </div>
       }
     </section>
   </div>
+
+  @if (selectedTransaction(); as tx) {
+    <div class="staff-customer__details-backdrop" (click)="closeDetails()">
+      <div class="staff-customer__details-dialog" (click)="$event.stopPropagation()">
+        <app-transaction-details-panel [transaction]="tx" [readonly]="true" (closed)="closeDetails()" />
+      </div>
+    </div>
+  }
 }

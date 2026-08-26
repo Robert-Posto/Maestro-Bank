@@ -103,6 +103,9 @@
           <button type="button" class="account-card__icon-btn" title="Transfer" (click)="goToTransfer()">
             <app-icon name="transfer" [size]="15" />
           </button>
+          <button type="button" class="account-card__icon-btn" title="Extras de cont" (click)="openStatementModal(account)">
+            <app-icon name="receipt" [size]="15" />
+          </button>
           <button
             type="button"
             class="account-card__icon-btn account-card__icon-btn--danger"
@@ -239,6 +242,25 @@
       </label>
       <app-action-button [fullWidth]="true" [loading]="creatingPocket()" (pressed)="saveNewPocket()">
         Creează obiectiv
+      </app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (statementAccount(); as statementAcc) {
+  <app-modal title="Extras de cont" (closed)="closeStatementModal()">
+    <div class="pocket-form">
+      <p class="statement-modal__account">{{ catalog[statementAcc.account_type].label }} · {{ statementAcc.iban }}</p>
+      <label>
+        <span>De la</span>
+        <input type="date" [ngModel]="statementFrom()" (ngModelChange)="statementFrom.set($event)" />
+      </label>
+      <label>
+        <span>Până la</span>
+        <input type="date" [ngModel]="statementTo()" (ngModelChange)="statementTo.set($event)" />
+      </label>
+      <app-action-button [fullWidth]="true" [loading]="generatingStatement()" (pressed)="downloadStatement()">
+        <app-icon name="download" [size]="16" /> Descarcă PDF
       </app-action-button>
     </div>
   </app-modal>
