@@ -8,7 +8,7 @@ tests/test_fraud_scoring.py) — fără să fie nevoie să se reverse-engineerea
 praguri reale de reguli doar ca să se declanșeze un anumit număr de reguli
 dintr-o familie."""
 
-from app.fraud.catalogue import RULES
+from app.fraud.catalogue import RULES, SUBSUMED_BY
 from app.fraud.models import RuleContext, RuleOutcome, ScoredRule, ScoreResult
 from app.fraud.ruleset_config import RulesetConfig
 
@@ -23,7 +23,23 @@ def _map_score_to_band(score: int, ruleset: RulesetConfig) -> str:
     return "pass"
 
 
+def _suppress_subsumed_rules(fired: list[RuleOutcome]) -> list[RuleOutcome]:
+    """O regulă subsumată (vezi catalogue.py::SUBSUMED_BY) nu aduce niciun
+    semnal nou dacă regula ei "mamă" a fost declanșată și ea — suprimată aici
+    (contributes_to_score=False), NU eliminată din listă, ca să rămână
+    vizibilă în audit exact ca BEN-05."""
+    fired_ids = {outcome.rule_id for outcome in fired}
+    suppressed: list[RuleOutcome] = []
+    for outcome in fired:
+        parents = SUBSUMED_BY.get(outcome.rule_id, ())
+        if outcome.contributes_to_score and any(parent in fired_ids for parent in parents):
+            outcome = outcome.model_copy(update={"contributes_to_score": False})
+        suppressed.append(outcome)
+    return suppressed
+
+
 def apply_diminishing_returns(fired: list[RuleOutcome], ruleset: RulesetConfig) -> ScoreResult:
+    fired = _suppress_subsumed_rules(fired)
     by_family: dict[str, list[RuleOutcome]] = {}
     for outcome in fired:
         by_family.setdefault(outcome.family, []).append(outcome)

@@ -16,9 +16,11 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app import webauthn_service
 from app.config import settings
 from app.database import get_database
 from app.email_service import send_verification_email
+from app.login_events import get_recent_login_events, record_login_attempt
 from app.models import ChangePasswordRequest, UserLogin, UserRegister
 from app.security import create_access_token, decode_access_token, hash_password, verify_password
 
@@ -196,18 +198,33 @@ async def mark_identity_verified(user_id: str) -> None:
     logger.info("auth-service: identitate verificată pentru user_id=%s", user_id)
 
 
-async def authenticate_user(payload: UserLogin) -> str:
+async def authenticate_user(payload: UserLogin, *, ip_address: str | None = None, user_agent: str | None = None) -> str:
     db = get_database()
     user = await db.users.find_one({"email": payload.email})
 
     if user is None or not verify_password(payload.password, user["password_hash"]):
         logger.info("auth-service: autentificare eșuată pentru %s", payload.email)
+        await record_login_attempt(
+            user_id=str(user["_id"]) if user else None,
+            email_attempted=payload.email,
+            success=False,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email sau parolă incorectă.")
 
     if not user.get("is_active", True):
+        await record_login_attempt(
+            user_id=str(user["_id"]), email_attempted=payload.email, success=False,
+            ip_address=ip_address, user_agent=user_agent,
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Contul este dezactivat.")
 
     token = create_access_token(user_id=str(user["_id"]), email=user["email"], role=user.get("role", "customer"))
+    await record_login_attempt(
+        user_id=str(user["_id"]), email_attempted=payload.email, success=True,
+        ip_address=ip_address, user_agent=user_agent,
+    )
     logger.info("auth-service: autentificare reușită (user_id=%s)", user["_id"])
     return token
 
@@ -252,9 +269,10 @@ async def change_password(authorization: str | None, payload: ChangePasswordRequ
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Parola curentă este incorectă.")
 
     db = get_database()
+    now = datetime.now(timezone.utc)
     await db.users.update_one(
         {"_id": user["_id"]},
-        {"$set": {"password_hash": hash_password(payload.new_password)}},
+        {"$set": {"password_hash": hash_password(payload.new_password), "password_changed_at": now}},
     )
     logger.info("auth-service: parolă schimbată cu succes pentru user_id=%s", user["_id"])
 
@@ -317,4 +335,36 @@ async def get_user_contact(user_id: str) -> dict:
         "last_name": user["last_name"],
         "email": user["email"],
         "phone_number": user.get("phone_number"),
+    }
+
+
+async def get_security_facts(user_id: str) -> dict:
+    """Rută INTERNĂ, DOAR pentru transactions-service (motorul de fraudă —
+    VEL-04, DEV-01/02/04/05/06). UN SINGUR apel adună tot ce au nevoie
+    aceste reguli (istoric login + schimbare parolă + evenimente
+    credențiale), ca să nu multiplicăm hop-uri HTTP pe calea de evaluare
+    fraud — vezi planul fazei. Toate comparațiile relative la momentul
+    tranzacției rămân responsabilitatea APELANTULUI: acest modul întoarce
+    STRICT fapte brute, la fel ca get_latest_credential_created_at (DEV-03)."""
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+
+    db = get_database()
+    user = await db.users.find_one({"_id": object_id})
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+
+    # naiv-UTC, nu aware — get_recent_credential_events face comparații
+    # Python directe pe datetime-uri citite din Mongo, care vin mereu
+    # naive (Motor fără tz_aware=True), indiferent cum au fost scrise.
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90)
+    recent_logins = await get_recent_login_events(user_id)
+    recent_credential_events = await webauthn_service.get_recent_credential_events(user_id, since)
+
+    return {
+        "recent_logins": recent_logins,
+        "password_changed_at": user.get("password_changed_at"),
+        "recent_credential_events": recent_credential_events,
     }

@@ -103,13 +103,25 @@ async def _get_evaluation(transaction_id: str) -> dict | None:
 
 
 async def test_shadow_mode_high_score_does_not_alter_transfer_outcome(client: AsyncClient, mock_accounts, monkeypatch):
-    """Sold 100.000, transfer de 99.000 -> AMT-03 + AMT-04 (familia
-    "amount") + BEN-01 (primul beneficiar) + BEH-01 (categorie nouă)
-    garantează un scor >= 80 ("hold"). Cu shadow mode ACTIV explicit
-    (implicit e False de la faza "PENDING hold" — vezi test_transfers_hold_
-    integration.py pentru cazul opus, aplicare reală), transferul TOT
-    trebuie să treacă normal — shadow mode nu blochează niciodată."""
+    """Sold 100.000: burst VEL-01 + transfer de 99.000 -> AMT-04 (golire
+    cont, familia "amount") + BEN-01 (primul beneficiar) + BEH-01 (categorie
+    nouă) + VEL-01 (burst) garantează un scor >= 80 ("hold"). AMT-03 nu mai
+    contribuie separat (subsumată de AMT-04, vezi catalogue.py::SUBSUMED_BY)
+    — vezi test_transfers_hold_integration.py::_trigger_hold pentru de ce
+    burst-ul e necesar și de ce IBAN-ul/categoria lui diferă de declanșator.
+    Cu shadow mode ACTIV explicit (implicit e False de la faza "PENDING
+    hold" — vezi test_transfers_hold_integration.py pentru cazul opus,
+    aplicare reală), transferul TOT trebuie să treacă normal — shadow mode
+    nu blochează niciodată."""
     monkeypatch.setattr("app.config.settings.fraud_shadow_mode", True)
+    for _ in range(5):
+        burst = await client.post(
+            "/transactions/transfers",
+            json={"to_iban": "RO99BURST0000000000000099", "amount_minor": 100, "description": "", "category": "other"},
+            headers=AUTH_HEADER,
+        )
+        assert burst.status_code == 201
+
     response = await client.post(
         "/transactions/transfers",
         json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 99_000, "description": "", "category": "groceries"},
@@ -119,7 +131,8 @@ async def test_shadow_mode_high_score_does_not_alter_transfer_outcome(client: As
     body = response.json()
     assert body["status"] == "completed"
     assert body["amount_minor"] == 99_000
-    assert mock_accounts["source"]["balance_minor"] == 1_000  # transferul CHIAR s-a aplicat
+    # 100_000 - 500 (5 x burst) - 99_000 (declanșator) — toate aplicate normal (shadow mode)
+    assert mock_accounts["source"]["balance_minor"] == 500
 
     evaluation = await _get_evaluation(body["id"])
     assert evaluation is not None

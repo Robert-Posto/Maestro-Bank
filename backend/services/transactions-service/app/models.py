@@ -285,3 +285,36 @@ class HoldResolutionOut(BaseModel):
     @classmethod
     def from_transaction_doc(cls, doc: dict) -> "HoldResolutionOut":
         return cls(_id=doc["_id"], status=doc["status"], resolution=(doc.get("hold") or {}).get("resolution"))
+
+
+# --- Personal — blocklist de beneficiari (vezi app/blocklist.py, BEN-04) ---
+#
+# Scriere DOAR de personal — niciodată dintr-un raport de fraudă al unui
+# client (vezi motivul în docstring-ul app/blocklist.py).
+
+
+class BlocklistCreateRequest(BaseModel):
+    iban: str = Field(min_length=10, max_length=34)
+    reason: str = Field(default="", max_length=280)
+
+    @field_validator("iban")
+    @classmethod
+    def normalize_iban(cls, value: str) -> str:
+        return value.strip().upper().replace(" ", "")
+
+
+class BlocklistEntryOut(BaseModel):
+    id: str = Field(alias="_id")
+    iban: str
+    added_by: str
+    reason: str
+    source: Literal["confirmed_fraud_review", "manual"]
+    evaluation_id: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", "evaluation_id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str | None:
+        return str(value) if value is not None else None

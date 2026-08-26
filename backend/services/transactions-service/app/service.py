@@ -23,9 +23,10 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import BackgroundTasks, HTTPException, status
 
-from app import content_screening, holds
+from app import blocklist, content_screening, holds
 from app.config import settings
 from app.database import get_database
+from app.fraud.audit import record_blocklist_rejection
 from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
 from app.guardian import service as guardian_service
 from app.money import format_minor_amount
@@ -185,6 +186,12 @@ async def create_transfer(
     if destination["status"] != "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul destinație nu este activ.")
 
+    # 5.5. beneficiar pe blocklist (BEN-04) — SINGURA regulă din catalog
+    # care NU trece prin scoring (vezi app/blocklist.py) — verificată aici,
+    # devreme, dar transaction_doc-ul complet (mai jos) tot se construiește
+    # normal, ca refuzul să lase o urmă bogată în istoricul expeditorului.
+    blocklist_entry = await blocklist.is_blocked(destination["iban"])
+
     # 6. amount_minor > 0 — garantat de validarea Pydantic (TransferRequest)
 
     # 7. monedă compatibilă
@@ -233,13 +240,26 @@ async def create_transfer(
         "description": payload.description,
         "category": payload.category,
         "type": "transfer",
-        "status": "pending",
+        "status": "rejected" if blocklist_entry else "pending",
         "recognized": False,
         "reported": False,
         "created_at": now,
         "content_warning": content_warning,
     }
     insert_result = await db.transactions.insert_one(transaction_doc)
+
+    if blocklist_entry:
+        # BEN-04 — refuz direct: NICIODATĂ nu ajunge la accounts-service,
+        # soldul destinatarului/expeditorului rămâne complet neatins. Tot
+        # scrisă o evaluare de audit (GDPR — vezi fraud/audit.py), cu banda
+        # specială "reject", separată de scoring-ul normal 0-100.
+        await record_blocklist_rejection(transaction_id=insert_result.inserted_id, user_id=user_id, evaluated_at=now)
+        logger.warning(
+            "transactions-service: transfer REFUZAT — beneficiar pe blocklist (tx_id=%s, iban=%s)",
+            insert_result.inserted_id,
+            destination["iban"],
+        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acest beneficiar este pe lista de blocare a băncii.")
 
     # Scor fraud + audit. Când `fraud_shadow_mode` e activ (Faza 1), banda
     # întoarsă e ÎNTOTDEAUNA None — create_transfer nu are cum să ramifice

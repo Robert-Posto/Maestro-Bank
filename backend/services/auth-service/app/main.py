@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from app import service, webauthn_service
 from app.database import close_database_connection, ping_database
+from app.login_events import ensure_login_event_indexes
 from app.routers.auth import router as auth_router
 from app.routers.internal import router as internal_router
 from app.routers.webauthn import router as webauthn_router
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     # pentru același pattern.
     await webauthn_service.ensure_webauthn_indexes()
     await service.backfill_verification_flags()
+    await ensure_login_event_indexes()
     yield
     await close_database_connection()
 

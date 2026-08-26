@@ -18,11 +18,13 @@ Extern (prin Gateway) acestea devin:
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 
-from app import holds, service
+from app import blocklist, holds, service
 from app.fraud import staff as staff_service
 from app.models import (
+    BlocklistCreateRequest,
+    BlocklistEntryOut,
     FraudEvaluationOut,
     FraudEvaluationReviewRequest,
     HoldResolutionOut,
@@ -114,3 +116,24 @@ async def get_customer_transactions(
     relevant într-o investigație de fraudă, nu doar experiența "curată" a
     clientului (vezi service.py::_build_filter_query)."""
     return await service.list_transactions_for_user(user_id, limit, skip, include_all_statuses=True)
+
+
+@router.get("/blocklist", response_model=list[BlocklistEntryOut], response_model_by_alias=False)
+async def list_blocklist(
+    limit: int = Query(default=50, ge=1, le=100), skip: int = Query(default=0, ge=0), staff_user_id: str = RequireStaff
+):
+    return await blocklist.list_blocklist(limit, skip)
+
+
+@router.post(
+    "/blocklist", response_model=BlocklistEntryOut, response_model_by_alias=False, status_code=status.HTTP_201_CREATED
+)
+async def add_to_blocklist(payload: BlocklistCreateRequest, staff_user_id: str = RequireStaff):
+    return await blocklist.add_to_blocklist(
+        iban=payload.iban, added_by=staff_user_id, reason=payload.reason, source="manual"
+    )
+
+
+@router.delete("/blocklist/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_from_blocklist(entry_id: str, staff_user_id: str = RequireStaff):
+    await blocklist.remove_from_blocklist(entry_id)

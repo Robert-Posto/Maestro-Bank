@@ -172,3 +172,36 @@ class InternalMarkIdentityVerifiedRequest(BaseModel):
     Nu circulă imagini aici — doar rezultatul (userul e deja confirmat)."""
 
     user_id: str
+
+
+class InternalLoginEventView(BaseModel):
+    """O încercare de login, succes SAU eșec — vezi app/login_events.py.
+    Consumată DOAR de transactions-service (motorul de fraudă: VEL-04,
+    DEV-01/04/05/06)."""
+
+    success: bool
+    ip_address: str | None = None
+    device_signature: str | None = None
+    country: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    created_at: datetime
+
+
+class InternalCredentialEventView(BaseModel):
+    """Înrolare SAU revocare de passkey — vezi
+    webauthn_service.py::get_recent_credential_events. Consumată DOAR de
+    transactions-service (regula fraud DEV-02)."""
+
+    event: Literal["enrolled", "revoked"]
+    created_at: datetime
+
+
+class InternalSecurityFactsView(BaseModel):
+    """Vedere combinată, UN SINGUR apel HTTP — vezi
+    service.py::get_security_facts pentru de ce sunt adunate împreună (evită
+    multiplicarea hop-urilor pe calea de evaluare fraud)."""
+
+    recent_logins: list[InternalLoginEventView]
+    password_changed_at: datetime | None = None
+    recent_credential_events: list[InternalCredentialEventView]

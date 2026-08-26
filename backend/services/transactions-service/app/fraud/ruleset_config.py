@@ -10,7 +10,7 @@ să încapă mai târziu fără să atingă context.py/scoring.py.
 
 from dataclasses import dataclass
 
-RULESET_VERSION = "2026-08-25.1"
+RULESET_VERSION = "2026-08-26.1"
 COLD_START_MIN_TRANSACTIONS = 20
 
 
@@ -54,6 +54,9 @@ class RulesetConfig:
     vel03_min_new_beneficiaries: int = 3
     vel03_window_minutes: int = 60
 
+    vel04_weight: int = 35
+    vel04_min_failed_attempts: int = 3
+
     # --- Beneficiary --------------------------------------------------------
     ben01_weight: int = 15
     ben03_weight: int = 20
@@ -66,9 +69,22 @@ class RulesetConfig:
     time02_weight: int = 25
     time02_dormant_days: int = 90
 
-    # --- Device (doar DEV-03 în Faza 1) --------------------------------------
+    # --- Device -----------------------------------------------------------
     dev03_weight: int = 40
     dev03_window_minutes: int = 60
+
+    dev01_weight: int = 25  # dispozitiv nou — semnal moderat, oamenii chiar schimbă telefonul/browserul legitim
+
+    dev02_weight: int = 35  # parolă/credențială schimbată recent
+    dev02_window_hours: int = 24
+
+    dev04_weight: int = 45  # "călătorie imposibilă" — semnal puternic, rar fals-pozitiv
+    dev04_max_plausible_kmh: float = 900.0
+
+    dev05_weight: int = 20  # țară nouă — oamenii chiar călătoresc legitim
+    dev05_window_days: int = 30
+
+    dev06_weight: int = 70  # combo dispozitiv nou + beneficiar nou + sumă mare — cel mai puternic semnal din catalog
 
     # --- Behaviour ------------------------------------------------------------
     beh01_weight: int = 15

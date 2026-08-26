@@ -39,6 +39,27 @@ async def record_evaluation(*, transaction_id: ObjectId, user_id: str, result: S
     await _write_with_fallback(doc)
 
 
+async def record_blocklist_rejection(*, transaction_id: ObjectId, user_id: str, evaluated_at: datetime) -> None:
+    """BEN-04 — refuz direct, ÎNAINTE de scoring (vezi
+    app/blocklist.py/app/service.py::create_transfer). NU e o evaluare
+    "ok" normală (n-a fost scoring deloc) — `decision_would_apply="reject"`
+    e o bandă SEPARATĂ de pass/notify/step_up/hold, ca dreptul la
+    explicație GDPR să acopere și acest caz."""
+    doc = {
+        "transaction_id": transaction_id,
+        "user_id": user_id,
+        "status": "ok",
+        "score": None,
+        "fired_rules": [],
+        "decision_would_apply": "reject",
+        "ruleset_version": "N/A — BEN-04, refuz direct fără scoring",
+        "shadow_mode": settings.fraud_shadow_mode,
+        "evaluated_at": evaluated_at,
+        "error": None,
+    }
+    await _write_with_fallback(doc)
+
+
 async def record_evaluation_error(
     *, transaction_id: ObjectId, user_id: str, ruleset_version: str, evaluated_at: datetime, error: Exception
 ) -> None:

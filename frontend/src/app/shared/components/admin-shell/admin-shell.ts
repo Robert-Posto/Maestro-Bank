@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import { IdleService } from '../../../services/idle.service';
@@ -17,7 +17,7 @@ import { ToastContainer } from '../toast/toast-container';
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [RouterOutlet, Icon, ToastContainer],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, ToastContainer],
   templateUrl: './admin-shell.html',
   styleUrl: './admin-shell.css',
 })

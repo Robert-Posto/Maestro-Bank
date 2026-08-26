@@ -12,6 +12,7 @@ const STATUS_TONE_MAP: Record<string, BadgeTone> = {
   in_progress: 'warning',
   frozen: 'error',
   failed: 'error',
+  rejected: 'error',
   cancelled: 'neutral',
   inactive: 'neutral',
   disabled: 'neutral',
@@ -24,6 +25,10 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   // Reținut de motorul de fraud (scor peste prag) — vezi backend app/holds.py.
   pending_review: 'Reținut pentru verificare',
   failed: 'Eșuată',
+  // Refuz direct BEN-04 (beneficiar pe blocklist) — vezi backend
+  // app/blocklist.py/app/service.py::create_transfer. Distinct de "failed"
+  // (eroare tehnică/ledger) — aici e o decizie deliberată a băncii.
+  rejected: 'Refuzată — beneficiar blocat',
   resolved: 'Rezolvat',
   open: 'Deschis',
   in_progress: 'În lucru',
