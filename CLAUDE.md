@@ -58,7 +58,7 @@ Angular (4200) → Nginx (8080, reverse proxy) → API Gateway (8000: routing, J
         ▼           ▼              ▼             ▼             ▼              ▼               ▼                  ▼
   auth-service  accounts-service  transactions  budgets       support       exchange     verification      ai-orchestrator
     (8001)         (8002)        -service(8003) -service(8004) -service(8005) -service(8006)  -service(8007)  -service(8008)
-     auth_db       accounts_db       tx_db       budgets_db    support_db    exchange_db    (stateless)        (stateless)
+     auth_db       accounts_db       tx_db       budgets_db    support_db    exchange_db    (stateless)      ai_orchestrator_db
 ```
 
 All services share **one MongoDB instance**, each with its **own database** — no service ever reads another's database directly. Cross-service data needs go through that service's HTTP API. `verification-service` is fully stateless (no `MONGO_URL`, no `database.py`), comparing two images (ID photo + selfie) and discarding them immediately after. `ai-orchestrator-service` now has a `database.py` for storing conversation history, but continues to call other services through the Gateway exactly like an external client (Angular), with the current user's JWT propagated.
