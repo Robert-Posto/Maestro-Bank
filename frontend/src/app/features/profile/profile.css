@@ -96,6 +96,32 @@
   pointer-events: none;
 }
 
+.profile-avatar-camera {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill);
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.profile-avatar-camera:hover:not(:disabled) {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.profile-avatar-camera:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .profile-avatar-remove {
   font-family: inherit;
   font-size: var(--mb-font-size-sm);
@@ -108,6 +134,63 @@
 
 .profile-avatar-remove:hover {
   color: var(--mb-negative);
+}
+
+/* --- Captură live cu camera (poză de profil) ----------------------------- */
+
+.profile-camera-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mb-space-3);
+  max-width: 320px;
+  margin: 0 auto var(--mb-space-5);
+}
+
+.profile-camera-panel__video-wrap {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #000;
+}
+
+.profile-camera-panel__video-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* efect "oglindă", firesc ca la un selfie */
+}
+
+.profile-camera-panel__shutter {
+  position: absolute;
+  bottom: var(--mb-space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.profile-camera-panel__shutter:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.profile-camera-panel__preview {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-camera-panel__actions {
+  display: flex;
+  gap: var(--mb-space-3);
 }
 
 .profile-field {

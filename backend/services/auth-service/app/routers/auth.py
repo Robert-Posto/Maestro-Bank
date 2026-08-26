@@ -11,7 +11,16 @@ Extern (prin Gateway) acestea devin: /api/auth/register, /api/auth/login,
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from app import login_events, service
-from app.models import ChangePasswordRequest, EmailVerifyRequest, TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
+from app.models import (
+    ChangePasswordRequest,
+    EmailVerifyRequest,
+    ProfilePictureUpdate,
+    TokenResponse,
+    UserLogin,
+    UserMeOut,
+    UserOut,
+    UserRegister,
+)
 from app.security import get_current_user_id_from_header
 
 router = APIRouter(prefix="/auth", tags=["auth"])
