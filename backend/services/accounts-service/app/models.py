@@ -125,6 +125,18 @@ class CardOut(BaseModel):
     international_payments_enabled: bool = True
     daily_limit_minor: int = 500_000  # 5.000,00 RON — limită demo implicită
 
+    # --- Security settings (Cardul meu) -------------------------------
+    # Implicit True — cardurile create ÎNAINTE de acest control erau deja
+    # notificate necondiționat la fiecare tranzacție (vezi service.py din
+    # transactions-service), deci True păstrează comportamentul existent;
+    # userul poate opta să le oprească.
+    transaction_alerts_enabled: bool = True
+    # Implicit False — spre deosebire de alerte, asta e o restricție NOUĂ
+    # (transferuri mari rămân în așteptare până confirmi PIN-ul) — nu are
+    # sens activată implicit pentru carduri deja existente, ar bloca
+    # userul din senin.
+    payment_confirmation_enabled: bool = False
+
     # --- Carduri multiple / personalizare (Cardul meu) ---------------
     design: str = "midnight"
     is_one_time: bool = False
@@ -212,10 +224,38 @@ class CardSettingsUpdate(BaseModel):
     contactless_enabled: bool | None = None
     atm_withdrawals_enabled: bool | None = None
     international_payments_enabled: bool | None = None
+    transaction_alerts_enabled: bool | None = None
+    payment_confirmation_enabled: bool | None = None
 
 
 class CardLimitUpdate(BaseModel):
     daily_limit_minor: int = Field(gt=0, le=100_000_000)  # cap defensiv: max 1.000.000,00 RON/zi
+
+
+class CardPinChangeRequest(BaseModel):
+    """PATCH /cards/{id}/pin — schimbă PIN-ul cardului. Necesită
+    reconfirmarea identității exact ca la reveal (vezi CardRevealRequest)
+    — fie PIN-ul CURENT, fie WebAuthn — plus PIN-ul nou, ales de user."""
+
+    new_pin: str = Field(min_length=4, max_length=4)
+    current_pin: str | None = Field(default=None, min_length=4, max_length=4)
+    webauthn_challenge_id: str | None = None
+    webauthn_assertion: dict[str, Any] | None = None
+
+    @field_validator("new_pin")
+    @classmethod
+    def validate_new_pin(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("PIN-ul nou trebuie să conțină exact 4 cifre.")
+        return value
+
+    @model_validator(mode="after")
+    def _exactly_one_method(self) -> "CardPinChangeRequest":
+        has_current_pin = self.current_pin is not None
+        has_webauthn = self.webauthn_challenge_id is not None and self.webauthn_assertion is not None
+        if has_current_pin == has_webauthn:
+            raise ValueError("Trimite fie PIN-ul curent, fie o confirmare biometrică — nu ambele sau niciuna.")
+        return self
 
 
 # --- Beneficiari (transfer către IBAN salvat) -----------------------------
@@ -322,6 +362,29 @@ class InternalAccountView(BaseModel):
     balance_minor: int
     status: str
     account_type: AccountType = "current"
+
+
+class InternalCardSettingsView(BaseModel):
+    """Apelat de transactions-service (vezi app/service.py::create_transfer)
+    — setările de securitate ale cardurilor unui cont, AGREGATE (un cont
+    poate avea mai multe carduri — vezi app/service.py::get_account_card_settings
+    pentru raționamentul agregării: "oricare card" activează alerta/
+    confirmarea pentru tot contul, nu fiecare card separat)."""
+
+    transaction_alerts_enabled: bool
+    payment_confirmation_required: bool
+    # ID-ul cardului al cărui PIN trebuie verificat, dacă
+    # payment_confirmation_required=True — None altfel. Dacă mai multe
+    # carduri au setarea activă, e primul găsit (caz rar într-un demo).
+    payment_confirmation_card_id: str | None = None
+
+
+class InternalVerifyPinRequest(BaseModel):
+    pin: str
+
+
+class InternalVerifyPinResponse(BaseModel):
+    valid: bool
 
 
 class InternalTransferRequest(BaseModel):

@@ -203,6 +203,13 @@
   font-size: var(--mb-font-size-xs);
   font-weight: var(--mb-font-weight-semibold);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.topbar__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .topbar__profile-info {
@@ -216,12 +223,6 @@
   font-size: var(--mb-font-size-sm);
   font-weight: var(--mb-font-weight-semibold);
   color: var(--mb-text-primary);
-}
-
-.topbar__profile-type {
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-blue-600);
-  font-weight: var(--mb-font-weight-medium);
 }
 
 .topbar__dropdown {

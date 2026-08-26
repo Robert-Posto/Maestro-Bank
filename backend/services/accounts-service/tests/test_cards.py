@@ -160,3 +160,118 @@ async def test_backfill_is_idempotent(client: AsyncClient):
 
     response = await client.post(f"/cards/{created['id']}/reveal", json={"pin": "1234"}, headers=headers)
     assert response.status_code == 200
+
+
+# --- Change PIN --------------------------------------------------------------
+
+
+async def test_change_pin_with_correct_current_pin(client: AsyncClient):
+    _, headers, _ = await _provision(client)
+    created = (
+        await client.post("/cards", json={"design": "midnight", "type": "virtual", "pin": "1111"}, headers=headers)
+    ).json()
+
+    response = await client.patch(
+        f"/cards/{created['id']}/pin", json={"current_pin": "1111", "new_pin": "2222"}, headers=headers
+    )
+    assert response.status_code == 200
+
+    old_pin_rejected = await client.post(f"/cards/{created['id']}/reveal", json={"pin": "1111"}, headers=headers)
+    assert old_pin_rejected.status_code == 401
+
+    new_pin_accepted = await client.post(f"/cards/{created['id']}/reveal", json={"pin": "2222"}, headers=headers)
+    assert new_pin_accepted.status_code == 200
+
+
+async def test_change_pin_with_wrong_current_pin(client: AsyncClient):
+    _, headers, _ = await _provision(client)
+    created = (
+        await client.post("/cards", json={"design": "midnight", "type": "virtual", "pin": "1111"}, headers=headers)
+    ).json()
+
+    response = await client.patch(
+        f"/cards/{created['id']}/pin", json={"current_pin": "9999", "new_pin": "2222"}, headers=headers
+    )
+    assert response.status_code == 401
+
+    # PIN-ul vechi tot funcționează — schimbarea n-a avut loc.
+    still_old = await client.post(f"/cards/{created['id']}/reveal", json={"pin": "1111"}, headers=headers)
+    assert still_old.status_code == 200
+
+
+async def test_change_pin_rejects_non_numeric_new_pin(client: AsyncClient):
+    _, headers, card = await _provision(client)
+    response = await client.patch(f"/cards/{card['id']}/pin", json={"current_pin": "0000", "new_pin": "ab12"}, headers=headers)
+    assert response.status_code == 422
+
+
+# --- Security settings toggles (Transaction alerts / Payment confirmation) --
+
+
+async def test_security_settings_default_values(client: AsyncClient):
+    _, headers, card = await _provision(client)
+    assert card["transaction_alerts_enabled"] is True
+    assert card["payment_confirmation_enabled"] is False
+
+
+async def test_toggle_security_settings(client: AsyncClient):
+    _, headers, card = await _provision(client)
+    response = await client.patch(
+        f"/cards/{card['id']}/settings",
+        json={"transaction_alerts_enabled": False, "payment_confirmation_enabled": True},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["transaction_alerts_enabled"] is False
+    assert body["payment_confirmation_enabled"] is True
+
+
+# --- Endpoint-uri interne (apelate de transactions-service) -----------------
+
+
+async def test_internal_card_settings_aggregates_across_cards(client: AsyncClient):
+    user_id, headers, first_card = await _provision(client)
+    await client.patch(f"/cards/{first_card['id']}/settings", json={"payment_confirmation_enabled": True}, headers=headers)
+
+    account = await client.get("/me", headers=headers)
+    account_id = account.json()["id"]
+
+    response = await client.get(f"/internal/accounts/{account_id}/card-settings")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["transaction_alerts_enabled"] is True
+    assert body["payment_confirmation_required"] is True
+    assert body["payment_confirmation_card_id"] == first_card["id"]
+
+
+async def test_internal_card_settings_string_account_id(client: AsyncClient):
+    """Cardurile din scripts/seed_demo_data.py salvează `account_id` ca
+    STRING, nu ObjectId (inconsistență preexistentă) — endpoint-ul trebuie
+    să recunoască ambele forme, altfel userii demo n-ar avea niciodată
+    setările citite corect."""
+    user_id, headers, card = await _provision(client)
+    account = await client.get("/me", headers=headers)
+    account_id = account.json()["id"]
+
+    db = get_database()
+    await db.cards.update_one({"_id": ObjectId(card["id"])}, {"$set": {"account_id": account_id}})
+
+    response = await client.get(f"/internal/accounts/{account_id}/card-settings")
+    assert response.status_code == 200
+    assert response.json()["transaction_alerts_enabled"] is True
+
+
+async def test_internal_verify_pin(client: AsyncClient):
+    _, headers, _ = await _provision(client)
+    created = (
+        await client.post("/cards", json={"design": "midnight", "type": "virtual", "pin": "4444"}, headers=headers)
+    ).json()
+
+    correct = await client.post(f"/internal/accounts/cards/{created['id']}/verify-pin", json={"pin": "4444"})
+    assert correct.status_code == 200
+    assert correct.json()["valid"] is True
+
+    wrong = await client.post(f"/internal/accounts/cards/{created['id']}/verify-pin", json={"pin": "0000"})
+    assert wrong.status_code == 200
+    assert wrong.json()["valid"] is False

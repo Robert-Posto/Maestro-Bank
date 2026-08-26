@@ -89,10 +89,22 @@ def mock_accounts(monkeypatch):
         names = {SOURCE_ACCOUNT["user_id"]: "Octavia Stefan", DEST_ACCOUNT["user_id"]: "Andrei Popescu"}
         return names.get(user_id)
 
+    # Implicit: alerte active, fără cerință de "Payment confirmation" —
+    # comportamentul de dinainte de acest control, ca testele existente
+    # (care nu testează explicit asta) să nu fie afectate. Vezi
+    # test_transfers_security_settings.py pentru testele dedicate.
+    async def fake_get_account_card_settings(account_id: str) -> dict:
+        return {"transaction_alerts_enabled": True, "payment_confirmation_required": False, "payment_confirmation_card_id": None}
+
+    async def fake_verify_card_pin(card_id: str, pin: str) -> bool:
+        return False
+
     monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
     monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)
     monkeypatch.setattr("app.service._apply_transfer", fake_apply_transfer)
     monkeypatch.setattr("app.service._get_user_name", fake_get_user_name)
+    monkeypatch.setattr("app.service._get_account_card_settings", fake_get_account_card_settings)
+    monkeypatch.setattr("app.service._verify_card_pin", fake_verify_card_pin)
     return state
 
 
