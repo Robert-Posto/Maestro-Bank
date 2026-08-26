@@ -44,6 +44,100 @@ def auth_header() -> str:
     return f"Bearer {make_token()}"
 
 
+# --- Fixtures pentru testele Spending + Forecast Agent (tests/test_agent.py,
+# tests/test_spending_forecast_conversations.py) — mutate aici din
+# test_agent.py pentru că pytest nu partajează un fixture de modul între
+# fișiere de test diferite, iar noul fișier de conversații are nevoie de
+# EXACT aceleași date mock (vezi task-4-brief.md, Step 2).
+
+ACCOUNT = {
+    "id": "acc1",
+    "user_id": "68a0f0f0f0f0f0f0f0f0f0f0",
+    "iban": "RO69MAES0244110069180888",
+    "currency": "RON",
+    "balance_minor": 586043,
+    "status": "active",
+    "account_type": "current",
+}
+SPENDING_SUMMARY = {
+    "month": "2026-08",
+    "total_spent_minor": 112000,
+    "average_daily_spending_minor": 3733,
+    "by_category": [
+        {"category": "groceries", "amount_minor": 60000, "percentage": 53.6},
+        {"category": "restaurants", "amount_minor": 52000, "percentage": 46.4},
+    ],
+}
+FORECAST = {
+    "current_balance_minor": 586043,
+    "expected_expenses_minor": 176000,
+    "upcoming_obligations": [{"name": "Netflix", "amount_minor": 4999, "billing_day": 25}],
+    "estimated_end_of_month_balance_minor": 458861,
+    "days_remaining_in_month": 15,
+}
+SUBSCRIPTIONS = [
+    {
+        "id": "s1",
+        "name": "Netflix",
+        "amount_minor": 4999,
+        "currency": "RON",
+        "billing_day": 25,
+        "category": "subscriptions",
+        "active": True,
+        "created_at": "2026-08-01T00:00:00Z",
+    }
+]
+CASH_FLOW = {"period_days": 30, "points": []}
+BUDGETS = [
+    {"id": "bud1", "name": "Restaurante", "category": "restaurants", "limit_minor": 90000, "period": "monthly", "active": True},
+]
+
+
+@pytest.fixture(autouse=True)
+def mock_tools(monkeypatch):
+    received_headers: list[str] = []
+
+    async def fake_account(auth_header):
+        received_headers.append(auth_header)
+        return ACCOUNT
+
+    async def fake_spending(auth_header):
+        received_headers.append(auth_header)
+        return SPENDING_SUMMARY
+
+    async def fake_forecast(auth_header):
+        received_headers.append(auth_header)
+        return FORECAST
+
+    async def fake_cash_flow(auth_header, days=30):
+        received_headers.append(auth_header)
+        return CASH_FLOW
+
+    async def fake_subscriptions(auth_header):
+        received_headers.append(auth_header)
+        return SUBSCRIPTIONS
+
+    async def fake_budgets(auth_header):
+        received_headers.append(auth_header)
+        return BUDGETS
+
+    monkeypatch.setattr("app.tools.accounts_tools.get_account_balance", fake_account)
+    monkeypatch.setattr("app.tools.transactions_tools.get_spending_summary", fake_spending)
+    monkeypatch.setattr("app.tools.transactions_tools.get_forecast", fake_forecast)
+    monkeypatch.setattr("app.tools.transactions_tools.get_recent_cash_flow", fake_cash_flow)
+    monkeypatch.setattr("app.tools.budgets_tools.get_upcoming_subscriptions", fake_subscriptions)
+    monkeypatch.setattr("app.tools.budgets_tools.get_budgets", fake_budgets)
+
+    # Testele astea verifică orchestrarea agentului, nu RAG-ul în sine
+    # (vezi test_rag_retrieval.py pentru asta) — forțăm fallback-ul TF-IDF
+    # local, ca să rămână rapide/deterministe/fără rețea, indiferent ce e
+    # configurat în mediul containerului.
+    monkeypatch.setattr("app.rag.retriever.settings.azure_openai_embedding_endpoint", "")
+    monkeypatch.setattr("app.rag.retriever.settings.azure_openai_embedding_api_key", "")
+
+    return received_headers
+
+
 # --- Fixtures pentru testele Support Agent (tests/test_support_agent.py, --
 # test_confirmation_flow.py, test_security.py) — prefixate `support_` ca
 # să nu se ciocnească cu `auth_header` de mai sus (formă diferită: dict
