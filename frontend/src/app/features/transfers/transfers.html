@@ -19,9 +19,6 @@
   </button>
   <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'request'" (click)="sendMode.set('request')">
     <app-icon name="send" [size]="14" /> Solicit
-    @if (paymentRequests().length > 0) {
-      <span class="transfers-tabs__count">{{ paymentRequests().length }}</span>
-    }
   </button>
 </div>
 

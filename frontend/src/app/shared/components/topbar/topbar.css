@@ -276,12 +276,58 @@
 }
 
 .topbar__notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
   padding: var(--mb-space-2) 0;
   border-bottom: 1px solid var(--mb-border);
 }
 
 .topbar__notification:last-child {
   border-bottom: none;
+}
+
+.topbar__notification-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* „X"-ul de ștergere: apare la hover pe rând, ca lista să nu fie plină de
+   butoane. Rămâne accesibil de la tastatură prin :focus-visible. */
+.topbar__notification-delete {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--mb-radius-sm);
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.topbar__notification:hover .topbar__notification-delete,
+.topbar__notification-delete:focus-visible {
+  opacity: 1;
+}
+
+.topbar__notification-delete:hover {
+  color: var(--mb-negative);
+}
+
+/* Chenar fix, cu derulare proprie: lista poate avea până la 30 de
+   notificări (limita din support-service), iar fără plafon dropdown-ul se
+   întindea până jos în pagină. Înălțimea e aleasă cât să se vadă vreo 3
+   notificări, iar a treia să fie tăiată — un indiciu vizual că mai există
+   conținut dedesubt, fără să fie nevoie de un buton separat. */
+.topbar__notification-list {
+  max-height: 240px;
+  overflow-y: auto;
+  /* Scrollbar-ul ar sta altfel peste „X"-ul de ștergere. */
+  padding-right: var(--mb-space-1);
 }
 
 .topbar__notification p {
