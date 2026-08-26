@@ -295,9 +295,11 @@ services:
     environment:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
-      # Agentul NU accesează MongoDB — vorbește STRICT prin Gateway,
-      # exact ca un client extern (Angular), propagând JWT-ul userului.
+      # Datele de cont/tranzacții tot vin STRICT prin Gateway (vezi
+      # app/tools/*) — MONGO_URL de mai jos ține DOAR istoricul
+      # conversațiilor (vezi app/database.py), nu date financiare.
       - GATEWAY_URL=http://gateway:8000
+      - MONGO_URL=${MONGODB_URI_BASE}/ai_orchestrator_db?appName=maestrobank
       # Azure OpenAI (GPT-5-mini) — vezi .env.example. Fără credențiale
       # setate, serviciul tot pornește (health check trece), dar orice
       # cerere de chat întoarce 503 până sunt configurate.
