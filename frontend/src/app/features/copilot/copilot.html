@@ -225,6 +225,35 @@
 
   <aside class="copilot-side">
     <div class="copilot-side-card">
+      <div class="copilot-side-card__header">
+        <strong>Conversații</strong>
+        <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
+          <app-icon name="plus" [size]="14" /> Nouă
+        </button>
+      </div>
+      @if (conversations().length === 0) {
+        <p class="copilot-conversations__empty">Nicio conversație salvată încă.</p>
+      } @else {
+        <div class="copilot-conversations__list">
+          @for (conversation of conversations(); track conversation.id) {
+            <button
+              type="button"
+              class="copilot-conversations__item"
+              [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
+              (click)="openConversation(conversation.id)"
+            >
+              <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
+              <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+              <span class="copilot-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                <app-icon name="trash" [size]="13" />
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="copilot-side-card">
       <div class="copilot-side-card__header"><strong>Context financiar</strong></div>
       @if (lastResponse(); as ctx) {
         <div class="copilot-context-grid">

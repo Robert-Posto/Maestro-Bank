@@ -1,13 +1,15 @@
-import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { AiCopilotService, ChatHistoryMessage, SpendingForecastResponse } from '../../services/ai-copilot.service';
+import { AiCopilotService, ConversationDetail, ConversationSummary, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { ToastService } from '../../shared/components/toast/toast.service';
 
 const SUGGESTED_QUESTIONS = [
   'Îmi permit un city break de 2.000 lei luna asta?',
@@ -47,13 +49,14 @@ function formatChatTime(date: Date): string {
 @Component({
   selector: 'app-copilot',
   standalone: true,
-  imports: [FormsModule, PageHeader, Icon, MoneyPipe, MarkdownLitePipe],
+  imports: [FormsModule, DatePipe, PageHeader, Icon, MoneyPipe, MarkdownLitePipe],
   templateUrl: './copilot.html',
   styleUrl: './copilot.css',
 })
-export class Copilot implements OnDestroy {
+export class Copilot implements OnInit, OnDestroy {
   private readonly copilotApi = inject(AiCopilotService);
   protected readonly speech = inject(SpeechService);
+  private readonly toast = inject(ToastService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
   protected readonly suggestedQuestions = SUGGESTED_QUESTIONS;
@@ -64,6 +67,8 @@ export class Copilot implements OnDestroy {
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly sendingSlow = signal(false);
   protected readonly chatMessages = signal<ChatMessage[]>([]);
+  protected readonly conversations = signal<ConversationSummary[]>([]);
+  protected readonly activeConversationId = signal<string | null>(null);
   private slowTimer?: ReturnType<typeof setTimeout>;
 
   /** Ultimul răspuns reușit — alimentează "Context financiar" din sidebar,
@@ -86,11 +91,57 @@ export class Copilot implements OnDestroy {
     });
   }
 
+  ngOnInit(): void {
+    this.loadConversations();
+  }
+
   ngOnDestroy(): void {
     // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
     // plecat de pe pagină (ex. a navigat spre Transferuri în timp ce
     // MaestroAssistent încă citea un răspuns).
     this.speech.stopSpeaking();
+  }
+
+  private loadConversations(): void {
+    this.copilotApi.listConversations().subscribe({
+      next: (list) => this.conversations.set(list),
+    });
+  }
+
+  protected startNewConversation(): void {
+    this.activeConversationId.set(null);
+    this.chatMessages.set([]);
+  }
+
+  protected openConversation(id: string): void {
+    if (id === this.activeConversationId()) return;
+    this.copilotApi.getConversation(id).subscribe({
+      next: (detail: ConversationDetail) => {
+        this.activeConversationId.set(detail.id);
+        this.chatMessages.set(
+          detail.messages.map((m, index) => ({
+            id: index,
+            role: m.role,
+            text: m.content,
+            time: formatChatTime(new Date(m.created_at)),
+            response: m.response ?? undefined,
+            actionState: m.response?.pending_action ? 'pending' : undefined,
+          })),
+        );
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut încărca conversația.')),
+    });
+  }
+
+  protected deleteConversation(event: Event, id: string): void {
+    event.stopPropagation();
+    this.copilotApi.deleteConversation(id).subscribe({
+      next: () => {
+        this.conversations.update((list) => list.filter((c) => c.id !== id));
+        if (this.activeConversationId() === id) this.startNewConversation();
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut șterge conversația.')),
+    });
   }
 
   protected sendMessage(): void {
@@ -132,10 +183,6 @@ export class Copilot implements OnDestroy {
   }
 
   private ask(message: string): void {
-    // Istoricul se construiește ÎNAINTE de a adăuga mesajul nou al
-    // userului în chat (altfel ar apărea de 2 ori — o dată în istoric, o
-    // dată ca `message`) — vezi ai-copilot.service.ts::ChatHistoryMessage.
-    const history = this.buildHistory();
     this.pushMessage({ id: Date.now(), role: 'user', text: message, time: formatChatTime(new Date()) });
     this.sending.set(true);
     this.sendingSlow.set(false);
@@ -143,9 +190,13 @@ export class Copilot implements OnDestroy {
     // arătăm un indiciu, ca să nu pară că s-a blocat.
     this.slowTimer = setTimeout(() => this.sendingSlow.set(true), 15_000);
 
-    this.copilotApi.sendMessage(message, history).subscribe({
+    this.copilotApi.sendMessage(message, this.activeConversationId()).subscribe({
       next: (response) => {
         this.stopSending();
+        if (!this.activeConversationId()) {
+          this.activeConversationId.set(response.conversation_id);
+          this.loadConversations();
+        }
         this.pushMessage({
           id: Date.now(),
           role: 'assistant',
@@ -171,14 +222,6 @@ export class Copilot implements OnDestroy {
 
   private pushMessage(message: ChatMessage): void {
     this.chatMessages.update((messages) => [...messages, message]);
-  }
-
-  /** Istoricul conversației, în forma cerută de backend — exclude bulele
-   * de eroare (nu au conținut relevant de reținut). */
-  private buildHistory(): ChatHistoryMessage[] {
-    return this.chatMessages()
-      .filter((m) => !m.errorText && m.text)
-      .map((m) => ({ role: m.role, content: m.text }));
   }
 
   /** Execută REAL acțiunea propusă (creare/modificare/ștergere buget) —

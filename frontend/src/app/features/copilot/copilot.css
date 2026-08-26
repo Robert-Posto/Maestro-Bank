@@ -968,6 +968,101 @@
   margin: calc(var(--mb-space-5) * -1) calc(var(--mb-space-5) * -1) var(--mb-space-4);
   padding: var(--mb-space-4) var(--mb-space-5);
   border-bottom: 1px solid var(--mb-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-2);
+}
+
+.copilot-conversations__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--mb-border-strong);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  font: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.copilot-conversations__new:hover {
+  background: var(--mb-blue-50);
+  color: var(--mb-blue-600);
+}
+
+.copilot-conversations__empty {
+  margin: 0;
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+}
+
+.copilot-conversations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.copilot-conversations__item {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: var(--mb-radius-sm);
+  background: transparent;
+  color: var(--mb-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.copilot-conversations__item:hover {
+  background: var(--mb-surface-muted);
+}
+
+.copilot-conversations__item--active {
+  background: var(--mb-blue-50);
+  color: var(--mb-blue-600);
+}
+
+.copilot-conversations__item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--mb-font-size-sm);
+}
+
+.copilot-conversations__item-date {
+  flex-shrink: 0;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.copilot-conversations__item--active .copilot-conversations__item-date {
+  color: var(--mb-blue-600);
+}
+
+.copilot-conversations__item-delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--mb-radius-sm);
+  color: var(--mb-text-tertiary);
+}
+
+.copilot-conversations__item-delete:hover {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
 }
 
 .copilot-context-tile {
