@@ -114,6 +114,54 @@ async def _apply_transfer(from_account_id: str, to_account_id: str, amount_minor
     return response.json()
 
 
+# --- "Payment confirmation" + "Transaction alerts" (Security settings,
+# Cardul meu — vezi accounts-service/app/models.py::CardOut) ---------------
+#
+# Ambele sunt setări PER-CARD, dar transferurile MaestroBank sunt cont-la-
+# cont, nu card-la-card (vezi task-ul userului) — de-aia pragul/alertele se
+# verifică la nivel de CONT (accounts-service agregă "oricare card" —
+# vezi get_account_card_settings acolo), nu per card individual.
+
+_PAYMENT_CONFIRMATION_THRESHOLD_MINOR = 500_000  # 5.000,00 RON — prag implicit, fix (nu configurabil per-card acum)
+
+_DEFAULT_CARD_SETTINGS = {
+    "transaction_alerts_enabled": True,
+    "payment_confirmation_required": False,
+    "payment_confirmation_card_id": None,
+}
+
+
+async def _get_account_card_settings(account_id: str) -> dict:
+    """Degradare grațioasă: dacă accounts-service nu răspunde, presupunem
+    alertele ACTIVE (comportamentul de dinainte de acest control — nu
+    lăsăm userul brusc fără notificări din cauza unui apel opțional eșuat)
+    și confirmarea de plată DEZACTIVATĂ (nu blocăm un transfer normal doar
+    pentru că un serviciu extern e temporar jos — vezi și restul funcțiilor
+    "best-effort" din acest fișier, ex. _get_user_name)."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.accounts_service_url}/internal/accounts/{account_id}/card-settings")
+        if response.status_code == 200:
+            return response.json()
+    except httpx.RequestError:
+        logger.warning("transactions-service: accounts-service indisponibil la citirea setărilor de card (account_id=%s)", account_id)
+    return dict(_DEFAULT_CARD_SETTINGS)
+
+
+async def _verify_card_pin(card_id: str, pin: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.accounts_service_url}/internal/accounts/cards/{card_id}/verify-pin",
+                json={"pin": pin},
+            )
+        if response.status_code == 200:
+            return bool(response.json().get("valid", False))
+    except httpx.RequestError:
+        logger.error("transactions-service: verificarea PIN-ului cardului a eșuat (card_id=%s)", card_id)
+    return False
+
+
 def check_description_content(description: str) -> str | None:
     """Verificare LIVE, apelată de frontend pe măsură ce userul scrie în
     câmpul de descriere (vezi app/routers/transfers.py, POST
@@ -207,6 +255,26 @@ async def create_transfer(
     # 9. nu permite transfer către același cont
     if source["id"] == destination["id"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu poți transfera către același cont.")
+
+    # "Payment confirmation" (Security settings, Cardul meu) — verificăm
+    # ÎNAINTE de orice altceva costisitor (rezolvare nume, screening, motor
+    # de fraudă): dacă transferul depășește pragul ȘI contul sursă are
+    # controlul activat pe vreun card, cerem PIN-ul cardului. Fără el
+    # (prima încercare, din frontend) -> 428, frontend-ul cere PIN-ul și
+    # RETRIMITE exact același request, cu `card_pin` completat.
+    source_card_settings = await _get_account_card_settings(source["id"])
+    if (
+        payload.amount_minor >= _PAYMENT_CONFIRMATION_THRESHOLD_MINOR
+        and source_card_settings["payment_confirmation_required"]
+    ):
+        if payload.card_pin is None:
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail=f"Transferurile peste {format_minor_amount(_PAYMENT_CONFIRMATION_THRESHOLD_MINOR)} "
+                f"{source['currency']} necesită confirmare cu PIN-ul cardului.",
+            )
+        if not await _verify_card_pin(source_card_settings["payment_confirmation_card_id"], payload.card_pin):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="PIN incorect.")
 
     # 10. descriere limitată rezonabil — garantat de validarea Pydantic (max_length=140)
 
@@ -333,22 +401,28 @@ async def create_transfer(
         await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "completed"}})
         logger.info("transactions-service: transfer reușit (tx_id=%s)", insert_result.inserted_id)
 
-        await _notify_user(
-            user_id,
-            "transfer",
-            f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
-        )
+        # "Transaction alerts" (Security settings, Cardul meu) — vezi
+        # source_card_settings, calculat mai sus pentru "Payment confirmation";
+        # refolosit aici, nu mai facem un apel suplimentar pentru expeditor.
+        if source_card_settings["transaction_alerts_enabled"]:
+            await _notify_user(
+                user_id,
+                "transfer",
+                f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+            )
 
         # Destinatarul primea bani fără NICIO notificare — doar expeditorul
         # era anunțat mai sus. Excepție: transfer între propriile conturi
         # (destination["user_id"] == user_id) — notificarea de mai sus e
         # deja suficientă, a doua ar fi doar zgomot ("ai primit de la tine").
         if destination["user_id"] != user_id:
-            await _notify_user(
-                destination["user_id"],
-                "transfer_received",
-                f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
-            )
+            destination_card_settings = await _get_account_card_settings(destination["id"])
+            if destination_card_settings["transaction_alerts_enabled"]:
+                await _notify_user(
+                    destination["user_id"],
+                    "transfer_received",
+                    f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+                )
 
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
         # actualizează DOAR la transferuri efectiv "completed" — vezi

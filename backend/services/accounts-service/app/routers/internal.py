@@ -17,10 +17,13 @@ from app import service
 from app.models import (
     FraudHoldingAccountView,
     InternalAccountView,
+    InternalCardSettingsView,
     InternalExchangeRequest,
     InternalExchangeResponse,
     InternalTransferRequest,
     InternalTransferResponse,
+    InternalVerifyPinRequest,
+    InternalVerifyPinResponse,
     ProvisionRequest,
     ProvisionResponse,
 )
@@ -52,6 +55,24 @@ async def get_account_by_iban(iban: str):
 @router.post("/transfer", response_model=InternalTransferResponse)
 async def apply_internal_transfer(payload: InternalTransferRequest):
     return await service.apply_internal_transfer(payload.from_account_id, payload.to_account_id, payload.amount_minor)
+
+
+@router.get("/{account_id}/card-settings", response_model=InternalCardSettingsView)
+async def get_account_card_settings(account_id: str):
+    """Apelat de transactions-service — vezi
+    app/service.py::get_account_card_settings pentru raționamentul
+    agregării "oricare card" (alertele/confirmarea la plăți sunt setate
+    per-card, dar transferurile MaestroBank sunt cont-la-cont, nu
+    card-la-card)."""
+    return await service.get_account_card_settings(account_id)
+
+
+@router.post("/cards/{card_id}/verify-pin", response_model=InternalVerifyPinResponse)
+async def verify_card_pin(card_id: str, payload: InternalVerifyPinRequest):
+    """Apelat DOAR de transactions-service, cu un `card_id` deja rezolvat
+    de get_account_card_settings de mai sus — vezi
+    app/service.py::verify_card_pin_internal."""
+    return InternalVerifyPinResponse(valid=await service.verify_card_pin_internal(card_id, payload.pin))
 
 
 @router.post("/exchange", response_model=InternalExchangeResponse)

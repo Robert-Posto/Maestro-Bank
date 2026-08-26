@@ -64,8 +64,8 @@ def _is_protected(service: str, path: str) -> bool:
     """Determină dacă o rută necesită JWT valid, ÎNAINTE de forwarding.
 
     Regulă:
-      - auth: "me" și "change-password" sunt protejate (register/login
-        rămân publice). La fel, sub /webauthn: register/options,
+      - auth: "me", "me/profile-picture" și "change-password" sunt
+        protejate (register/login rămân publice). La fel, sub /webauthn: register/options,
         register/verify, credentials (+ /{id}) și stepup/options sunt
         protejate — dar login/options și login/verify rămân PUBLICE
         (nu știm încă cine e userul, exact ca /auth/login cu parolă);
@@ -84,6 +84,7 @@ def _is_protected(service: str, path: str) -> bool:
     if service == "auth":
         if path in (
             "me",
+            "me/profile-picture",
             "change-password",
             "verify-email",
             "resend-verification-email",

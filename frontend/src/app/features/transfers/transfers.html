@@ -174,10 +174,34 @@
         <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ formError() }}</p>
       }
 
-      <div class="transfer-review-actions">
-        <app-action-button variant="secondary" (pressed)="backToForm()">Înapoi</app-action-button>
-        <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">Confirmă transferul</app-action-button>
-      </div>
+      @if (needsCardPin()) {
+        <!-- "Payment confirmation" (Security settings, Cardul meu) — vezi
+             transactions-service/app/service.py::_PAYMENT_CONFIRMATION_THRESHOLD_MINOR.
+             Rămânem pe review, nu refacem tot formularul. -->
+        <p class="transfer-content-warning"><app-icon name="shield" [size]="15" /> {{ cardPinRequiredMessage() }}</p>
+        <label class="transfer-field">
+          <span>PIN card</span>
+          <input
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="••••"
+            [ngModel]="cardPin()"
+            (ngModelChange)="cardPin.set($event)"
+            name="cardPin"
+          />
+        </label>
+        <div class="transfer-review-actions">
+          <app-action-button variant="secondary" (pressed)="backToForm()">Înapoi</app-action-button>
+          <app-action-button [loading]="cardPinBusy()" (pressed)="submitCardPinConfirmation()">Confirmă cu PIN</app-action-button>
+        </div>
+      } @else {
+        <div class="transfer-review-actions">
+          <app-action-button variant="secondary" (pressed)="backToForm()">Înapoi</app-action-button>
+          <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">Confirmă transferul</app-action-button>
+        </div>
+      }
     </div>
   </div>
 } @else if (step() === 'success' && completedTransaction(); as tx) {

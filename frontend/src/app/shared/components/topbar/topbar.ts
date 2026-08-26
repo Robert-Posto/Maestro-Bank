@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
@@ -11,7 +11,7 @@ import { Icon } from '../icon/icon';
 /**
  * Bara de sus — search, buton rapid "Tranzacție nouă" (duce la formularul
  * real de transfer, /app/transfers — nu duplicăm logica de transfer aici),
- * notificări, avatar + nume (din backend, NU hardcodat) + tip de cont demo.
+ * notificări, avatar + nume (din backend, NU hardcodat).
  * Vezi UI reference/*.png.
  */
 const NOTIFICATIONS_POLL_INTERVAL_MS = 30_000;
@@ -29,8 +29,6 @@ export class Topbar implements OnInit, OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   protected readonly notificationsService = inject(NotificationsService);
   protected readonly themeService = inject(ThemeService);
-
-  readonly accountType = input('Client Premium');
 
   protected readonly currentUser = this.auth.currentUser;
   protected readonly fullName = computed(() => {

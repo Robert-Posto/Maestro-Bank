@@ -9,6 +9,7 @@ modele (`app/models.py`). Acest modul e singurul care atinge
 import logging
 import random
 from datetime import datetime, timezone
+from typing import Any
 
 import httpx
 from bson import ObjectId
@@ -25,10 +26,12 @@ from app.models import (
     BeneficiaryCreate,
     CardCreateRequest,
     CardLimitUpdate,
+    CardPinChangeRequest,
     CardRevealRequest,
     CardSettingsUpdate,
     CreatableAccountType,
     InternalAccountView,
+    InternalCardSettingsView,
     InternalExchangeResponse,
     InternalTransferResponse,
     PocketOut,
@@ -560,6 +563,86 @@ async def reveal_card(card_id: str, user_id: str, payload: CardRevealRequest) ->
         "expiry_month": card["expiry_month"],
         "expiry_year": card["expiry_year"],
     }
+
+
+async def change_card_pin(card_id: str, user_id: str, payload: CardPinChangeRequest) -> dict:
+    """Schimbă PIN-ul unui card — reconfirmare identică cu reveal_card
+    (PIN curent SAU WebAuthn), vezi CardPinChangeRequest."""
+    card = await _get_card_for_user(card_id, user_id)
+
+    if payload.current_pin is not None:
+        pin_hash = card.get("pin_hash")
+        ok = pin_hash is not None and pin_module.verify_pin(payload.current_pin, pin_hash)
+        error_detail = "PIN curent incorect."
+    else:
+        ok = await _verify_webauthn_with_auth_service(
+            user_id, card_id, payload.webauthn_challenge_id, payload.webauthn_assertion
+        )
+        error_detail = "Confirmarea biometrică a eșuat."
+
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_detail)
+
+    db = get_database()
+    new_pin_hash = pin_module.hash_pin(payload.new_pin)
+    await db.cards.update_one({"_id": card["_id"]}, {"$set": {"pin_hash": new_pin_hash}})
+    logger.info("accounts-service: PIN schimbat (card_id=%s, user_id=%s)", card["_id"], user_id)
+    return await db.cards.find_one({"_id": card["_id"]})
+
+
+# --- Apelate de transactions-service (vezi routers/internal.py) -----------
+#
+# "Payment confirmation" (Security settings, Cardul meu) — la cererea
+# userului: transferuri MARI din contul asociat cardului rămân în
+# așteptare până confirmă din nou PIN-ul cardului. Transferurile
+# MaestroBank NU sunt legate de un card anume (sunt cont-la-cont, vezi
+# transactions-service), de-aia pragul se aplică la nivel de CONT — dacă
+# ORICARE dintre cardurile contului are `payment_confirmation_enabled`,
+# tot contul cere confirmare la transferuri peste prag (vezi
+# transactions-service/app/service.py::_PAYMENT_CONFIRMATION_THRESHOLD_MINOR).
+# La fel pentru `transaction_alerts_enabled` — agregare "oricare card".
+
+
+async def get_account_card_settings(account_id: str) -> InternalCardSettingsView:
+    db = get_database()
+    # Cardurile create prin fluxul normal (create_card/provision_account,
+    # mai sus în acest fișier) salvează `account_id` ca ObjectId Mongo
+    # nativ — dar cardurile demo din scripts/seed_demo_data.py îl salvează
+    # ca STRING (inconsistență preexistentă, nu introdusă aici). Acceptăm
+    # ambele forme, altfel userii demo (seedați) n-ar avea niciodată
+    # setările de securitate recunoscute de acest endpoint.
+    account_id_variants: list[Any] = [account_id]
+    try:
+        account_id_variants.append(ObjectId(account_id))
+    except InvalidId:
+        pass
+
+    cards = await db.cards.find({"account_id": {"$in": account_id_variants}}).to_list(length=_MAX_CARDS_PER_USER)
+    alerts_enabled = any(card.get("transaction_alerts_enabled", True) for card in cards)
+    confirmation_card = next((card for card in cards if card.get("payment_confirmation_enabled", False)), None)
+
+    return InternalCardSettingsView(
+        transaction_alerts_enabled=alerts_enabled,
+        payment_confirmation_required=confirmation_card is not None,
+        payment_confirmation_card_id=str(confirmation_card["_id"]) if confirmation_card else None,
+    )
+
+
+async def verify_card_pin_internal(card_id: str, pin: str) -> bool:
+    """Apelat DOAR de transactions-service, cu un `card_id` deja rezolvat
+    de get_account_card_settings mai sus (niciodată direct dintr-un
+    parametru trimis de client) — fără verificare de proprietate aici,
+    apelantul a validat deja că userul autentificat deține contul căruia
+    îi aparține cardul."""
+    db = get_database()
+    try:
+        object_id = ObjectId(card_id)
+    except InvalidId:
+        return False
+
+    card = await db.cards.find_one({"_id": object_id})
+    pin_hash = card.get("pin_hash") if card else None
+    return pin_hash is not None and pin_module.verify_pin(pin, pin_hash)
 
 
 # --- Pockets (obiective de economisire) -----------------------------------

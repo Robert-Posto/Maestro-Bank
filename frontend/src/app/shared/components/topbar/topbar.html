@@ -57,10 +57,15 @@
     </div>
 
     <button type="button" class="topbar__profile" (click)="toggleProfileMenu()">
-      <span class="topbar__avatar">{{ initials() }}</span>
+      <span class="topbar__avatar">
+        @if (currentUser()?.profile_picture; as picture) {
+          <img [src]="picture" alt="" class="topbar__avatar-img" />
+        } @else {
+          {{ initials() }}
+        }
+      </span>
       <span class="topbar__profile-info">
         <span class="topbar__profile-name">{{ fullName() }}</span>
-        <span class="topbar__profile-type">{{ accountType() }}</span>
       </span>
       <app-icon name="chevron-down" [size]="16" />
     </button>

@@ -3,6 +3,28 @@
 <div class="profile-grid">
   <section class="profile-panel">
     <h2>Profil</h2>
+
+    <div class="profile-avatar-row">
+      <span class="profile-avatar">
+        @if (currentUser()?.profile_picture; as picture) {
+          <img [src]="picture" alt="Poză de profil" />
+        } @else {
+          <app-icon name="profile" [size]="22" />
+        }
+      </span>
+      <div class="profile-avatar-actions">
+        <label class="profile-avatar-upload" [class.profile-avatar-upload--busy]="profilePictureBusy()">
+          <input type="file" accept="image/*" (change)="onProfilePictureSelected($event)" [disabled]="profilePictureBusy()" hidden />
+          {{ currentUser()?.profile_picture ? 'Schimbă poza' : 'Adaugă poză (opțional)' }}
+        </label>
+        @if (currentUser()?.profile_picture) {
+          <button type="button" class="profile-avatar-remove" [disabled]="profilePictureBusy()" (click)="removeProfilePicture()">
+            Șterge
+          </button>
+        }
+      </div>
+    </div>
+
     <div class="profile-field">
       <span>Prenume</span>
       <p>{{ currentUser()?.first_name ?? '—' }}</p>
