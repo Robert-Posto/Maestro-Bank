@@ -27,12 +27,15 @@
   --mb-bg: #f6f7fb;
   --mb-surface: #ffffff;
   --mb-surface-muted: #fafbfd;
-  --mb-border: #e7e9f0;
-  --mb-border-strong: #d8dbe6;
+  --mb-border: #dfe2ec;
+  --mb-border-strong: #cfd3e2;
 
   --mb-text-primary: #12172b;
   --mb-text-secondary: #5b6172;
-  --mb-text-tertiary: #8a90a1;
+  /* Era #8a90a1 — sub 3.2:1 față de alb, prea slab pentru text (etichete,
+     meta-date, timestamp-uri) folosit peste tot în aplicație. #6b7280
+     trece de 4.5:1 (AA, text normal), fără să pară "greu"/prea închis. */
+  --mb-text-tertiary: #6b7280;
   --mb-text-on-navy: #f5f7fd;
 
   /* --- Semantic --- */
@@ -122,12 +125,16 @@
   --mb-bg: #0b0f1a;
   --mb-surface: #131829;
   --mb-surface-muted: #171d31;
-  --mb-border: #232a41;
-  --mb-border-strong: #2e3550;
+  /* Bordurile erau prea aproape ca luminozitate de --mb-surface/-muted —
+     cardurile "se contopeau" între ele, fără nicio graniță vizibilă. */
+  --mb-border: #2a3250;
+  --mb-border-strong: #3a4266;
 
   --mb-text-primary: #eef1fa;
   --mb-text-secondary: #9aa2ba;
-  --mb-text-tertiary: #6d7590;
+  /* Era #6d7590 — sub 4:1 față de --mb-surface, prea slab. #8890a8 trece
+     de 5.5:1, aceeași motivație ca la varianta light de mai sus. */
+  --mb-text-tertiary: #8890a8;
 
   --mb-blue-50: #16213d;
   --mb-blue-100: #1c2c4d;

@@ -46,6 +46,11 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // Etichetat, ca "Bancar"/"Planificare" mai sus — fără label, grupul
+    // ăsta ieșea în evidență ca "orfan" față de restul, inconsecvent
+    // vizual, deși cele două intrări sunt deja rudă (ambele agenți AI
+    // găzduiți de ai-orchestrator-service).
+    label: 'Asistenți AI',
     items: [
       // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
       // Spending + Forecast, peste GPT-5-mini), deci e o intrare normală

@@ -42,6 +42,9 @@
   padding-left: 18%;
 }
 
+/* Aceeași insignă ca MaestroAgent (vezi copilot.css::.copilot-message-avatar)
+   — cei doi agenți AI sunt grupați acum și în sidebar, trebuie să se simtă
+   ca o familie de componente, nu ca 2 pagini construite separat. */
 .support-chat__message-avatar {
   flex: 0 0 auto;
   display: grid;
@@ -50,15 +53,15 @@
   height: 34px;
   margin-top: 2px;
   border-radius: 10px;
-  border: 1px solid var(--mb-border);
-  color: var(--mb-text-secondary);
-  background: var(--mb-surface);
+  color: #fff;
+  background: linear-gradient(145deg, var(--mb-navy-800), var(--mb-navy-950));
+  box-shadow: 0 5px 12px rgba(10, 18, 38, 0.16);
 }
 
 .support-chat__message-avatar--user {
   color: var(--mb-blue-600);
   background: var(--mb-blue-50);
-  border-color: transparent;
+  box-shadow: none;
   order: 2;
 }
 
@@ -125,8 +128,8 @@
   padding: 0.8rem 1rem;
   border-color: transparent;
   border-radius: 14px 14px 4px 14px;
-  background: linear-gradient(135deg, var(--mb-blue-50), #e8f0ff);
-  color: var(--mb-navy-900);
+  background: linear-gradient(135deg, var(--mb-blue-50), var(--mb-blue-100));
+  color: var(--mb-text-primary);
   box-shadow: none;
 }
 
@@ -458,11 +461,73 @@
   cursor: not-allowed;
 }
 
+/* Microfon — neutru (nu albastru, ca butonul de Trimite), roșu/pulsând
+   cât timp ascultă — vezi features/copilot/copilot.css pentru aceeași
+   componentă, stilizată identic aici (fiecare pagină stă pe propriul CSS
+   încapsulat, nu putem partaja regulile direct între componente). */
+.support-chat__composer .support-chat__mic-btn {
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  box-shadow: none;
+}
+
+.support-chat__composer .support-chat__mic-btn:not(:disabled):hover {
+  background: var(--mb-border);
+}
+
+.support-chat__composer .support-chat__mic-btn--active {
+  background: var(--mb-negative);
+  color: #fff;
+  animation: support-chat-mic-pulse 1.4s ease infinite;
+}
+
+@keyframes support-chat-mic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-chat__composer .support-chat__mic-btn--active {
+    animation: none;
+  }
+}
+
+/* "Ascultă" pe un răspuns al Support Agent. */
+.support-chat__listen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--mb-space-2);
+  padding: 4px 10px;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+  cursor: pointer;
+  transition: color var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.support-chat__listen-btn:hover {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
+.support-chat__listen-btn--active {
+  color: var(--mb-blue-600);
+  border-color: var(--mb-blue-500);
+}
+
 .support-chat__notice {
   color: var(--mb-text-tertiary);
   font-size: var(--mb-font-size-xs);
   text-align: center;
 }
+
 
 /* Ecran de bun-venit (stare goală) — IDENTIC ca structură/vizual cu
    MaestroAssistent (vezi features/copilot/copilot.css::.copilot-welcome),
@@ -497,7 +562,7 @@
   text-align: center;
   background:
     radial-gradient(circle at 50% -20%, rgba(47, 111, 237, 0.15), transparent 18rem),
-    linear-gradient(145deg, #fff, #f9fbff);
+    linear-gradient(145deg, var(--mb-surface), var(--mb-surface-muted));
   box-shadow: 0 8px 28px rgba(16, 24, 48, 0.06);
 }
 
@@ -530,7 +595,10 @@
   margin-bottom: var(--mb-space-3);
   border-radius: 16px;
   color: #fff;
-  background: linear-gradient(145deg, var(--mb-navy-800), var(--mb-navy-950));
+  /* Aceeași identitate vizuală ca MaestroAgent (vezi copilot.css::.copilot-welcome__icon)
+     — cei doi agenți AI sunt acum grupați și în sidebar, trebuie să se
+     simtă ca familie, nu ca 2 pagini construite separat. */
+  background: linear-gradient(145deg, var(--mb-blue-500), var(--mb-navy-800));
   box-shadow: 0 10px 22px rgba(10, 18, 38, 0.22);
 }
 
@@ -544,7 +612,7 @@
 }
 
 .support-chat__welcome h2 {
-  color: var(--mb-navy-900);
+  color: var(--mb-text-primary);
   font-size: clamp(1.4rem, 3vw, 1.75rem);
   letter-spacing: -0.025em;
 }
@@ -574,8 +642,8 @@
   padding: 0.75rem var(--mb-space-4);
   border: 1px solid var(--mb-border-strong);
   border-radius: 12px;
-  color: var(--mb-navy-900);
-  background: rgba(255, 255, 255, 0.9);
+  color: var(--mb-text-primary);
+  background: var(--mb-surface);
   font: inherit;
   font-size: var(--mb-font-size-sm);
   text-align: left;
@@ -628,7 +696,7 @@
 }
 
 .support-panel--agent {
-  background: linear-gradient(145deg, var(--mb-surface), #fcfdff);
+  background: linear-gradient(145deg, var(--mb-surface), var(--mb-surface-muted));
 }
 
 .support-agent {

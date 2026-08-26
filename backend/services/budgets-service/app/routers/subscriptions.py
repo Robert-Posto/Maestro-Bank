@@ -3,6 +3,7 @@
 Extern (prin Gateway) acestea devin:
   POST   /api/budgets/subscriptions
   GET    /api/budgets/subscriptions
+  GET    /api/budgets/subscriptions/suggestions
   PATCH  /api/budgets/subscriptions/{id}
   DELETE /api/budgets/subscriptions/{id}
 """
@@ -10,7 +11,7 @@ Extern (prin Gateway) acestea devin:
 from fastapi import APIRouter, status
 
 from app import service
-from app.models import SubscriptionCreate, SubscriptionOut, SubscriptionUpdate
+from app.models import SubscriptionCreate, SubscriptionOut, SubscriptionSuggestion, SubscriptionUpdate
 from app.security import CurrentUserId
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -24,6 +25,14 @@ async def create_subscription(payload: SubscriptionCreate, user_id: str = Curren
 @router.get("", response_model=list[SubscriptionOut], response_model_by_alias=False)
 async def list_subscriptions(user_id: str = CurrentUserId):
     return await service.list_subscriptions_for_user(user_id)
+
+
+@router.get("/suggestions", response_model=list[SubscriptionSuggestion])
+async def list_subscription_suggestions(user_id: str = CurrentUserId):
+    """ÎNAINTE de /{subscription_id} mai jos — altfel "suggestions" ar fi
+    interpretat ca un subscription_id (același motiv documentat la /new,
+    /staff etc. din alte servicii ale acestei aplicații)."""
+    return await service.detect_recurring_payments(user_id)
 
 
 @router.patch("/{subscription_id}", response_model=SubscriptionOut, response_model_by_alias=False)

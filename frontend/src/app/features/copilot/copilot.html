@@ -37,6 +37,18 @@
             } @else {
               <div class="copilot-answer" [innerHTML]="msg.text | markdownLite"></div>
 
+              @if (speech.ttsSupported && msg.text) {
+                <button
+                  type="button"
+                  class="copilot-listen-btn"
+                  [class.copilot-listen-btn--active]="speech.speakingMessageId() === msg.id"
+                  (click)="toggleSpeak(msg)"
+                >
+                  <app-icon [name]="speech.speakingMessageId() === msg.id ? 'stop' : 'volume'" [size]="13" />
+                  {{ speech.speakingMessageId() === msg.id ? 'Oprește' : 'Ascultă' }}
+                </button>
+              }
+
               @if (msg.response; as r) {
                 @if (r.relevant_cards.length > 0) {
                 <div class="copilot-cards">
@@ -182,12 +194,24 @@
     }
 
     <form class="copilot-composer" (ngSubmit)="sendMessage()">
+      @if (speech.sttSupported) {
+        <button
+          type="button"
+          class="copilot-mic-btn"
+          [class.copilot-mic-btn--active]="speech.listening()"
+          [attr.aria-label]="speech.listening() ? 'Oprește ascultarea' : 'Vorbește mesajul'"
+          [disabled]="sending()"
+          (click)="toggleListening()"
+        >
+          <app-icon [name]="speech.listening() ? 'mic-off' : 'mic'" [size]="17" />
+        </button>
+      }
       <input
         type="text"
         name="copilotMessage"
         autocomplete="off"
         aria-label="Întreabă ceva despre finanțele tale"
-        placeholder="Întreabă ceva despre finanțele tale..."
+        [placeholder]="speech.listening() ? 'Te ascult...' : 'Întreabă ceva despre finanțele tale...'"
         [ngModel]="chatInput()"
         (ngModelChange)="chatInput.set($event)"
         [disabled]="sending()"

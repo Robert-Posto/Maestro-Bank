@@ -15,11 +15,18 @@
 }
 
 .tx-filters-advanced__inner {
+  /* overflow:hidden e necesar CÂT TIMP panoul se restrânge/extinde (vezi
+     trucul grid-template-rows 0fr/1fr de mai sus — fără el, rândul grid nu
+     poate coborî sub înălțimea "naturală" a conținutului). Odată complet
+     deschis, îl scoatem (regula de mai jos) — altfel taie orice conținut
+     care iese din cutie, inclusiv panoul dropdown-ului "Direcție"
+     (app-select), care se randează în afara ei. */
   overflow: hidden;
 }
 
 .tx-filters-advanced--open .tx-filters-advanced__inner {
   margin-bottom: var(--mb-space-5);
+  overflow: visible;
 }
 
 .tx-filters-advanced__inner app-action-button {

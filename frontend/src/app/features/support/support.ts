@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -10,6 +10,7 @@ import {
 } from '../../services/ai-support.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
+import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
 import { ACCOUNT_TYPE_CATALOG } from '../../shared/account-types';
 import { SUPPORT_CHAT_STORAGE_KEY } from '../../core/storage-keys';
 import { PageHeader } from '../../shared/components/page-header/page-header';
@@ -134,9 +135,10 @@ function persistMessages(messages: ChatMessage[]): void {
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
-export class Support implements OnInit {
+export class Support implements OnInit, OnDestroy {
   private readonly supportApi = inject(SupportService);
   private readonly aiSupport = inject(AiSupportService);
+  protected readonly speech = inject(SpeechService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -187,6 +189,12 @@ export class Support implements OnInit {
     if (shouldOpen) this.openModal();
   }
 
+  ngOnDestroy(): void {
+    // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
+    // plecat de pe pagină — vezi Copilot::ngOnDestroy, același motiv.
+    this.speech.stopSpeaking();
+  }
+
   protected openModal(): void {
     this.subject.set('');
     this.message.set('');
@@ -198,6 +206,27 @@ export class Support implements OnInit {
     if (!text) return;
     this.chatInput.set('');
     this.askAgent(text);
+  }
+
+  /** Microfon — vezi Copilot::toggleListening, exact același comportament
+   * (textul recunoscut apare în input, nu se trimite automat). */
+  protected toggleListening(): void {
+    if (this.speech.listening()) {
+      this.speech.stopListening();
+      return;
+    }
+    this.speech.startListening((text) => {
+      if (text) this.chatInput.set(text);
+    });
+  }
+
+  /** "Ascultă" pe un răspuns al Support Agent — vezi Copilot::toggleSpeak. */
+  protected toggleSpeak(chatMessage: ChatMessage): void {
+    if (this.speech.speakingMessageId() === chatMessage.id) {
+      this.speech.stopSpeaking();
+      return;
+    }
+    this.speech.speak(stripMarkdownForSpeech(chatMessage.text), chatMessage.id);
   }
 
   /** Întrebare rapidă aleasă din lista de sugestii — trimisă ca mesaj real către Support Agent. */
