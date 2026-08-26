@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.database import close_database_connection, ping_database
 from app.routers.exchange import router as exchange_router
+from app.routers.internal import router as internal_router
 from app.service import refresh_rates_from_bnr
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [exchange-service] %(levelname)s %(message)s")
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MaestroBank Exchange Service", lifespan=lifespan)
 app.include_router(exchange_router)
+app.include_router(internal_router)
 
 
 @app.get("/health")

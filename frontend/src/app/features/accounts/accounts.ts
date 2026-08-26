@@ -4,6 +4,7 @@ import { DatePipe, LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { AccountType, AccountView, BankingService, CreatableAccountType, PocketView } from '../../services/banking.service';
+import { TransactionsService } from '../../services/transactions.service';
 import { ACCOUNT_TYPE_CATALOG, CREATABLE_ACCOUNT_TYPES } from '../../shared/account-types';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
@@ -55,6 +56,7 @@ type Tab = 'accounts' | 'pockets';
 })
 export class Accounts implements OnInit {
   private readonly banking = inject(BankingService);
+  private readonly transactionsApi = inject(TransactionsService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
 
@@ -74,6 +76,12 @@ export class Accounts implements OnInit {
 
   protected readonly pendingDeleteAccount = signal<AccountView | null>(null);
   protected readonly deleting = signal(false);
+
+  // --- Extras de cont (PDF) — orice cont, nu doar cel curent -------------
+  protected readonly statementAccount = signal<AccountView | null>(null);
+  protected readonly statementFrom = signal(this.monthStartIso());
+  protected readonly statementTo = signal(this.todayIso());
+  protected readonly generatingStatement = signal(false);
 
   protected readonly availableTypes = computed(() => {
     const owned = new Set(this.accounts().map((a) => a.account_type));
@@ -262,6 +270,58 @@ export class Accounts implements OnInit {
       return;
     }
     this.pendingDeleteAccount.set(account);
+  }
+
+  protected openStatementModal(account: AccountView): void {
+    this.statementFrom.set(this.monthStartIso());
+    this.statementTo.set(this.todayIso());
+    this.statementAccount.set(account);
+  }
+
+  protected closeStatementModal(): void {
+    if (this.generatingStatement()) return; // nu închide în timp ce PDF-ul se generează
+    this.statementAccount.set(null);
+  }
+
+  protected downloadStatement(): void {
+    const account = this.statementAccount();
+    const from = this.statementFrom();
+    const to = this.statementTo();
+    if (!account || !from || !to) return;
+    if (from > to) {
+      this.toast.error('Data de start trebuie să fie înaintea datei de final.');
+      return;
+    }
+
+    this.generatingStatement.set(true);
+    this.transactionsApi
+      .downloadStatement(new Date(from).toISOString(), new Date(to + 'T23:59:59').toISOString(), account.id)
+      .subscribe({
+        next: (blob) => {
+          this.generatingStatement.set(false);
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = `extras-cont-${account.iban}-${from}_${to}.pdf`;
+          anchor.click();
+          URL.revokeObjectURL(url);
+          this.statementAccount.set(null);
+          this.toast.success('Extras de cont generat.');
+        },
+        error: (err) => {
+          this.generatingStatement.set(false);
+          this.toast.error(extractErrorMessage(err, 'Nu am putut genera extrasul de cont.'));
+        },
+      });
+  }
+
+  private monthStartIso(): string {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  }
+
+  private todayIso(): string {
+    return new Date().toISOString().slice(0, 10);
   }
 
   protected confirmDelete(): void {

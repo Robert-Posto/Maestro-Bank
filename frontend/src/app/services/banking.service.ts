@@ -45,6 +45,9 @@ export interface CardView {
   daily_limit_minor: number;
   design: CardDesign;
   is_one_time: boolean;
+  /** Security settings (Cardul meu) — vezi accounts-service/app/models.py::CardOut. */
+  transaction_alerts_enabled: boolean;
+  payment_confirmation_enabled: boolean;
 }
 
 export interface CardSettingsPayload {
@@ -52,7 +55,13 @@ export interface CardSettingsPayload {
   contactless_enabled?: boolean;
   atm_withdrawals_enabled?: boolean;
   international_payments_enabled?: boolean;
+  transaction_alerts_enabled?: boolean;
+  payment_confirmation_enabled?: boolean;
 }
+
+export type CardPinChangeProof =
+  | { current_pin: string; new_pin: string }
+  | (WebauthnStepUpProof & { new_pin: string });
 
 export interface CardCreatePayload {
   design: CardDesign;
@@ -136,7 +145,18 @@ export interface TransferPayload {
   amount_minor: number;
   description: string;
   category?: string;
+  /** PIN-ul cardului — necesar DOAR dacă backend-ul a respins o încercare
+   * anterioară cu 428 (vezi transfers.ts) — "Payment confirmation"
+   * (Security settings, Cardul meu), transferuri peste
+   * PAYMENT_CONFIRMATION_THRESHOLD_MINOR. */
+  card_pin?: string;
 }
+
+/** Sincronizat cu backend — vezi transactions-service/app/service.py::
+ * _PAYMENT_CONFIRMATION_THRESHOLD_MINOR. Folosit STRICT pentru mesajul
+ * afișat userului înainte de a încerca — decizia REALĂ vine mereu din
+ * răspunsul 428 al backend-ului, nu de aici. */
+export const PAYMENT_CONFIRMATION_THRESHOLD_MINOR = 50_000;
 
 export type ScheduleFrequency = 'weekly' | 'monthly';
 
@@ -252,6 +272,13 @@ export class BankingService {
    * accounts-service/app/models.py::CardRevealRequest. */
   revealCard(cardId: string, proof: { pin: string } | WebauthnStepUpProof): Observable<CardRevealView> {
     return this.http.post<CardRevealView>(`${API_BASE_URL}/accounts/cards/${cardId}/reveal`, proof);
+  }
+
+  /** `proof` conține `new_pin` + fie `current_pin`, fie un assertion WebAuthn
+   * — vezi accounts-service/app/models.py::CardPinChangeRequest (aceeași
+   * regulă de "exact una dintre cele două metode" ca la reveal). */
+  changeCardPin(cardId: string, proof: CardPinChangeProof): Observable<CardView> {
+    return this.http.patch<CardView>(`${API_BASE_URL}/accounts/cards/${cardId}/pin`, proof);
   }
 
   freezeCard(cardId: string): Observable<CardView> {

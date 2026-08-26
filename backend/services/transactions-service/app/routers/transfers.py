@@ -7,6 +7,7 @@ Extern (prin Gateway) acestea devin:
   POST  /api/transactions/transfers
   GET   /api/transactions
   GET   /api/transactions/export
+  GET   /api/transactions/statement
   GET   /api/transactions/analytics/spending
   GET   /api/transactions/analytics/cash-flow
   GET   /api/transactions/analytics/forecast
@@ -102,6 +103,27 @@ async def export_my_transactions(
         content=csv_content,
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=maestrobank-tranzactii.csv"},
+    )
+
+
+@router.get("/statement")
+async def download_statement(
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
+    account_id: str | None = Query(default=None),
+    user_id: str = CurrentUserId,
+):
+    """Extras de cont (PDF) — vezi service.generate_account_statement.
+    `date_from`/`date_to` sunt OBLIGATORII (spre deosebire de /export, unde
+    filtrele sunt opționale) — un extras de cont e prin definiție legat de
+    o perioadă anume. `account_id` OPȚIONAL — implicit contul curent (ca
+    până acum), sau orice alt cont al userului (economii/depozit/student/
+    eur/usd/gbp — vezi pagina Conturi)."""
+    pdf_bytes, filename = await service.generate_account_statement(user_id, date_from, date_to, account_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

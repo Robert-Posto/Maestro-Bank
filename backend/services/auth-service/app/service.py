@@ -19,7 +19,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 from app.database import get_database
 from app.email_service import send_verification_email
-from app.models import ChangePasswordRequest, UserLogin, UserRegister
+from app.models import ChangePasswordRequest, ProfilePictureUpdate, UserLogin, UserRegister
 from app.security import create_access_token, decode_access_token, hash_password, verify_password
 
 logger = logging.getLogger("auth-service")
@@ -257,6 +257,17 @@ async def change_password(authorization: str | None, payload: ChangePasswordRequ
         {"$set": {"password_hash": hash_password(payload.new_password)}},
     )
     logger.info("auth-service: parolă schimbată cu succes pentru user_id=%s", user["_id"])
+
+
+async def update_profile_picture(authorization: str | None, payload: ProfilePictureUpdate) -> dict:
+    """Setează/șterge (`profile_picture=None`) poza de profil — vezi
+    ProfilePictureUpdate. Opțională, la cererea userului — nu afectează
+    nimic altceva din cont."""
+    user = await get_current_user(authorization)
+    db = get_database()
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"profile_picture": payload.profile_picture}})
+    logger.info("auth-service: poză de profil %s pentru user_id=%s", "ștearsă" if payload.profile_picture is None else "actualizată", user["_id"])
+    return await db.users.find_one({"_id": user["_id"]})
 
 
 async def verify_user_password(user_id: str, password: str) -> bool:

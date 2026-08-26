@@ -164,3 +164,43 @@ async def test_execute_exchange_propagates_missing_account_error(client: AsyncCl
 
     mine = await client.get("/history", headers=AUTH_HEADER)
     assert mine.json() == []
+
+
+# --- GET /internal/exchanges/by-user/{user_id} ------------------------------
+# Folosit de transactions-service pentru extrasul de cont (vezi
+# transactions-service/app/service.py::generate_account_statement) — un
+# cont EUR/USD/GBP (sau latura RON, pe contul curent) se mișcă prin schimb
+# valutar, invizibil pentru tx_db.
+
+
+async def test_internal_get_exchanges_by_user(client: AsyncClient, monkeypatch):
+    mock_apply = AsyncMock(return_value=None)
+    monkeypatch.setattr("app.service._apply_exchange_in_accounts_service", mock_apply)
+
+    await client.post(
+        "/execute",
+        json={"from_currency": "RON", "to_currency": "EUR", "amount_minor": 500_000},
+        headers=AUTH_HEADER,
+    )
+
+    response = await client.get(f"/internal/exchanges/by-user/{USER_ID}")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["from_currency"] == "RON"
+    assert body[0]["to_currency"] == "EUR"
+
+
+async def test_internal_get_exchanges_by_user_empty_for_unknown_user(client: AsyncClient):
+    response = await client.get(f"/internal/exchanges/by-user/{str(ObjectId())}")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_internal_exchanges_endpoint_needs_no_jwt(client: AsyncClient):
+    """Rută INTERNĂ (service-to-service) — fără JWT, spre deosebire de
+    /history (publică, prin Gateway). Gateway-ul blochează orice path
+    "internal/*" indiferent de autentificare — vezi
+    backend/gateway/app/routers/proxy.py."""
+    response = await client.get(f"/internal/exchanges/by-user/{USER_ID}")
+    assert response.status_code == 200

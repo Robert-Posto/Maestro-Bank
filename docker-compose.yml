@@ -126,6 +126,7 @@ services:
       - BUDGETS_SERVICE_URL=http://budgets-service:8000
       - AUTH_SERVICE_URL=http://auth-service:8000
       - SUPPORT_SERVICE_URL=http://support-service:8000
+      - EXCHANGE_SERVICE_URL=http://exchange-service:8000
       # Guardian (app/guardian/) — explicații LLM ale deciziilor motorului
       # de fraudă. Aceleași variabile Azure OpenAI ca ai-orchestrator-service
       # (vezi .env), dar client propriu, izolat — vezi app/guardian/llm_client.py.
