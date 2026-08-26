@@ -177,6 +177,35 @@
   </section>
 
   <aside class="support-sidebar">
+    <section class="support-panel support-panel--conversations">
+      <div class="support-panel__header">
+        <strong>Conversații</strong>
+        <button type="button" class="support-conversations__new" (click)="startNewConversation()">
+          <app-icon name="plus" [size]="14" /> Nouă
+        </button>
+      </div>
+      @if (conversations().length === 0) {
+        <p class="support-conversations__empty">Nicio conversație salvată încă.</p>
+      } @else {
+        <div class="support-conversations__list">
+          @for (conversation of conversations(); track conversation.id) {
+            <button
+              type="button"
+              class="support-conversations__item"
+              [class.support-conversations__item--active]="conversation.id === activeConversationId()"
+              (click)="openConversation(conversation.id)"
+            >
+              <span class="support-conversations__item-title">{{ conversation.title }}</span>
+              <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+              <span class="support-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                <app-icon name="trash" [size]="13" />
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
     <section class="support-panel support-panel--agent">
       <div class="support-agent">
         <span class="support-agent__icon"><app-icon name="support" [size]="16" /></span>
