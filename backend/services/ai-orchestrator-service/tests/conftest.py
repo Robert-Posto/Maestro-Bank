@@ -7,11 +7,22 @@ from typing import Any
 import jwt
 import pytest
 from httpx import ASGITransport, AsyncClient
+from motor.motor_asyncio import AsyncIOMotorClient
 
+import app.database as db_module
 from app.config import settings
 from app.main import app
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(autouse=True)
+async def fresh_database():
+    db_module.client = AsyncIOMotorClient(settings.mongo_url)
+    db_module.database = db_module.client.get_default_database()
+    yield
+    await db_module.database.conversations.delete_many({})
+    db_module.client.close()
 
 
 def make_token(user_id: str = "68a0f0f0f0f0f0f0f0f0f0f0", secret: str | None = None, expired: bool = False) -> str:
