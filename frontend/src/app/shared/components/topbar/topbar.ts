@@ -5,7 +5,7 @@ import { DatePipe } from '@angular/common';
 
 import { AuthService } from '../../../services/auth.service';
 import { ThemeService } from '../../../services/theme.service';
-import { AppNotification, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Icon } from '../icon/icon';
 
 /**
@@ -75,13 +75,6 @@ export class Topbar implements OnInit, OnDestroy {
       this.notificationsService.refresh();
       this.notificationsService.markAllRead();
     }
-  }
-
-  protected removeNotification(notification: AppNotification, event: Event): void {
-    // Butonul stă în interiorul rândului — fără asta, click-ul ar închide
-    // și dropdown-ul (vezi listener-ul de click din afara componentei).
-    event.stopPropagation();
-    this.notificationsService.remove(notification.id);
   }
 
   protected toggleProfileMenu(): void {

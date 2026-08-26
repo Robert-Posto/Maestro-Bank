@@ -405,16 +405,11 @@
   cursor: not-allowed;
 }
 
-/* Centrat, la fel ca la MaestroAgent (vezi copilot.css::.copilot-quick-replies)
-   — chip-urile au lățimi foarte diferite, așa că la wrap ultimul rând rămânea
-   cu un singur chip agățat în stânga, ca o listă tăiată. Centrarea
-   echilibrează fiecare rând, indiferent câte chip-uri încap pe el. */
 .support-chat__quick-replies {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: var(--mb-space-2);
-  margin: 0 var(--mb-space-5) var(--mb-space-4);
+  margin: 0 0 var(--mb-space-4);
 }
 
 .support-chat__quick-reply {
@@ -441,16 +436,12 @@
   cursor: not-allowed;
 }
 
-/* Marginea laterală o ține departe de bordura panoului — fără ea, conturul
-   barei ajungea lipit de marginile cardului de chat. `--mb-space-5` e exact
-   padding-ul zonei de mesaje, deci bara se aliniază cu bulele de
-   conversație (identic cu copilot.css::.copilot-composer). */
 .support-chat__composer {
   display: flex;
   align-items: center;
   gap: var(--mb-space-3);
   min-height: 58px;
-  margin: 0 var(--mb-space-5) var(--mb-space-3);
+  margin: 0 0 var(--mb-space-3);
   padding: var(--mb-space-1) var(--mb-space-1) var(--mb-space-1) var(--mb-space-5);
   border: 1px solid var(--mb-border-strong);
   border-radius: var(--mb-radius-lg);
@@ -542,11 +533,6 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  /* `inline-flex` singur NU e suficient: părintele (.support-chat__message-col)
-     e flex pe coloană, iar `align-items: stretch` (implicit) întindea butonul
-     pe toată lățimea mesajului, ca o bară. `align-self` îl lasă la lățimea
-     conținutului, adică un buton normal. */
-  align-self: flex-start;
   margin-top: var(--mb-space-2);
   padding: 4px 10px;
   border: 1px solid var(--mb-border);

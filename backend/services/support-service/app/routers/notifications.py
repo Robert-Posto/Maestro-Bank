@@ -2,8 +2,7 @@
 
 Două categorii de rute, separate clar:
   - PUBLICE (prin Gateway, JWT): GET /api/support/notifications,
-    PATCH /api/support/notifications/read-all,
-    DELETE /api/support/notifications/{id} — userul vede și șterge DOAR
+    PATCH /api/support/notifications/read-all — userul vede DOAR
     notificările lui.
   - INTERNE (service-to-service, NU expuse prin Gateway — vezi
     backend/gateway/app/routers/proxy.py, care blochează explicit orice
@@ -29,14 +28,6 @@ async def list_my_notifications(user_id: str = CurrentUserId):
 @router.patch("/read-all", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_all_read(user_id: str = CurrentUserId):
     await service.mark_all_read(user_id)
-
-
-@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_notification(notification_id: str, user_id: str = CurrentUserId):
-    """Șterge o notificare a userului curent — folosit de „X"-ul din lista
-    de notificări (vezi shared/components/topbar). Definită DUPĂ /read-all,
-    ca acel path să nu fie prins de `{notification_id}`."""
-    await service.delete_notification(notification_id, user_id)
 
 
 @internal_router.post("", response_model=NotificationOut, response_model_by_alias=False, status_code=status.HTTP_201_CREATED)

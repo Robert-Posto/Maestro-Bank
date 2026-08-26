@@ -356,15 +356,9 @@
   font-size: var(--mb-font-size-xs);
 }
 
-/* Centrat, nu lipit la stânga: chip-urile au lățimi foarte diferite (de la
-   "Cât am cheltuit luna asta?" până la întrebări de două ori mai lungi), așa
-   că la wrap ultimul rând rămânea aproape gol, cu un singur chip agățat în
-   stânga — arăta ca o listă tăiată, nu ca un set de sugestii. Centrarea
-   echilibrează fiecare rând, indiferent câte chip-uri încap pe el. */
 .copilot-quick-replies {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: var(--mb-space-2);
   margin: 0 var(--mb-space-6) var(--mb-space-4);
 }
@@ -482,11 +476,6 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  /* `inline-flex` singur NU e suficient: părintele (.copilot-message-col) e
-     flex pe coloană, iar `align-items: stretch` (implicit) întindea butonul
-     pe toată lățimea mesajului, ca o bară. `align-self` îl lasă la lățimea
-     conținutului, adică un buton normal. */
-  align-self: flex-start;
   margin-top: var(--mb-space-2);
   padding: 4px 10px;
   border: 1px solid var(--mb-border);
@@ -937,10 +926,8 @@
   font-weight: var(--mb-font-weight-medium);
 }
 
-/* Același inset lateral ca bara de scriere de mai jos și ca zona de mesaje
-   de mai sus — altfel chip-urile ar fi ieșit mai lat decât restul. */
 .copilot-quick-replies {
-  margin: 0 var(--mb-space-5) var(--mb-space-4);
+  margin: 0 0 var(--mb-space-4);
 }
 
 .copilot-quick-reply {
@@ -948,14 +935,9 @@
   box-shadow: var(--mb-shadow-xs);
 }
 
-/* Marginea laterală o ține departe de bordura panoului — fără ea, conturul
-   barei de scriere ajungea lipit de marginile cardului de chat, ca și cum
-   ar fi tăiat. `--mb-space-5` e exact padding-ul zonei de mesaje de mai
-   sus, deci bara se aliniază la stânga/dreapta cu bulele de conversație,
-   în loc să fie mai lată decât ele. */
 .copilot-composer {
   min-height: 58px;
-  margin: 0 var(--mb-space-5) var(--mb-space-3);
+  margin: 0 0 var(--mb-space-3);
   padding-left: var(--mb-space-5);
   border-radius: var(--mb-radius-lg);
   box-shadow: 0 3px 14px rgba(16, 24, 48, 0.05);

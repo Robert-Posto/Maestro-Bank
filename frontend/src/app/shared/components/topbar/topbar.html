@@ -45,24 +45,12 @@
           @if (notifications().length === 0) {
             <p class="topbar__dropdown-empty">Nicio notificare încă.</p>
           } @else {
-            <div class="topbar__notification-list">
-              @for (n of notifications(); track n.id) {
-                <div class="topbar__notification">
-                  <div class="topbar__notification-body">
-                    <p>{{ n.text }}</p>
-                    <span>{{ n.createdAt | date: 'short' }}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="topbar__notification-delete"
-                    aria-label="Șterge notificarea"
-                    (click)="removeNotification(n, $event)"
-                  >
-                    <app-icon name="close" [size]="14" />
-                  </button>
-                </div>
-              }
-            </div>
+            @for (n of notifications(); track n.id) {
+              <div class="topbar__notification">
+                <p>{{ n.text }}</p>
+                <span>{{ n.createdAt | date: 'short' }}</span>
+              </div>
+            }
           }
         </div>
       }
