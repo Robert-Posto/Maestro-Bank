@@ -1,5 +1,6 @@
 """Teste pentru scoring.py — cap la 100, diminishing returns per familie,
-determinism, excluderea BEN-05 din scor. FĂRĂ DB.
+determinism, excluderea BEN-05 din scor, suprimarea regulilor subsumate
+(catalogue.py::SUBSUMED_BY). FĂRĂ DB.
 
 Folosește `apply_diminishing_returns` direct, cu liste de RuleOutcome
 construite manual — NU trece prin regulile reale (vezi scoring.py pentru
@@ -14,6 +15,7 @@ from app.fraud.models import (
     DeviceFacts,
     RuleContext,
     RuleOutcome,
+    SecurityFacts,
     TransactionSnapshot,
     UserProfileSnapshot,
     WindowFacts,
@@ -42,6 +44,7 @@ def _ctx() -> RuleContext:
         window=WindowFacts(),
         cohort=CohortBaseline(),
         device=DeviceFacts(),
+        security=SecurityFacts(),
         evaluated_at=EVALUATED_AT,
     )
 
@@ -116,6 +119,85 @@ def test_ben_05_excluded_from_score_and_from_family_ordering():
     assert by_id["BEN-05"].contribution == 0.0
     assert by_id["BEN-01"].contribution == 15 * 1.0  # credit PLIN, nu 60% — BEN-05 nu a ocupat slotul 1
     assert result.score == 15
+
+
+# --- Suprimare reguli subsumate (catalogue.py::SUBSUMED_BY) ---------------
+
+
+def test_amt_03_suppressed_when_amt_04_also_fires():
+    """AMT-04 (>=98% sold) implică matematic AMT-03 (>70% sold) — scorarea
+    ambelor ar umfla artificial fără niciun semnal nou."""
+    fired = [_outcome("AMT-03", "amount", 20), _outcome("AMT-04", "amount", 40)]
+    result = apply_diminishing_returns(fired, RULESET)
+    by_id = {r.rule_id: r for r in result.fired_rules}
+
+    assert by_id["AMT-04"].contribution == 40  # regula "mamă" ia credit plin
+    assert by_id["AMT-03"].excluded_from_score is True
+    assert by_id["AMT-03"].contribution == 0.0
+    assert result.score == 40
+
+
+def test_amt_03_scores_normally_without_amt_04():
+    fired = [_outcome("AMT-03", "amount", 20)]
+    result = apply_diminishing_returns(fired, RULESET)
+    assert result.fired_rules[0].contribution == 20
+    assert result.fired_rules[0].excluded_from_score is False
+
+
+def test_ben_01_suppressed_when_ben_03_also_fires():
+    """O țară CHIAR nouă (BEN-03) nu poate proveni decât de la un
+    beneficiar niciodată plătit înainte (BEN-01) — vezi rules_beneficiary.py."""
+    fired = [_outcome("BEN-01", "beneficiary", 15), _outcome("BEN-03", "beneficiary", 20)]
+    result = apply_diminishing_returns(fired, RULESET)
+    by_id = {r.rule_id: r for r in result.fired_rules}
+
+    assert by_id["BEN-03"].contribution == 20
+    assert by_id["BEN-01"].excluded_from_score is True
+    assert result.score == 20
+
+
+def test_ben_01_suppressed_when_dev_06_also_fires_cross_family():
+    """DEV-06 (familie "device") subsumă BEN-01 (familie "beneficiary") —
+    suprimarea trebuie să funcționeze și CROSS-familie, nu doar în interiorul
+    aceleiași familii (diminishing-returns per familie NU ar fi prins asta)."""
+    fired = [_outcome("BEN-01", "beneficiary", 15), _outcome("DEV-06", "device", 70)]
+    result = apply_diminishing_returns(fired, RULESET)
+    by_id = {r.rule_id: r for r in result.fired_rules}
+
+    assert by_id["DEV-06"].contribution == 70
+    assert by_id["BEN-01"].excluded_from_score is True
+    assert result.score == 70
+
+
+def test_dev_06_suppresses_dev_01_and_amt_01_simultaneously():
+    """Cazul complet — DEV-06 e literal DEV-01 + beneficiar nou + AMT-01
+    restatate (vezi rules_device.py::check_dev_06); înainte de fix, cele
+    3 reguli-ingredient (una cross-familie, fără diminishing-returns automat)
+    puteau împinge scorul la 125 dintr-un SINGUR tipar detectat."""
+    fired = [
+        _outcome("DEV-06", "device", 70),
+        _outcome("DEV-01", "device", 25),
+        _outcome("BEN-01", "beneficiary", 15),
+        _outcome("AMT-01", "amount", 25),
+    ]
+    result = apply_diminishing_returns(fired, RULESET)
+    by_id = {r.rule_id: r for r in result.fired_rules}
+
+    assert by_id["DEV-06"].contribution == 70
+    assert by_id["DEV-01"].excluded_from_score is True
+    assert by_id["BEN-01"].excluded_from_score is True
+    assert by_id["AMT-01"].excluded_from_score is True
+    assert result.score == 70
+
+
+def test_subsumed_rule_still_appears_in_audit_with_zero_contribution():
+    """Suprimarea NU șterge regula din fired_rules — dreptul la explicație
+    GDPR (vezi fraud/audit.py) tot trebuie să poată arăta CE s-a declanșat,
+    doar că nu contribuie de două ori la scor."""
+    fired = [_outcome("AMT-03", "amount", 20), _outcome("AMT-04", "amount", 40)]
+    result = apply_diminishing_returns(fired, RULESET)
+    rule_ids = {r.rule_id for r in result.fired_rules}
+    assert rule_ids == {"AMT-03", "AMT-04"}
 
 
 def test_no_fired_rules_gives_zero_score_and_pass_band():

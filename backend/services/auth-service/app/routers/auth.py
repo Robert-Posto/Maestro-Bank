@@ -8,19 +8,10 @@ Extern (prin Gateway) acestea devin: /api/auth/register, /api/auth/login,
 /api/auth/resend-verification-email — vezi backend/gateway/app/routers/proxy.py.
 """
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Request, status
 
-from app import service
-from app.models import (
-    ChangePasswordRequest,
-    EmailVerifyRequest,
-    ProfilePictureUpdate,
-    TokenResponse,
-    UserLogin,
-    UserMeOut,
-    UserOut,
-    UserRegister,
-)
+from app import login_events, service
+from app.models import ChangePasswordRequest, EmailVerifyRequest, TokenResponse, UserLogin, UserMeOut, UserOut, UserRegister
 from app.security import get_current_user_id_from_header
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -37,8 +28,14 @@ async def register(payload: UserRegister):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: UserLogin):
-    token = await service.authenticate_user(payload)
+async def login(payload: UserLogin, request: Request):
+    # PRIMA rută din orice serviciu de business din acest backend care
+    # citește `Request` — are nevoie de IP/User-Agent pentru tracking de
+    # login/sesiune (vezi app/login_events.py și planul fazei). Restul
+    # serviciilor n-au avut nevoie de asta până acum.
+    ip_address = login_events.extract_client_ip(request)
+    user_agent = request.headers.get("user-agent")
+    token = await service.authenticate_user(payload, ip_address=ip_address, user_agent=user_agent)
     return TokenResponse(access_token=token)
 
 

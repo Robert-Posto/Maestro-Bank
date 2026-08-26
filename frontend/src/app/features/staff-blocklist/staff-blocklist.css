@@ -1,0 +1,117 @@
+.blocklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.blocklist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-4) var(--mb-space-5);
+  box-shadow: var(--mb-shadow-xs);
+  flex-wrap: wrap;
+}
+
+.blocklist-row__main {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--mb-negative);
+}
+
+.blocklist-row__iban {
+  font-weight: var(--mb-font-weight-semibold);
+  font-size: var(--mb-font-size-md);
+  color: var(--mb-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blocklist-row__reason {
+  margin: 0.15rem 0 0;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-secondary);
+}
+
+.blocklist-row__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--mb-space-2);
+  flex: 0 0 auto;
+}
+
+.blocklist-row__date {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+@media (max-width: 720px) {
+  .blocklist-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .blocklist-row__meta {
+    align-items: flex-start;
+  }
+}
+
+/* --- Formular modal (adaugă pe blocklist) --------------------------------- */
+
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.add-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.add-form__field input,
+.add-form__field textarea {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+  resize: vertical;
+}
+
+.add-form__field input {
+  min-height: 44px;
+}
+
+.add-form__field input:focus,
+.add-form__field textarea:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.add-form__error {
+  margin: 0;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-negative);
+}
+
+.add-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mb-space-2);
+}

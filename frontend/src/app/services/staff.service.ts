@@ -66,6 +66,16 @@ export interface GuardianEvaluationView {
   model: string | null;
 }
 
+export interface BlocklistEntryView {
+  id: string;
+  iban: string;
+  added_by: string;
+  reason: string;
+  source: 'confirmed_fraud_review' | 'manual';
+  evaluation_id: string | null;
+  created_at: string;
+}
+
 export interface FraudEvaluationView {
   id: string;
   transaction_id: string;
@@ -120,5 +130,20 @@ export class StaffService {
     return this.http.get<TransactionView[]>(
       `${API_BASE_URL}/transactions/staff/customers/${userId}/transactions?limit=${limit}&skip=${skip}`,
     );
+  }
+
+  /** Beneficiari refuzați direct, înainte de scoring — vezi BEN-04 (backend
+   * app/blocklist.py). Scriere DOAR de personal — niciodată dintr-un raport
+   * de fraudă al unui client. */
+  listBlocklist(): Observable<BlocklistEntryView[]> {
+    return this.http.get<BlocklistEntryView[]>(`${API_BASE_URL}/transactions/staff/blocklist`);
+  }
+
+  addToBlocklist(iban: string, reason: string): Observable<BlocklistEntryView> {
+    return this.http.post<BlocklistEntryView>(`${API_BASE_URL}/transactions/staff/blocklist`, { iban, reason });
+  }
+
+  removeFromBlocklist(entryId: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/transactions/staff/blocklist/${entryId}`);
   }
 }

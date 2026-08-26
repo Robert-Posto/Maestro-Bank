@@ -15,7 +15,10 @@ from app.fraud.ruleset_config import RulesetConfig
 def check_ben_01(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
     """Prima plată către acest beneficiar — se declanșează normal chiar la
     transaction_count == 0 (primul transfer al userului e, corect, și
-    prima plată către acest beneficiar)."""
+    prima plată către acest beneficiar).
+
+    Subsumată de BEN-03 (țară nouă) și de DEV-06 (combo dispozitiv nou +
+    beneficiar nou + sumă mare) — vezi catalogue.py::SUBSUMED_BY."""
     if ctx.window.beneficiary.seen_before:
         return None
     return RuleOutcome(
@@ -31,7 +34,11 @@ def check_ben_03(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None
     """Țara IBAN-ului absentă din istoricul userului (derivat din prefixul
     IBAN, fără câmp nou stocat). Gardă: NU se declanșează la
     transaction_count == 0 — primul transfer, prin definiție, nu are
-    "istoric de țări", iar declanșarea acolo ar fi un fals-pozitiv."""
+    "istoric de țări", iar declanșarea acolo ar fi un fals-pozitiv.
+
+    Implică matematic BEN-01 (vezi catalogue.py::SUBSUMED_BY) — o țară CHIAR
+    nouă nu poate proveni decât de la un beneficiar niciodată plătit
+    înainte, altfel țara lui ar fi deja în beneficiary_countries."""
     if ctx.profile.transaction_count == 0:
         return None
     country = ctx.transaction.to_iban[:2]

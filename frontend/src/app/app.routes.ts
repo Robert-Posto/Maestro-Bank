@@ -112,6 +112,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/staff-holds/staff-holds').then((m) => m.StaffHolds),
       },
       {
+        path: 'blocklist',
+        loadComponent: () => import('./features/staff-blocklist/staff-blocklist').then((m) => m.StaffBlocklist),
+      },
+      {
         path: 'customers/:userId',
         loadComponent: () => import('./features/staff-customer/staff-customer').then((m) => m.StaffCustomer),
       },

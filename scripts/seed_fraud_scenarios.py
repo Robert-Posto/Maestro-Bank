@@ -15,10 +15,14 @@ Creează:
   - 10 useri "baseline": user + cont RON + card + ~40-60 tranzacții de
     cheltuieli, distribuite pe 60 de zile, cu categorii/sume realiste —
     suficient cât să dea un cohort baseline (percentile globale) cu sens.
-  - 10 useri "scenariu": fiecare reproduce UN tipar clar din catalog (vezi
+  - 15 useri "scenariu": fiecare reproduce UN tipar clar din catalog (vezi
     SCENARIOS mai jos), cu istoric propriu STABILIT (>=20 tranzacții, ca să
     nu cadă în cold start din greșeală — exceptând scenariul "dormant",
-    unde cold start / inactivitatea e CHIAR punctul testat).
+    unde cold start / inactivitatea e CHIAR punctul testat). 5 dintre ele
+    (credential stuffing, dispozitiv nou, călătorie imposibilă, schimbare
+    parolă, beneficiar blocat) au nevoie și de evenimente de securitate
+    (auth_db.login_events/password_changed_at) sau de o intrare de
+    blocklist (tx_db.beneficiary_blocklist), seedate DIRECT — vezi seed().
 
 De ce istoricul de bază se scrie direct în Mongo, dar tranzacția-DECLANȘATOR
 a fiecărui scenariu trece prin API-ul REAL (POST /api/transactions/transfers,
@@ -330,9 +334,15 @@ async def cleanup_fraud_sim_data(db_auth, db_accounts, db_tx) -> int:
             )
         await db_tx.fraud_profiles.delete_many({"user_id": {"$in": user_ids}})
         await db_tx.fraud_evaluations.delete_many({"user_id": {"$in": user_ids}})
+        await db_auth.login_events.delete_many({"user_id": {"$in": user_ids}})
         await db_accounts.cards.delete_many({"user_id": {"$in": user_ids}})
         await db_accounts.accounts.delete_many({"user_id": {"$in": user_ids}})
         await db_auth.users.delete_many({"_id": {"$in": [ObjectId(uid) for uid in user_ids]}})
+
+    # marcaj propriu, DISTINCT de blocklist-ul real produs de staff/reviewer —
+    # vezi lecția din docstring-ul funcției (nescoped filters), NICIODATĂ un
+    # `delete_many({})` nescoped pe o colecție folosită și de datele reale
+    await db_tx.beneficiary_blocklist.delete_many({"added_by": "fraud-sim-seed"})
 
     merchant_accounts = await db_accounts.accounts.find({"is_fraud_sim": True, "user_id": {"$regex": "^merchant:"}}).to_list(length=200)
     merchant_account_ids = [str(a["_id"]) for a in merchant_accounts]
@@ -448,6 +458,54 @@ async def scenario_smurfing(client, tokens, user_ctx, dest_ctx) -> dict:
     return {"key": user_ctx["key"], "scenario": "smurfing (STR-01)", "trigger": results[-1], "all_triggers": results}
 
 
+async def scenario_credential_stuffing(client, tokens, user_ctx, dest_ctx) -> dict:
+    """VEL-04: 3 login-uri eșuate seedate direct în auth_db.login_events,
+    imediat urmate (cronologic) de login-ul REAL din bucla de tokens — vezi
+    seed(), secțiunea "evenimente de securitate seedate direct"."""
+    result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], 5_000, "Transfer test", "other")
+    return {"key": user_ctx["key"], "scenario": "credential stuffing (VEL-04)", "trigger": result}
+
+
+async def scenario_new_device(client, tokens, user_ctx, dest_ctx) -> dict:
+    """DEV-01 + DEV-06: un login VECHI, cu semnătură de dispozitiv diferită
+    de cea a login-ului REAL (curent), seedat direct — vezi seed(). Sumă
+    mare + beneficiar nou, ca DEV-06 (combo) să se declanșeze și el."""
+    result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], 500_000, "Transfer urgent", "other")
+    return {"key": user_ctx["key"], "scenario": "dispozitiv nou (DEV-01, DEV-06)", "trigger": result}
+
+
+async def scenario_impossible_travel(client, tokens, user_ctx, dest_ctx) -> dict:
+    """DEV-04 + DEV-05: două login-uri REUȘITE, seedate direct cu
+    coordonate/țări la mii de km distanță, la 10 minute una de alta — vezi
+    seed(). Login-ul REAL (din bucla de tokens) nu are geolocalizare (IP
+    intern Docker, nu poate fi localizat) — filtrat automat de regulă, nu
+    interferează cu cele două seedate."""
+    result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], 5_000, "Transfer test", "other")
+    return {"key": user_ctx["key"], "scenario": "călătorie imposibilă (DEV-04, DEV-05)", "trigger": result}
+
+
+async def scenario_password_change(client, tokens, user_ctx, dest_ctx) -> dict:
+    """DEV-02: password_changed_at setat direct pe user_doc, cu o oră
+    înainte de declanșator — vezi seed()."""
+    result = await run_live_transfer(client, tokens[user_ctx["key"]], dest_ctx["iban"], 5_000, "Transfer test", "other")
+    return {"key": user_ctx["key"], "scenario": "schimbare parolă recentă (DEV-02)", "trigger": result}
+
+
+async def scenario_blocked_beneficiary(client, tokens, user_ctx, blocked_dest_ctx) -> dict:
+    """BEN-04: IBAN-ul destinație e pre-seedat pe tx_db.beneficiary_blocklist
+    — se așteaptă REFUZ DIRECT (403), NU o evaluare scorată. Verificat
+    separat în print_final_report (status așteptat != 201, dar tot un
+    succes al scenariului, nu un eșec)."""
+    result = await run_live_transfer(client, tokens[user_ctx["key"]], blocked_dest_ctx["iban"], 5_000, "Transfer test", "other")
+    return {
+        "key": user_ctx["key"],
+        "scenario": "beneficiar blocat (BEN-04)",
+        "trigger": result,
+        "expected_status": 403,
+        "user_id": user_ctx["user_id"],
+    }
+
+
 # --------------------------------------------------------------------------
 # Orchestrare
 # --------------------------------------------------------------------------
@@ -515,6 +573,11 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
         ("scenario-mulesender", "MuleSender", "Scenario"),
         ("scenario-benfanout", "BenFanout", "Scenario"),
         ("scenario-smurfing", "Smurfing", "Scenario"),
+        ("scenario-credstuff", "CredStuff", "Scenario"),
+        ("scenario-newdevice", "NewDevice", "Scenario"),
+        ("scenario-travel", "ImpossibleTravel", "Scenario"),
+        ("scenario-pwchange", "PasswordChange", "Scenario"),
+        ("scenario-blocklist", "BlockedBeneficiary", "Scenario"),
     ]
     scenario_users: dict[str, dict] = {}
     for key, first_name, last_name in scenario_specs:
@@ -524,6 +587,7 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
     for key in [
         "scenario-drain", "scenario-velocity", "scenario-escalating", "scenario-structuring",
         "scenario-passthrough", "scenario-mulesender", "scenario-benfanout",
+        "scenario-credstuff", "scenario-newdevice", "scenario-travel", "scenario-pwchange", "scenario-blocklist",
     ]:
         user_ctx = scenario_users[key]
         generate_spending_history(ledger, user_ctx, merchant_accounts, opening_ctx, 20_000.0, window_start, now, 30)
@@ -549,6 +613,89 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
     # passthrough: un credit de intrare, cu ~30 min înainte de declanșator
     passthrough_ctx = scenario_users["scenario-passthrough"]
     ledger.add(opening_ctx, passthrough_ctx, 500.0, "income", "Credit extern", now - timedelta(minutes=30))
+
+    # --- evenimente de securitate, seedate DIRECT în auth_db.login_events —
+    # VEL-04/DEV-01/02/04/05/06 au nevoie de istoric de login pe care NICIUN
+    # API public nu-l poate produce retroactiv (la fel ca istoricul de
+    # tranzacții de mai sus). Login-ul REAL, folosit ca să obținem un JWT
+    # (bucla `tokens`, mai jos) rulează DUPĂ acest bloc — devine automat
+    # "login-ul curent" pentru fiecare user, imediat după cele seedate aici.
+    credstuff_ctx = scenario_users["scenario-credstuff"]
+    await db_auth.login_events.insert_many(
+        [
+            {
+                "user_id": credstuff_ctx["user_id"],
+                "email_attempted": _user_email("scenario-credstuff"),
+                "success": False,
+                "ip_address": "203.0.113.10",
+                "user_agent": "fraud-sim",
+                "device_signature": None,
+                "country": None,
+                "lat": None,
+                "lon": None,
+                "created_at": now - timedelta(minutes=minutes_ago),
+            }
+            for minutes_ago in (3, 2, 1)
+        ]
+    )
+
+    newdevice_ctx = scenario_users["scenario-newdevice"]
+    await db_auth.login_events.insert_one(
+        {
+            "user_id": newdevice_ctx["user_id"],
+            "email_attempted": _user_email("scenario-newdevice"),
+            "success": True,
+            "ip_address": "203.0.113.20",
+            "user_agent": "fraud-sim-old-device",
+            "device_signature": "sig-old-device-fraud-sim",
+            "country": "RO",
+            "lat": 44.43,
+            "lon": 26.10,
+            "created_at": window_start + timedelta(days=1),
+        }
+    )
+
+    # travel: DOAR punctul "vechi" (RO) aici — punctul "curent" (US) e seedat
+    # DUPĂ login-ul REAL din bucla de tokens, mai jos, ca să rămână CHIAR el
+    # cel mai recent eveniment — altfel DEV-05 (care se uită la ÎNTREGUL cel
+    # mai recent login, nu doar la cele geolocalizate) ar vedea mereu
+    # login-ul REAL (fără geolocalizare — IP intern Docker) ca fiind
+    # "curent" și n-ar avea niciodată o țară de comparat.
+    travel_ctx = scenario_users["scenario-travel"]
+    await db_auth.login_events.insert_one(
+        {
+            "user_id": travel_ctx["user_id"],
+            "email_attempted": _user_email("scenario-travel"),
+            "success": True,
+            "ip_address": "203.0.113.30",
+            "user_agent": "fraud-sim",
+            "device_signature": "sig-travel-ro",
+            "country": "RO",
+            "lat": 44.43,
+            "lon": 26.10,
+            "created_at": now - timedelta(minutes=20),
+        }
+    )
+
+    pwchange_ctx = scenario_users["scenario-pwchange"]
+    await db_auth.users.update_one(
+        {"_id": ObjectId(pwchange_ctx["user_id"])}, {"$set": {"password_changed_at": now - timedelta(hours=1)}}
+    )
+
+    # --- beneficiar blocat direct (BEN-04) — refuz înainte de scoring, vezi
+    # app/blocklist.py. `added_by="fraud-sim-seed"` — marcaj de curățenie
+    # (vezi cleanup_fraud_sim_data), NICIODATĂ un userId real de personal.
+    blocked_dest_ctx = await create_pseudo_account(db_accounts, "fraud-sim-blocked-dest", "Beneficiar Blocat (fraud-sim)", now)
+    await db_tx.beneficiary_blocklist.insert_one(
+        {
+            "iban": blocked_dest_ctx["iban"],
+            "added_by": "fraud-sim-seed",
+            "reason": "Seed fraud-sim — BEN-04.",
+            "source": "manual",
+            "evaluation_id": None,
+            "created_at": now,
+        }
+    )
 
     if ledger.transactions:
         await db_tx.transactions.insert_many(ledger.transactions)
@@ -576,6 +723,24 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
             if response.status_code == 200:
                 tokens[user_ctx["key"]] = response.json()["access_token"]
 
+        # travel: punctul "curent" (US) — seedat DUPĂ login-ul real de mai
+        # sus, ca să rămână cel mai recent eveniment din login_events (vezi
+        # nota de la seedarea punctului "vechi", mai sus).
+        await db_auth.login_events.insert_one(
+            {
+                "user_id": travel_ctx["user_id"],
+                "email_attempted": _user_email("scenario-travel"),
+                "success": True,
+                "ip_address": "203.0.113.31",
+                "user_agent": "fraud-sim",
+                "device_signature": "sig-travel-us",
+                "country": "US",
+                "lat": 40.71,
+                "lon": -74.00,
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
+
         # sold curent (după istoric) pentru scenariul "drain"
         drain_ctx = scenario_users["scenario-drain"]
         account = await db_accounts.accounts.find_one({"_id": ObjectId(drain_ctx["account_id"])})
@@ -591,6 +756,10 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
         fresh_dest_8 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-8", "Beneficiar Nou 8", now)
         fresh_dest_9 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-9", "Beneficiar Nou 9", now)
         smurfing_dest = await create_pseudo_account(db_accounts, "fraud-sim-smurfing-dest", "Beneficiar Smurfing", now)
+        fresh_dest_10 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-10", "Beneficiar Nou 10", now)
+        fresh_dest_11 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-11", "Beneficiar Nou 11", now)
+        fresh_dest_12 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-12", "Beneficiar Nou 12", now)
+        fresh_dest_13 = await create_pseudo_account(db_accounts, "fraud-sim-fresh-13", "Beneficiar Nou 13", now)
 
         scenario_results.append(await scenario_drain(http_client, tokens, drain_ctx, fresh_dest_1))
         scenario_results.append(
@@ -608,6 +777,13 @@ async def seed(mongo_url: str, demo_password: str, gateway_url: str) -> dict:
             await scenario_new_beneficiary_burst(http_client, tokens, scenario_users["scenario-benfanout"], [fresh_dest_7, fresh_dest_8, fresh_dest_9])
         )
         scenario_results.append(await scenario_smurfing(http_client, tokens, scenario_users["scenario-smurfing"], smurfing_dest))
+        scenario_results.append(await scenario_credential_stuffing(http_client, tokens, credstuff_ctx, fresh_dest_10))
+        scenario_results.append(await scenario_new_device(http_client, tokens, newdevice_ctx, fresh_dest_11))
+        scenario_results.append(await scenario_impossible_travel(http_client, tokens, travel_ctx, fresh_dest_12))
+        scenario_results.append(await scenario_password_change(http_client, tokens, pwchange_ctx, fresh_dest_13))
+        scenario_results.append(
+            await scenario_blocked_beneficiary(http_client, tokens, scenario_users["scenario-blocklist"], blocked_dest_ctx)
+        )
 
         shadow_report = None
         try:
@@ -637,8 +813,26 @@ async def print_final_report(db_tx, scenario_results: list[dict], shadow_report:
         trigger = result["trigger"]
         status_code = trigger["status_code"]
         body = trigger["body"]
+        expected_status = result.get("expected_status", 201)
         print(f"\n{result['scenario']} ({result['key']})")
         print(f"  HTTP transfer declanșator: {status_code}")
+
+        if expected_status != 201:
+            # BEN-04 — refuz direct, NU o evaluare scorată (vezi
+            # scenario_blocked_beneficiary). status_code != 201 e SUCCESUL
+            # așteptat aici, nu un eșec al scenariului.
+            if status_code != expected_status:
+                print(f"  EȘUAT — se aștepta {expected_status}, a venit {status_code}: {body}")
+                continue
+            evaluation = await db_tx.fraud_evaluations.find_one(
+                {"user_id": result["user_id"], "decision_would_apply": "reject"}, sort=[("created_at", -1)]
+            )
+            if not evaluation:
+                print("  Refuzat corect, dar nicio evaluare cu decision_would_apply=reject găsită (neașteptat).")
+                continue
+            print(f"  Refuzat DIRECT, înainte de scoring — decision_would_apply={evaluation['decision_would_apply']}")
+            continue
+
         if status_code != 201:
             print(f"  EȘUAT: {body}")
             continue

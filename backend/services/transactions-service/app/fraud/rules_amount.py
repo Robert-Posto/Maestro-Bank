@@ -26,7 +26,10 @@ def _windowed_amounts(ctx: RuleContext, ruleset: RulesetConfig, category: str | 
 
 
 def check_amt_01(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
-    """amount > 2 x p95(user, 90d) — fallback pe cohortă la cold start."""
+    """amount > 2 x p95(user, 90d) — fallback pe cohortă la cold start.
+
+    Subsumată de DEV-06 (vezi catalogue.py::SUBSUMED_BY) — check_dev_06
+    (rules_device.py) reutilizează CHIAR această funcție ca ingredient."""
     cold_start = _is_cold_start(ctx, ruleset)
     if cold_start:
         p95 = ctx.cohort.p95_amount_minor
@@ -96,7 +99,11 @@ def check_amt_02(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None
 
 
 def check_amt_03(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
-    """amount > 0.7 x sold disponibil (astăzi == balance_minor, fără hold)."""
+    """amount > 0.7 x sold disponibil (astăzi == balance_minor, fără hold).
+
+    Subsumată de AMT-04 (>=0.98 x sold) — vezi catalogue.py::SUBSUMED_BY —
+    când AMBELE se declanșează, AMT-03 nu contribuie la scor (regula "mamă"
+    acoperă deja semnalul, la un prag mai sever)."""
     if ctx.source_balance_minor <= 0:
         return None
     threshold = ruleset.amt03_ratio * ctx.source_balance_minor

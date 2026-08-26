@@ -268,7 +268,19 @@ async def test_notify_band_sets_pending_tier_and_schedules_background_task(
 async def test_hold_band_with_real_enforcement_is_held_synchronously(
     client: AsyncClient, mock_accounts, guardian_task_spy
 ):
-    # 0.99 x sold -> AMT-03 + AMT-04 + BEN-01 + BEH-01 -> scor >= 80 -> hold.
+    # VEL-01 (burst) + AMT-04 (golire cont, 0.99 x sold) + BEN-01 + BEH-01 ->
+    # scor >= 80 -> hold. AMT-03 nu mai contribuie separat (subsumată de
+    # AMT-04, vezi catalogue.py::SUBSUMED_BY) — burst-ul de mai jos, către
+    # un IBAN/categorie DIFERITE de declanșator, aduce semnalul independent
+    # care lipsea (vezi test_transfers_hold_integration.py::_trigger_hold).
+    for _ in range(5):
+        burst = await client.post(
+            "/transactions/transfers",
+            json={"to_iban": "RO99BURST0000000000000099", "amount_minor": 100, "description": "", "category": "other"},
+            headers=AUTH_HEADER,
+        )
+        assert burst.status_code == 201
+
     response = await client.post(
         "/transactions/transfers",
         json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 99_000, "description": "", "category": "shopping"},
@@ -279,8 +291,9 @@ async def test_hold_band_with_real_enforcement_is_held_synchronously(
     assert body["status"] == "pending_review"
     assert body["risk"] == {"tier": "held", "phrase": body["risk"]["phrase"], "status": "ready"}
 
-    # Personalul primește un raport (bandă "hold" e în guardian_staff_report_bands implicit).
-    assert len(guardian_task_spy) == 1
+    # Personalul primește un raport (bandă "hold" e în guardian_staff_report_bands implicit)
+    # — Guardian rulează pentru FIECARE transfer (inclusiv cele 5 de burst), nu doar cel reținut.
+    assert len(guardian_task_spy) == 6
     evaluation = await get_database().fraud_evaluations.find_one({"transaction_id": ObjectId(body["id"])})
     assert evaluation["guardian"]["staff_explanation"]
 

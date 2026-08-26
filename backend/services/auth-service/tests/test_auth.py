@@ -61,6 +61,13 @@ async def clean_webauthn_collections():
     await get_database().webauthn_challenges.delete_many({})
 
 
+@pytest.fixture(autouse=True)
+async def clean_login_events_collection():
+    await get_database().login_events.delete_many({})
+    yield
+    await get_database().login_events.delete_many({})
+
+
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)
@@ -580,3 +587,147 @@ async def test_staff_role_included_in_webauthn_login_jwt(client: AsyncClient):
         verify_resp.json()["access_token"], settings.jwt_secret, algorithms=[settings.jwt_algorithm]
     )
     assert payload["role"] == "staff"
+
+
+# --- Login events / device tracking / geolocation (VEL-04, DEV-0x) --------
+#
+# Nu testăm geoip.py aici (IP-urile de test sunt loopback -> geolocalizare
+# sărită din start, vezi app/geoip.py) — doar CĂ un login_events e scris,
+# cu user_id/success corecte, indiferent de rezultatul geolocalizării.
+
+
+async def test_login_success_records_login_event(client: AsyncClient):
+    register_response = await client.post("/auth/register", json=VALID_PAYLOAD)
+    user_id = register_response.json()["id"]
+
+    await client.post("/auth/login", json={"email": VALID_PAYLOAD["email"], "password": VALID_PAYLOAD["password"]})
+
+    events = await get_database().login_events.find({"user_id": user_id}).to_list(length=10)
+    assert len(events) == 1
+    assert events[0]["success"] is True
+    assert events[0]["email_attempted"] == VALID_PAYLOAD["email"]
+
+
+async def test_login_wrong_password_records_failed_event(client: AsyncClient):
+    register_response = await client.post("/auth/register", json=VALID_PAYLOAD)
+    user_id = register_response.json()["id"]
+
+    await client.post("/auth/login", json={"email": VALID_PAYLOAD["email"], "password": "ParolaGresita1"})
+
+    events = await get_database().login_events.find({"user_id": user_id}).to_list(length=10)
+    assert len(events) == 1
+    assert events[0]["success"] is False
+
+
+async def test_login_unknown_email_records_event_without_user_id(client: AsyncClient):
+    unknown_email = "nu-exista-deloc@maestrobank.local"
+    await client.post("/auth/login", json={"email": unknown_email, "password": "OricePassword1"})
+
+    events = await get_database().login_events.find({"email_attempted": unknown_email}).to_list(length=10)
+    assert len(events) == 1
+    assert events[0]["success"] is False
+    assert events[0]["user_id"] is None
+
+
+async def test_webauthn_login_success_records_login_event(client: AsyncClient):
+    token = await _register_and_login(client)
+    authenticator = SoftwareAuthenticator()
+    await _register_passkey(client, token, authenticator)
+
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    user_id = me.json()["id"]
+    await get_database().login_events.delete_many({"user_id": user_id})  # curăță evenimentul de la _register_and_login
+
+    challenge_id, options = await _login_options(client, VALID_PAYLOAD["email"])
+    credential = authenticator.get(
+        challenge=base64url_to_bytes(options["challenge"]), rp_id=settings.webauthn_rp_id, origin=settings.webauthn_origins[0]
+    )
+    verify_resp = await client.post("/auth/webauthn/login/verify", json={"challenge_id": challenge_id, "credential": credential})
+    assert verify_resp.status_code == 200
+
+    events = await get_database().login_events.find({"user_id": user_id}).to_list(length=10)
+    assert len(events) == 1
+    assert events[0]["success"] is True
+
+
+async def test_change_password_sets_password_changed_at(client: AsyncClient):
+    register_response = await client.post("/auth/register", json=VALID_PAYLOAD)
+    user_id = register_response.json()["id"]
+
+    before = await get_database().users.find_one({"_id": ObjectId(user_id)})
+    assert before.get("password_changed_at") is None
+
+    token = (
+        await client.post("/auth/login", json={"email": VALID_PAYLOAD["email"], "password": VALID_PAYLOAD["password"]})
+    ).json()["access_token"]
+    response = await client.post(
+        "/auth/change-password",
+        json={"current_password": VALID_PAYLOAD["password"], "new_password": "NewPass1234"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 204
+
+    after = await get_database().users.find_one({"_id": ObjectId(user_id)})
+    assert after["password_changed_at"] is not None
+
+
+async def test_webauthn_revoke_is_soft_delete_not_hard_delete(client: AsyncClient):
+    """revoke_credential trebuie să scrie `revoked_at`, NU să șteargă
+    documentul — DEV-02 (fraud, transactions-service) are nevoie să vadă
+    revocarea prin /internal/security-facts. Vezi webauthn_service.py."""
+    token = await _register_and_login(client)
+    authenticator = SoftwareAuthenticator()
+    await _register_passkey(client, token, authenticator)
+
+    creds = await client.get("/auth/webauthn/credentials", headers={"Authorization": f"Bearer {token}"})
+    credential_id = creds.json()[0]["id"]
+
+    delete_resp = await client.delete(f"/auth/webauthn/credentials/{credential_id}", headers={"Authorization": f"Bearer {token}"})
+    assert delete_resp.status_code == 204
+
+    # documentul TOT există în DB, doar marcat revocat
+    stored = await get_database().webauthn_credentials.find_one({"_id": ObjectId(credential_id)})
+    assert stored is not None
+    assert stored["revoked_at"] is not None
+
+    # dar dispare din orice listare/verificare activă, exact ca înainte
+    after_list = await client.get("/auth/webauthn/credentials", headers={"Authorization": f"Bearer {token}"})
+    assert after_list.json() == []
+
+
+async def test_internal_security_facts_combines_logins_password_and_credential_events(client: AsyncClient):
+    register_response = await client.post("/auth/register", json=VALID_PAYLOAD)
+    user_id = register_response.json()["id"]
+
+    # succes + eșec, ambele urmărite
+    token = (
+        await client.post("/auth/login", json={"email": VALID_PAYLOAD["email"], "password": VALID_PAYLOAD["password"]})
+    ).json()["access_token"]
+    await client.post("/auth/login", json={"email": VALID_PAYLOAD["email"], "password": "GresitaCuTotul1"})
+
+    # schimbare parolă -> password_changed_at
+    await client.post(
+        "/auth/change-password",
+        json={"current_password": VALID_PAYLOAD["password"], "new_password": "NewPass1234"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    # înrolare + revocare passkey -> evenimente de credențială
+    authenticator = SoftwareAuthenticator()
+    await _register_passkey(client, token, authenticator)
+    creds = await client.get("/auth/webauthn/credentials", headers={"Authorization": f"Bearer {token}"})
+    credential_id = creds.json()[0]["id"]
+    await client.delete(f"/auth/webauthn/credentials/{credential_id}", headers={"Authorization": f"Bearer {token}"})
+
+    response = await client.get(f"/internal/security-facts/{user_id}")
+    assert response.status_code == 200
+    body = response.json()
+
+    assert len(body["recent_logins"]) == 2
+    successes = [e["success"] for e in body["recent_logins"]]
+    assert True in successes and False in successes
+
+    assert body["password_changed_at"] is not None
+
+    events = {e["event"] for e in body["recent_credential_events"]}
+    assert events == {"enrolled", "revoked"}

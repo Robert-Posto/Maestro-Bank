@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.blocklist import ensure_blocklist_indexes
 from app.database import close_database_connection, ping_database
 from app.fraud.indexes import ensure_fraud_indexes
 from app.holds import ensure_hold_indexes
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     # deci indexurile trebuie să existe înaintea oricărui transfer.
     await ensure_fraud_indexes()
     await ensure_hold_indexes()
+    await ensure_blocklist_indexes()
     scheduled_transfers_task = asyncio.create_task(scheduled_transfers_loop())
     hold_expiry_task = asyncio.create_task(hold_expiry_loop())
     yield

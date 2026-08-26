@@ -8,6 +8,12 @@ NICIODATĂ ID-uri de regulă — analistul le vede deja separat, pe pagină."""
 
 RULE_ANALYST_HINTS: dict[str, str] = {
     "AMT-01": "Suma e mult peste ce cheltuiește de obicei clientul — merită să confirmi cu el scopul sumei; poate fi o achiziție mare planificată (electronice, o mașină) sau ceva ce nu-i aparține.",
+    "VEL-04": "Contul a fost accesat după mai multe încercări greșite de parolă chiar înainte de succes — un tipar clasic de ghicire a parolei; confirmă cu clientul dacă el a fost cel care s-a logat, nu altcineva care a încercat mai multe parole.",
+    "DEV-01": "Tranzacția vine de pe un dispozitiv/rețea pe care acest client nu le-a mai folosit niciodată — poate fi doar un telefon nou, dar merită o întrebare rapidă de confirmare.",
+    "DEV-02": "Clientul și-a schimbat recent parola sau o cheie de acces — dacă asta NU a fost inițiativa lui, ar putea însemna că altcineva tocmai a preluat controlul contului; verifică direct cu el.",
+    "DEV-04": "Clientul pare să se fi autentificat din două locuri prea îndepărtate ca să fie posibil în timpul scurs între ele — un semn puternic că cineva altcineva folosește contul de undeva din altă parte.",
+    "DEV-05": "Clientul s-a autentificat dintr-o țară în care nu a mai fost activ — poate fi o călătorie legitimă, dar merită confirmată.",
+    "DEV-06": "Se adună mai multe semnale grave deodată: dispozitiv nou, beneficiar nou și o sumă neobișnuit de mare — cel mai clar tipar de cont compromis și golit; tratează cu prioritate maximă.",
     "VEL-03": "Clientul a plătit mai mulți beneficiari noi, pe care nu i-a mai plătit niciodată, într-un timp foarte scurt — verifică dacă îi recunoaște pe toți sau dacă cineva îi controlează contul și îl golește către conturi diferite.",
     "STR-01": "Mai multe transferuri, la scurt timp unul de altul, se opresc mereu chiar sub aceeași valoare rotundă — un tipar tipic pentru cineva care încearcă deliberat să evite o limită de raportare; tratează cu prioritate și întreabă clientul de ce sumele sunt mereu atât de apropiate.",
     "AMT-02": "Suma e neobișnuit de mare pentru genul ăsta de cheltuială la acest client — întreabă-l ce a cumpărat, ca să te asiguri că achiziția are sens pentru el.",

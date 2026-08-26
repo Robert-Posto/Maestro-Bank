@@ -157,9 +157,24 @@ async def client():
 
 
 async def _trigger_hold(client: AsyncClient) -> dict:
-    """99% din sold + beneficiar nou + categorie nouă -> scor >= 80,
-    exact ca în Faza 1 (test_transfers_fraud.py) — reutilizat aici ca
-    declanșator sigur pentru un hold."""
+    """VEL-01 (>5 tranzacții/10min) + AMT-04 (golire cont) + BEN-01 (beneficiar
+    nou) + BEH-01 (categorie nouă) -> scor >= 80. De la eliminarea dublei-
+    numărări AMT-03/AMT-04 (vezi catalogue.py::SUBSUMED_BY), AMT-04+BEN-01+
+    BEH-01 (70) singure nu mai ajung la hold — un mic „burst" de transferuri
+    rapide către un IBAN DIFERIT (tipar realist: probe mici, apoi golire)
+    aduce semnalul independent VEL-01 care lipsea. IBAN-ul de burst NU
+    trebuie să coincidă cu cel al declanșatorului — altfel BEN-01 nu s-ar
+    mai declanșa pe transferul final (seen_before ar deveni True)."""
+    for _ in range(5):
+        # categorie "other", DISTINCTĂ de "groceries" (folosită de
+        # declanșator) — altfel BEH-01 n-ar mai fi "categorie nouă" până la
+        # transferul final.
+        burst = await client.post(
+            "/transactions/transfers",
+            json={"to_iban": "RO99BURST0000000000000099", "amount_minor": 100, "description": "", "category": "other"},
+            headers=AUTH_HEADER,
+        )
+        assert burst.status_code == 201
     response = await client.post(
         "/transactions/transfers",
         json={"to_iban": DEST_ACCOUNT["iban"], "amount_minor": 99_000, "description": "", "category": "groceries"},
@@ -175,8 +190,9 @@ async def test_high_score_transfer_creates_hold_not_completed(client: AsyncClien
     assert body["status"] == "pending_review"
     assert body["hold"] is not None
     assert body["hold"]["expires_at"]
-    assert mock_ledger["source"]["balance_minor"] == 1_000  # 100_000 - 99_000, banii CHIAR au ieșit
-    assert mock_ledger["destination"]["balance_minor"] == 0  # NU au ajuns încă la beneficiar
+    # 100_000 - 500 (5 x burst, aplicate normal) - 99_000 (reținut) = 500
+    assert mock_ledger["source"]["balance_minor"] == 500
+    assert mock_ledger["destination"]["balance_minor"] == 500  # DOAR burst-urile, transferul mare NU a ajuns încă
     assert mock_ledger["holding_balance_minor"] == 99_000
 
 
@@ -205,7 +221,8 @@ async def test_customer_can_cancel_own_hold(client: AsyncClient, mock_ledger):
     body = response.json()
     assert body["status"] == "cancelled"
     assert body["hold"]["resolution"] == "cancelled"
-    assert mock_ledger["source"]["balance_minor"] == 100_000  # revenit integral
+    # 99_000 reținuți revin integral — cei 500 din burst-uri rămân aplicați normal
+    assert mock_ledger["source"]["balance_minor"] == 99_500
     assert mock_ledger["holding_balance_minor"] == 0
 
 
@@ -227,7 +244,7 @@ async def test_staff_can_approve_hold(client: AsyncClient, mock_ledger):
     body = response.json()
     assert body["status"] == "completed"
     assert body["resolution"] == "released"
-    assert mock_ledger["destination"]["balance_minor"] == 99_000
+    assert mock_ledger["destination"]["balance_minor"] == 99_500  # 500 (burst-uri) + 99_000 (eliberați)
     assert mock_ledger["holding_balance_minor"] == 0
 
 
@@ -239,8 +256,8 @@ async def test_staff_can_reject_hold(client: AsyncClient, mock_ledger):
     body = response.json()
     assert body["status"] == "cancelled"
     assert body["resolution"] == "cancelled"
-    assert mock_ledger["source"]["balance_minor"] == 100_000
-    assert mock_ledger["destination"]["balance_minor"] == 0
+    assert mock_ledger["source"]["balance_minor"] == 99_500  # 500 (burst-uri, aplicate) + 99_000 (respinși, întorși)
+    assert mock_ledger["destination"]["balance_minor"] == 500  # DOAR burst-urile
 
 
 async def test_non_staff_cannot_approve_or_reject(client: AsyncClient, mock_ledger):

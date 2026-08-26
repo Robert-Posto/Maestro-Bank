@@ -23,8 +23,11 @@ from app.fraud import profile as profile_module
 from app.fraud.models import (
     BeneficiaryWindow,
     CohortBaseline,
+    CredentialEvent,
     DeviceFacts,
+    LoginEvent,
     RuleContext,
+    SecurityFacts,
     TransactionSnapshot,
     WindowFacts,
 )
@@ -33,6 +36,7 @@ from app.fraud.ruleset_config import RulesetConfig
 logger = logging.getLogger("transactions-service")
 
 _DEV03_TIMEOUT_SECONDS = 0.4
+_SECURITY_FACTS_TIMEOUT_SECONDS = 0.6  # un singur apel, dar întoarce mai multe date decât DEV-03 — puțin mai generos
 _NOT_FAILED = {"$ne": "failed"}
 
 
@@ -66,6 +70,7 @@ async def build_rule_context(
         ruleset=ruleset,
     )
     device = await _build_device_facts(user_id=user_id)
+    security = await _build_security_facts(user_id=user_id)
 
     return RuleContext(
         transaction=TransactionSnapshot(
@@ -79,6 +84,7 @@ async def build_rule_context(
         profile=user_profile,
         window=window,
         cohort=cohort_baseline,
+        security=security,
         device=device,
         evaluated_at=evaluated_at,
     )
@@ -272,3 +278,47 @@ async def _build_device_facts(*, user_id: str) -> DeviceFacts:
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         logger.warning("fraud: DEV-03 indisponibil (auth-service, user_id=%s): %s", user_id, exc)
         return DeviceFacts(latest_passkey_created_at=None, data_available=False)
+
+
+async def _build_security_facts(*, user_id: str) -> SecurityFacts:
+    """VEL-04, DEV-01/02/04/05/06 — AL DOILEA (și ultimul) network hop din
+    acest motor, separat de DEV-03 (apel diferit, mai vechi) — UN SINGUR
+    apel către auth-service adună istoricul de login + schimbări de
+    credențiale, ca să nu multiplicăm hop-uri HTTP pe calea de evaluare
+    fraud (vezi planul fazei). Timeout scurt + fail-open, exact ca DEV-03:
+    orice eroare -> NICIUNA din cele 6 reguli care depind de asta nu se
+    declanșează, niciodată confundată tacit cu "nu există istoric"."""
+    try:
+        async with httpx.AsyncClient(timeout=_SECURITY_FACTS_TIMEOUT_SECONDS) as client:
+            response = await client.get(f"{settings.auth_service_url}/internal/security-facts/{user_id}")
+        if response.status_code != 200:
+            raise httpx.HTTPError(f"status neașteptat {response.status_code}")
+        body = response.json()
+
+        recent_logins = tuple(
+            LoginEvent(
+                success=item["success"],
+                device_signature=item.get("device_signature"),
+                country=item.get("country"),
+                lat=item.get("lat"),
+                lon=item.get("lon"),
+                created_at=datetime.fromisoformat(item["created_at"]),
+            )
+            for item in body.get("recent_logins", [])
+        )
+        password_changed_raw = body.get("password_changed_at")
+        password_changed_at = datetime.fromisoformat(password_changed_raw) if password_changed_raw else None
+        recent_credential_events = tuple(
+            CredentialEvent(event=item["event"], created_at=datetime.fromisoformat(item["created_at"]))
+            for item in body.get("recent_credential_events", [])
+        )
+
+        return SecurityFacts(
+            recent_logins=recent_logins,
+            password_changed_at=password_changed_at,
+            recent_credential_events=recent_credential_events,
+            data_available=True,
+        )
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        logger.warning("fraud: security-facts indisponibile (auth-service, user_id=%s): %s", user_id, exc)
+        return SecurityFacts(data_available=False)

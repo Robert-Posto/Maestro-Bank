@@ -10,9 +10,12 @@ from datetime import datetime, timedelta
 from app.fraud.models import (
     BeneficiaryWindow,
     CohortBaseline,
+    CredentialEvent,
     DeviceFacts,
     HistorySample,
+    LoginEvent,
     RuleContext,
+    SecurityFacts,
     TransactionSnapshot,
     UserProfileSnapshot,
     WindowFacts,
@@ -21,10 +24,10 @@ from app.fraud.ruleset_config import RulesetConfig
 from app.fraud.rules_amount import check_amt_01, check_amt_02, check_amt_03, check_amt_04, check_amt_05
 from app.fraud.rules_behaviour import check_beh_01, check_beh_02, check_beh_03
 from app.fraud.rules_beneficiary import check_ben_01, check_ben_03, check_ben_05
-from app.fraud.rules_device import check_dev_03
+from app.fraud.rules_device import check_dev_01, check_dev_02, check_dev_03, check_dev_04, check_dev_05, check_dev_06
 from app.fraud.rules_structuring import check_str_01, check_str_02
 from app.fraud.rules_temporal import check_time_01, check_time_02
-from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_03, check_vel_05
+from app.fraud.rules_velocity import check_vel_01, check_vel_02, check_vel_03, check_vel_04, check_vel_05
 
 RULESET = RulesetConfig()
 EVALUATED_AT = datetime(2026, 8, 20, 12, 0, 0)  # naiv-UTC, ca tot ce circulă în fraud/ (vezi timeutil.py)
@@ -68,6 +71,7 @@ def _ctx(
     window=None,
     cohort=None,
     device=None,
+    security=None,
     evaluated_at=EVALUATED_AT,
 ) -> RuleContext:
     return RuleContext(
@@ -77,6 +81,7 @@ def _ctx(
         window=window or WindowFacts(),
         cohort=cohort or CohortBaseline(),
         device=device or DeviceFacts(),
+        security=security or SecurityFacts(),
         evaluated_at=evaluated_at,
     )
 
@@ -196,6 +201,41 @@ def test_vel_03_no_fire_below_threshold():
     assert check_vel_03(ctx, RULESET) is None
 
 
+def _login(success: bool, minutes_ago: int, **overrides) -> LoginEvent:
+    base = dict(success=success, created_at=EVALUATED_AT - timedelta(minutes=minutes_ago))
+    base.update(overrides)
+    return LoginEvent(**base)
+
+
+def test_vel_04_fires_at_3_consecutive_failures_before_success():
+    logins = (
+        _login(True, 1),
+        _login(False, 2),
+        _login(False, 3),
+        _login(False, 4),
+        _login(True, 100),
+    )
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_vel_04(ctx, RULESET) is not None
+
+
+def test_vel_04_no_fire_below_threshold():
+    logins = (_login(True, 1), _login(False, 2), _login(False, 3), _login(True, 100))
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_vel_04(ctx, RULESET) is None
+
+
+def test_vel_04_no_fire_without_any_success():
+    logins = (_login(False, 1), _login(False, 2), _login(False, 3))
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_vel_04(ctx, RULESET) is None
+
+
+def test_vel_04_no_fire_when_security_data_unavailable():
+    ctx = _ctx(security=SecurityFacts(data_available=False))
+    assert check_vel_04(ctx, RULESET) is None
+
+
 # --- BEN ------------------------------------------------------------------
 
 
@@ -297,6 +337,172 @@ def test_dev_03_no_fire_when_auth_service_data_unavailable():
     înrolare recentă' (vezi context.py)."""
     device = DeviceFacts(latest_passkey_created_at=EVALUATED_AT - timedelta(minutes=1), data_available=False)
     assert check_dev_03(_ctx(device=device), RULESET) is None
+
+
+def test_dev_01_fires_on_unseen_device_signature():
+    logins = (
+        _login(True, 1, device_signature="sig-new"),
+        _login(True, 100, device_signature="sig-old"),
+    )
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_01(ctx, RULESET) is not None
+
+
+def test_dev_01_no_fire_when_signature_seen_before():
+    logins = (
+        _login(True, 1, device_signature="sig-known"),
+        _login(True, 100, device_signature="sig-known"),
+    )
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_01(ctx, RULESET) is None
+
+
+def test_dev_01_no_fire_without_prior_login_history():
+    logins = (_login(True, 1, device_signature="sig-only"),)
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_01(ctx, RULESET) is None
+
+
+def test_dev_01_no_fire_when_security_data_unavailable():
+    ctx = _ctx(security=SecurityFacts(data_available=False))
+    assert check_dev_01(ctx, RULESET) is None
+
+
+def test_dev_02_fires_on_recent_password_change():
+    security = SecurityFacts(password_changed_at=EVALUATED_AT - timedelta(hours=1))
+    assert check_dev_02(_ctx(security=security), RULESET) is not None
+
+
+def test_dev_02_fires_on_recent_credential_event():
+    security = SecurityFacts(
+        recent_credential_events=(CredentialEvent(event="enrolled", created_at=EVALUATED_AT - timedelta(hours=1)),)
+    )
+    assert check_dev_02(_ctx(security=security), RULESET) is not None
+
+
+def test_dev_02_no_fire_outside_window():
+    security = SecurityFacts(
+        password_changed_at=EVALUATED_AT - timedelta(hours=25),
+        recent_credential_events=(CredentialEvent(event="revoked", created_at=EVALUATED_AT - timedelta(hours=25)),),
+    )
+    assert check_dev_02(_ctx(security=security), RULESET) is None
+
+
+def test_dev_02_no_fire_when_security_data_unavailable():
+    ctx = _ctx(security=SecurityFacts(password_changed_at=EVALUATED_AT, data_available=False))
+    assert check_dev_02(ctx, RULESET) is None
+
+
+_BUCHAREST = dict(lat=44.43, lon=26.10, country="RO")
+_NEW_YORK = dict(lat=40.71, lon=-74.00, country="US")
+
+
+def test_dev_04_fires_on_impossible_travel():
+    logins = (
+        _login(True, 10, **_NEW_YORK),
+        _login(True, 20, **_BUCHAREST),
+    )
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_04(ctx, RULESET) is not None
+
+
+def test_dev_04_no_fire_at_plausible_speed():
+    logins = (
+        _login(True, 10, **_BUCHAREST),
+        _login(True, 20, lat=44.44, lon=26.11, country="RO"),
+    )
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_04(ctx, RULESET) is None
+
+
+def test_dev_04_no_fire_with_fewer_than_2_geo_tagged_logins():
+    logins = (_login(True, 10, **_BUCHAREST),)
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_04(ctx, RULESET) is None
+
+
+def test_dev_04_no_fire_when_security_data_unavailable():
+    ctx = _ctx(security=SecurityFacts(data_available=False))
+    assert check_dev_04(ctx, RULESET) is None
+
+
+def test_dev_05_fires_on_new_country():
+    logins = (_login(True, 10, **_NEW_YORK), _login(True, 100, **_BUCHAREST))
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_05(ctx, RULESET) is not None
+
+
+def test_dev_05_no_fire_on_known_country():
+    logins = (_login(True, 10, **_BUCHAREST), _login(True, 100, **_BUCHAREST))
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_05(ctx, RULESET) is None
+
+
+def test_dev_05_no_fire_when_no_baseline_within_window():
+    """Fără istoric ÎN fereastra de 30 zile, nu avem cu ce compara — la fel
+    ca BEN-03/TIME-02 la istoric zero, nu tratăm 'nicio bază' ca 'țară nouă'."""
+    logins = (_login(True, 10, **_NEW_YORK), _login(True, 60 * 24 * 40, **_BUCHAREST))
+    ctx = _ctx(security=SecurityFacts(recent_logins=logins))
+    assert check_dev_05(ctx, RULESET) is None
+
+
+def test_dev_05_no_fire_when_security_data_unavailable():
+    ctx = _ctx(security=SecurityFacts(data_available=False))
+    assert check_dev_05(ctx, RULESET) is None
+
+
+def _dev_06_profile_and_tx():
+    profile = _profile(transaction_count=20, history_samples=_samples(list(range(100, 2100, 100))))
+    tx = _tx(amount_minor=100_000)  # peste 2x p95 -> AMT-01 se declanșează
+    return profile, tx
+
+
+def test_dev_06_fires_on_new_device_plus_new_beneficiary_plus_large_amount():
+    logins = (_login(True, 1, device_signature="sig-new"), _login(True, 100, device_signature="sig-old"))
+    profile, tx = _dev_06_profile_and_tx()
+    ctx = _ctx(
+        transaction=tx,
+        profile=profile,
+        window=WindowFacts(beneficiary=BeneficiaryWindow(seen_before=False)),
+        security=SecurityFacts(recent_logins=logins),
+    )
+    assert check_dev_06(ctx, RULESET) is not None
+
+
+def test_dev_06_no_fire_when_device_known():
+    logins = (_login(True, 1, device_signature="sig-known"), _login(True, 100, device_signature="sig-known"))
+    profile, tx = _dev_06_profile_and_tx()
+    ctx = _ctx(
+        transaction=tx,
+        profile=profile,
+        window=WindowFacts(beneficiary=BeneficiaryWindow(seen_before=False)),
+        security=SecurityFacts(recent_logins=logins),
+    )
+    assert check_dev_06(ctx, RULESET) is None
+
+
+def test_dev_06_no_fire_when_beneficiary_seen_before():
+    logins = (_login(True, 1, device_signature="sig-new"), _login(True, 100, device_signature="sig-old"))
+    profile, tx = _dev_06_profile_and_tx()
+    ctx = _ctx(
+        transaction=tx,
+        profile=profile,
+        window=WindowFacts(beneficiary=BeneficiaryWindow(seen_before=True)),
+        security=SecurityFacts(recent_logins=logins),
+    )
+    assert check_dev_06(ctx, RULESET) is None
+
+
+def test_dev_06_no_fire_when_amount_not_above_p95():
+    logins = (_login(True, 1, device_signature="sig-new"), _login(True, 100, device_signature="sig-old"))
+    profile = _profile(transaction_count=20, history_samples=_samples(list(range(100, 2100, 100))))
+    ctx = _ctx(
+        transaction=_tx(amount_minor=500),
+        profile=profile,
+        window=WindowFacts(beneficiary=BeneficiaryWindow(seen_before=False)),
+        security=SecurityFacts(recent_logins=logins),
+    )
+    assert check_dev_06(ctx, RULESET) is None
 
 
 # --- BEH ------------------------------------------------------------------

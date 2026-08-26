@@ -15,6 +15,7 @@ from app.models import (
     InternalMarkIdentityVerifiedRequest,
     InternalPasswordVerifyRequest,
     InternalPasswordVerifyResponse,
+    InternalSecurityFactsView,
     InternalUserContactView,
     InternalUserNameView,
 )
@@ -60,3 +61,8 @@ async def verify_webauthn(payload: InternalWebauthnVerifyRequest):
 @router.post("/auth/mark-identity-verified", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_identity_verified(payload: InternalMarkIdentityVerifiedRequest):
     await service.mark_identity_verified(payload.user_id)
+
+
+@router.get("/security-facts/{user_id}", response_model=InternalSecurityFactsView)
+async def get_security_facts(user_id: str):
+    return await service.get_security_facts(user_id)
