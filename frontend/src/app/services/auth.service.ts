@@ -3,7 +3,6 @@ import { Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
 import { API_BASE_URL } from '../core/api-config';
-import { SUPPORT_CHAT_STORAGE_KEY } from '../core/storage-keys';
 
 const TOKEN_STORAGE_KEY = 'maestrobank_dev_jwt';
 
@@ -89,10 +88,6 @@ export class AuthService {
 
   logout(): void {
     sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    // Conversația cu Support Agent e persistată per-tab (vezi
-    // features/support/support.ts) — ștearsă aici ca userul următor de pe
-    // același tab/browser să nu vadă conversația celui dinainte.
-    sessionStorage.removeItem(SUPPORT_CHAT_STORAGE_KEY);
     this.currentUser.set(null);
   }
 
