@@ -22,6 +22,9 @@
   <app-action-button variant="secondary" [loading]="exporting()" (pressed)="exportCsv()">
     <app-icon name="download" [size]="16" /> Exportă
   </app-action-button>
+  <app-action-button variant="secondary" [loading]="generatingStatement()" (pressed)="downloadStatement()">
+    <app-icon name="receipt" [size]="16" /> Extras de cont
+  </app-action-button>
 </div>
 
 <div class="tx-filters-advanced" [class.tx-filters-advanced--open]="filtersOpen()">
