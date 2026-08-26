@@ -31,7 +31,7 @@ docker compose exec -e MONGO_URL=mongodb://mongodb:27017/<db_name>_test <service
 
 Single test: append `::test_name` (or `::TestClass::test_name`) to the pytest invocation, e.g. `python -m pytest -q tests/test_auth.py::test_login_valid`.
 
-Service → db_name: `auth-service`→`auth_db`, `accounts-service`→`accounts_db`, `transactions-service`→`tx_db`, `budgets-service`→`budgets_db`, `support-service`→`support_db`, `exchange-service`→`exchange_db`. Test deps aren't baked into the image (keeps it lean); reinstall after every container recreate.
+Service → db_name: `auth-service`→`auth_db`, `accounts-service`→`accounts_db`, `transactions-service`→`tx_db`, `budgets-service`→`budgets_db`, `support-service`→`support_db`, `exchange-service`→`exchange_db`, `ai-orchestrator-service`→`ai_orchestrator_db`. Test deps aren't baked into the image (keeps it lean); reinstall after every container recreate.
 
 ### Frontend
 
@@ -61,7 +61,7 @@ Angular (4200) → Nginx (8080, reverse proxy) → API Gateway (8000: routing, J
      auth_db       accounts_db       tx_db       budgets_db    support_db    exchange_db    (stateless)        (stateless)
 ```
 
-All services share **one MongoDB instance**, each with its **own database** — no service ever reads another's database directly. Cross-service data needs go through that service's HTTP API. `verification-service` and `ai-orchestrator-service` are stateless (no `MONGO_URL`, no `database.py`) — the former compares two images (ID photo + selfie) and discards them immediately after, the latter never touches MongoDB, calling the other services through the Gateway exactly like an external client (Angular), with the current user's JWT propagated.
+All services share **one MongoDB instance**, each with its **own database** — no service ever reads another's database directly. Cross-service data needs go through that service's HTTP API. `verification-service` is fully stateless (no `MONGO_URL`, no `database.py`), comparing two images (ID photo + selfie) and discarding them immediately after. `ai-orchestrator-service` now has a `database.py` for storing conversation history, but continues to call other services through the Gateway exactly like an external client (Angular), with the current user's JWT propagated.
 
 ### Per-service internal structure (identical across the 6 stateful FastAPI services)
 
@@ -76,7 +76,7 @@ app/
 └── service.py   # ALL business logic + the only place that touches the database directly
 ```
 
-`verification-service` and `ai-orchestrator-service` follow the same `routers/`+`service.py` split but skip `database.py` (nothing to connect to).
+`verification-service` follows the same `routers/`+`service.py` split but skips `database.py` (nothing to connect to). `ai-orchestrator-service` now includes `database.py` for conversation history persistence.
 
 `routers/*.py` never touches the database directly. Routes under `routers/internal.py` (`/internal/*`) are service-to-service only — the Gateway hard-blocks any path starting with `internal/` at the proxy layer (`backend/gateway/app/routers/proxy.py::_forward`), so they're unreachable from the browser regardless of auth. This is how services call each other (e.g. accounts-service → auth-service `/internal/auth/verify-password` and `/internal/auth/verify-webauthn`; auth-service → accounts-service `/internal/accounts/provision` at registration).
 
