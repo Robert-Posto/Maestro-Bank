@@ -23,6 +23,7 @@ from app.config import settings
 from app.llm.azure_openai import chat_completion
 from app.models.support import ChatMessage
 from app.prompts.support_prompt import SUPPORT_SYSTEM_PROMPT
+from app.services import safety_guard
 from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
 
 logger = logging.getLogger("ai-orchestrator-service")
@@ -300,6 +301,19 @@ async def run_support_agent(
 
     Ridică `PendingConfirmationRequired` dacă modelul cere un tool de scriere.
     """
+    # Date sensibile de card (PIN/CVV/număr complet) sau încercări de a
+    # scoate promptul de sistem -> NU trecem deloc prin GPT (vezi
+    # app/services/safety_guard.py) — răspuns determinist, la fel ca la
+    # limbajul jignitor din Spending + Forecast Agent (vezi
+    # spending_forecast.py::handle_message — Support Agent nu avea încă
+    # niciun filtru determinist ÎNAINTE de acest task).
+    if safety_guard.detect_sensitive_data(message):
+        logger.info("Support Agent: mesaj cu date sensibile de card — răspuns determinist, fără apel GPT")
+        return safety_guard.SENSITIVE_DATA_WARNING, "unknown", [], False, {}
+    if safety_guard.detect_prompt_extraction_attempt(message):
+        logger.info("Support Agent: încercare de extragere a promptului — răspuns determinist, fără apel GPT")
+        return safety_guard.PROMPT_EXTRACTION_REFUSAL, "unknown", [], False, {}
+
     messages: list[dict[str, Any]] = [{"role": "system", "content": SUPPORT_SYSTEM_PROMPT}]
     messages.extend({"role": m.role, "content": m.content} for m in history[-_MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
@@ -313,7 +327,7 @@ async def run_support_agent(
         if not tool_calls:
             # Fallback — modelul ar trebui să folosească mereu respond_to_user,
             # dar nu ne bazăm strict pe asta pentru un răspuns utilizabil.
-            return response_message.content or "", "unknown", [], False, collected_context
+            return safety_guard.redact_if_sensitive(response_message.content or ""), "unknown", [], False, collected_context
 
         messages.append(
             {
@@ -331,8 +345,13 @@ async def run_support_agent(
                 arguments = {}
 
             if name == CONTROL_TOOL:
+                # Apărare suplimentară — vezi safety_guard.py::redact_if_sensitive.
+                # Nu ar trebui să se întâmple niciodată (niciun tool nu-i
+                # oferă PIN/CVV/PAN, vezi docstring-ul modulului), dar
+                # costă puțin să verificăm și ce a GENERAT GPT, nu doar
+                # mesajul userului (verificat mai sus, înainte de buclă).
                 return (
-                    arguments.get("answer", ""),
+                    safety_guard.redact_if_sensitive(arguments.get("answer", "")),
                     arguments.get("intent", "unknown"),
                     arguments.get("recommended_actions", []),
                     bool(arguments.get("out_of_scope", False)),

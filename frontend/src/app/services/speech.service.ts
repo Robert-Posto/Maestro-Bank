@@ -57,6 +57,41 @@ function resolveSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+/** Normalizare DOAR pentru detecția de întrebare de mai jos (diacritice
+ * scoase, minuscule) — NU afectează textul afișat/trimis, e folosită
+ * STRICT ca să comparăm cu lista de cuvinte interogative. */
+function normalizeForQuestionDetection(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ș|ş/g, 's')
+    .replace(/ț|ţ/g, 't');
+}
+
+// Cuvinte/particule interogative românești uzuale, verificate la ÎNCEPUTUL
+// propoziției — vezi addQuestionMarkIfLikelyQuestion mai jos. Deliberat o
+// listă simplă, ancorată la început (nu căutăm oriunde în text) — un fals
+// pozitiv aici înseamnă doar un "?" în plus la finalul unei propoziții
+// afirmative, niciodată o schimbare a cuvintelor recunoscute.
+const QUESTION_STARTERS =
+  /^(cum|ce|cine|unde|cand|cat|cata|cati|cate|care|de ce|oare|pot|poti|puteti|as putea|ati putea|imi poti|imi puteti|se poate|e posibil)\b/;
+
+/**
+ * Recunoașterea vocală (Web Speech API) NU adaugă niciodată punctuație —
+ * "cum fac un transfer" ajunge în input exact așa, fără "?" — la cererea
+ * userului: dacă propoziția ÎNCEPE cu un cuvânt interogativ cunoscut și nu
+ * se termină deja cu punctuație, adăugăm "?" la final. NU schimbă niciun
+ * cuvânt recunoscut, doar eventual adaugă un caracter — folosită STRICT
+ * la finalul recunoașterii vocale (vezi startListening mai jos), nu
+ * atinge deloc TTS-ul sau restul fluxului de microfon.
+ */
+export function addQuestionMarkIfLikelyQuestion(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed || /[.?!]$/.test(trimmed)) return trimmed;
+  return QUESTION_STARTERS.test(normalizeForQuestionDetection(trimmed)) ? `${trimmed}?` : trimmed;
+}
+
 /**
  * Curăță sintaxa Markdown-lite (vezi shared/pipes/markdown-lite.pipe.ts)
  * ÎNAINTE de a trimite textul la TTS — altfel motorul de voce ar citi
@@ -164,7 +199,8 @@ export class SpeechService {
       for (let i = 0; i < event.results.length; i++) {
         chunks.push(event.results[i][0].transcript);
       }
-      onFinalResult(chunks.join(' ').trim());
+      const transcript = chunks.join(' ').trim();
+      onFinalResult(addQuestionMarkIfLikelyQuestion(transcript));
     };
     recognition.onerror = () => {
       this.listening.set(false);
