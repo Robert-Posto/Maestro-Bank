@@ -439,3 +439,9 @@
   border-color: var(--mb-blue-500);
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
 }
+
+.statement-modal__account {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-tertiary);
+  margin-top: -4px;
+}

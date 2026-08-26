@@ -87,6 +87,7 @@ export class Transactions implements OnInit {
   protected readonly recognizing = signal(false);
   protected readonly reporting = signal(false);
   protected readonly exporting = signal(false);
+  protected readonly generatingStatement = signal(false);
   protected readonly cancellingHold = signal(false);
 
   protected readonly selectedTransaction = computed<TransactionDetail | null>(() => {
@@ -265,6 +266,44 @@ export class Transactions implements OnInit {
         this.toast.error(extractErrorMessage(err, 'Exportul a eșuat.'));
       },
     });
+  }
+
+  /** Extras de cont (PDF) — perioada e OBLIGATORIE pe backend, spre deosebire
+   * de export CSV; dacă userul n-a completat "Perioadă" din Filtre avansate,
+   * cădem pe o valoare implicită rezonabilă (luna curentă), ca butonul să
+   * funcționeze imediat, fără să-l forțăm mai întâi să deschidă filtrele. */
+  protected downloadStatement(): void {
+    const from = this.dateFrom() || this.monthStartIso();
+    const to = this.dateTo() || this.todayIso();
+
+    this.generatingStatement.set(true);
+    this.transactionsApi
+      .downloadStatement(new Date(from).toISOString(), new Date(to + 'T23:59:59').toISOString())
+      .subscribe({
+        next: (blob) => {
+          this.generatingStatement.set(false);
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = `extras-cont-${from}_${to}.pdf`;
+          anchor.click();
+          URL.revokeObjectURL(url);
+          this.toast.success('Extras de cont generat.');
+        },
+        error: (err) => {
+          this.generatingStatement.set(false);
+          this.toast.error(extractErrorMessage(err, 'Nu am putut genera extrasul de cont.'));
+        },
+      });
+  }
+
+  private monthStartIso(): string {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  }
+
+  private todayIso(): string {
+    return new Date().toISOString().slice(0, 10);
   }
 
   private updateLocal(updated: TransactionView): void {

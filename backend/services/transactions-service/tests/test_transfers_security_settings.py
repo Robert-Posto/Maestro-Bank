@@ -49,9 +49,9 @@ DEST_ACCOUNT = {
     "status": "active",
 }
 
-# Peste pragul de 5.000,00 RON (500_000 bani) — vezi
+# Peste pragul de 500,00 RON (50_000 bani) — vezi
 # service.py::_PAYMENT_CONFIRMATION_THRESHOLD_MINOR.
-LARGE_AMOUNT_MINOR = 600_000
+LARGE_AMOUNT_MINOR = 60_000
 SMALL_AMOUNT_MINOR = 10_000
 
 

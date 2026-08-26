@@ -115,6 +115,10 @@ Lives in `transactions-service/app/guardian/` — when the deterministic fraud e
 
 `transactions-service/app/content_screening.py` — a deliberately deterministic, keyword-based screen (not an LLM) for terrorism/violence/illegal-activity terms in a transfer's description, several hundred roots in RO+EN across ~14 categories, leetspeak-resilient normalization. Warns only — never blocks the transfer. Kept separate from both the fraud engine (not an 19th rule) and Guardian (no LLM judgment call here, same philosophy as the profanity filter in `ai-orchestrator-service`'s Support Agent).
 
+### Account statement (PDF)
+
+`GET /transactions/statement?date_from=...&date_to=...` (both required) — `transactions-service`'s `app/statement.py` renders a formal PDF statement (reportlab) for the user's `current` account only (same MVP scope as the rest of this file's reports — see the `_build_filter_query` note on multi-account). Opening/closing balance for the period is *reconstructed*, not read from a stored ledger: it walks every `completed` transaction on the account backwards from the account's live `balance_minor` (see `app/statement.py::reconstruct_statement_balances`, split out as a pure function specifically so the balance math is unit-testable without a DB). Requires `fonts-dejavu-core` in the image (see Dockerfile) — reportlab's base Helvetica font has no glyphs for Romanian diacritics (ă/â/î/ș/ț).
+
 ### Subscription detection (passive, from transaction history)
 
 `budgets-service`'s `detect_recurring_payments()` calls a new internal endpoint (`transactions-service`'s `GET /internal/transactions/by-user/{user_id}`) to fetch a user's raw history, groups outgoing completed transactions by description, and flags groups with 2+ occurrences, near-identical amount (±10%), and a real monthly cadence (every consecutive gap between 20-40 days) as suggestions (`GET /budgets/subscriptions/suggestions`) — never auto-created, the user confirms explicitly. Deterministic heuristic, not ML, same philosophy as content screening.

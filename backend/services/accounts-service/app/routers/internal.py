@@ -15,6 +15,7 @@ from fastapi import APIRouter, status
 
 from app import service
 from app.models import (
+    AccountPublicOut,
     FraudHoldingAccountView,
     InternalAccountView,
     InternalCardSettingsView,
@@ -50,6 +51,19 @@ async def get_account_by_user(user_id: str):
 @router.get("/by-iban/{iban}", response_model=InternalAccountView)
 async def get_account_by_iban(iban: str):
     return await service.get_account_by_iban(iban)
+
+
+@router.get("/{account_id}/for-user/{user_id}", response_model=AccountPublicOut)
+async def get_account_by_id_internal(account_id: str, user_id: str):
+    """Apelat de transactions-service pentru extrasul de cont per-cont
+    (userul poate alege orice cont al lui, nu doar "current" — vezi
+    generate_account_statement). Reutilizează EXACT
+    app/service.py::get_account_by_id_for_user — funcția care deja există
+    și e folosită de ruta PUBLICĂ GET /accounts/{account_id} — NU o
+    duplică; există special această rută /internal/ doar pentru că
+    transactions-service n-are JWT-ul userului, ca să poată apela ruta
+    publică direct."""
+    return await service.get_account_by_id_for_user(account_id, user_id)
 
 
 @router.post("/transfer", response_model=InternalTransferResponse)

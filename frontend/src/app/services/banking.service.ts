@@ -156,7 +156,7 @@ export interface TransferPayload {
  * _PAYMENT_CONFIRMATION_THRESHOLD_MINOR. Folosit STRICT pentru mesajul
  * afișat userului înainte de a încerca — decizia REALĂ vine mereu din
  * răspunsul 428 al backend-ului, nu de aici. */
-export const PAYMENT_CONFIRMATION_THRESHOLD_MINOR = 500_000;
+export const PAYMENT_CONFIRMATION_THRESHOLD_MINOR = 50_000;
 
 export type ScheduleFrequency = 'weekly' | 'monthly';
 
