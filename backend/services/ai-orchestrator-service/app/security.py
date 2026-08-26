@@ -70,3 +70,24 @@ async def get_authorization(authorization: str | None = Header(default=None)) ->
 
 
 CurrentAuthorization = Depends(get_authorization)
+
+
+# --- Persistență de conversații (vezi app/services/conversation_service.py) -
+# user_id folosit STRICT ca cheie de proprietate a unei conversații stocate
+# — NU e trecut agentului/tool-urilor (acelea rămân pe get_authorization de
+# mai sus, neschimbat) — deci nu încalcă principiul de mai sus.
+async def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Lipsește header-ul Authorization: Bearer <token>.",
+        )
+    token = authorization.split(" ", 1)[1]
+    payload = _decode(token)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
+    return user_id
+
+
+CurrentUserId = Depends(get_current_user_id)
