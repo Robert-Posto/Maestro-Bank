@@ -25,6 +25,10 @@ router = APIRouter(prefix="/support", tags=["support-agent"])
 
 _AGENT: conversation_service.Agent = "support"
 
+# Trebuie să rămână egal cu ChatRequest.history's Field(max_length=40) din
+# app/models/support.py — vezi comentariul din `chat()` de mai jos pentru de ce.
+_HISTORY_FIELD_MAX_LENGTH = 40
+
 
 @router.post("", response_model=ChatResponse)
 async def chat(
@@ -41,7 +45,15 @@ async def chat(
     # acces pe atribut (`m.role`, `m.content`), nu pe cheie de dict; ar
     # arunca AttributeError. Constructorul explicit forțează validarea
     # Pydantic normală, care transformă dict-urile în ChatMessage.
-    history_dicts = conversation_service.to_history_dicts(conversation)
+    #
+    # Trunchiat la ultimele `_HISTORY_FIELD_MAX_LENGTH` intrări ÎNAINTE de
+    # reconstrucție — istoricul Mongo e NElimitat (append_turn face un
+    # $push necondiționat), dar ChatRequest.history are max_length=40 (vezi
+    # app/models/support.py). Fără trunchiere, o conversație cu peste 40 de
+    # mesaje stocate (~21+ ture) ar arunca ValidationError aici, necaptat de
+    # `except RuntimeError`/`except APIError` de mai jos → 500 brut pentru
+    # un chat de suport normal, doar mai lung.
+    history_dicts = conversation_service.to_history_dicts(conversation)[-_HISTORY_FIELD_MAX_LENGTH:]
     payload_with_history = ChatRequest(
         message=payload.message,
         history=history_dicts,
