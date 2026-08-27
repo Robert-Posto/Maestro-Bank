@@ -181,3 +181,58 @@ async def liquidate_early(deposit_id: str, user_id: str) -> DepositOut:
     doc["status"] = "liquidated_early"
     logger.info("deposits-service: depozit lichidat anticipat (id=%s, user_id=%s)", doc["_id"], user_id)
     return _to_deposit_out(doc)
+
+
+async def process_matured_deposits() -> int:
+    """Apelat periodic de scheduler — vezi app/scheduler.py. Găsește
+    depozitele active cu scadența trecută și le reînnoiește sau le plătește,
+    în funcție de renew_at_maturity. Întoarce câte a procesat."""
+    db = get_database()
+    now = datetime.now(timezone.utc)
+    cursor = db.deposits.find({"status": "active", "matures_at": {"$lte": now}})
+    matured = await cursor.to_list(length=500)
+
+    processed = 0
+    for doc in matured:
+        interest_minor = _compute_interest_minor(doc["principal_minor"], doc["rate_percent_annual"], doc["term_months"])
+        total_minor = doc["principal_minor"] + interest_minor
+
+        if doc["renew_at_maturity"]:
+            new_rate = get_rate(doc["currency"], doc["term_months"])
+            new_doc = {
+                "user_id": doc["user_id"],
+                "currency": doc["currency"],
+                "principal_minor": total_minor,
+                "term_months": doc["term_months"],
+                "rate_percent_annual": new_rate,
+                "opened_at": now,
+                "matures_at": now + timedelta(days=30 * doc["term_months"]),
+                "renew_at_maturity": doc["renew_at_maturity"],
+                "status": "active",
+                "source_account_id": doc["source_account_id"],
+                "renewed_into_deposit_id": None,
+                "renewed_from_deposit_id": str(doc["_id"]),
+            }
+            new_result = await db.deposits.insert_one(new_doc)
+            await db.deposits.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"status": "matured_renewed", "renewed_into_deposit_id": str(new_result.inserted_id)}},
+            )
+            logger.info(
+                "deposits-service: depozit reînnoit (id=%s -> %s, user_id=%s)",
+                doc["_id"],
+                new_result.inserted_id,
+                doc["user_id"],
+            )
+        else:
+            await _credit_account(doc["source_account_id"], total_minor)
+            await db.deposits.update_one({"_id": doc["_id"]}, {"$set": {"status": "closed_paid_out"}})
+            logger.info(
+                "deposits-service: depozit plătit la scadență (id=%s, user_id=%s, suma=%s)",
+                doc["_id"],
+                doc["user_id"],
+                total_minor,
+            )
+        processed += 1
+
+    return processed
