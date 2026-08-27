@@ -217,6 +217,10 @@ import { Component, input } from '@angular/core';
           <path d="M7 7l10 10" />
           <path d="M17 8v9H8" />
         }
+        @case ('trending-up') {
+          <path d="M3 17l6-6 4 4 8-8" />
+          <path d="M15 7h6v6" />
+        }
         @case ('wallet') {
           <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3" />
           <rect x="3" y="7" width="18" height="13" rx="2" />

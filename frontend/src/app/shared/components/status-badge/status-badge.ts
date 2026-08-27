@@ -16,6 +16,9 @@ const STATUS_TONE_MAP: Record<string, BadgeTone> = {
   cancelled: 'neutral',
   inactive: 'neutral',
   disabled: 'neutral',
+  matured_renewed: 'info',
+  liquidated_early: 'warning',
+  closed_paid_out: 'neutral',
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -36,6 +39,9 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   cancelled: 'Anulată',
   inactive: 'Inactiv',
   disabled: 'Dezactivat',
+  matured_renewed: 'Reînnoit automat',
+  liquidated_early: 'Lichidat anticipat',
+  closed_paid_out: 'Plătit la scadență',
 };
 
 /** Badge de status reutilizabil — vezi "Status" pe carduri/tranzacții/tickete. */

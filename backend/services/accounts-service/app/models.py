@@ -19,7 +19,12 @@ CardType = Literal["virtual", "physical"]
 # vizual) — necesare ca schimbul valutar (exchange-service) să aibă unde să
 # crediteze/debiteze efectiv, vezi apply_internal_exchange mai jos.
 AccountType = Literal["current", "savings", "deposit", "student", "eur", "usd", "gbp"]
-CreatableAccountType = Literal["savings", "deposit", "student", "eur", "usd", "gbp"]
+# "deposit" a fost înlocuit de feature-ul real de depozite la termen
+# (deposits-service, vezi docs/superpowers/specs/2026-08-27-deposits-design.md)
+# — rămâne în AccountType (conturi vechi, deja deschise, tot funcționează
+# normal — transfer în/din ele prin IBAN merge ca înainte), dar dispare din
+# CreatableAccountType: nu se mai poate deschide unul nou de acest tip.
+CreatableAccountType = Literal["savings", "student", "eur", "usd", "gbp"]
 
 # --- Core banking --------------------------------------------------------
 
@@ -416,6 +421,24 @@ class InternalExchangeRequest(BaseModel):
 class InternalExchangeResponse(BaseModel):
     from_balance_minor: int
     to_balance_minor: int
+
+
+class InternalDebitRequest(BaseModel):
+    amount_minor: int = Field(gt=0)
+
+
+class InternalCreditRequest(BaseModel):
+    amount_minor: int = Field(gt=0)
+
+
+class InternalBalanceOut(BaseModel):
+    """Răspunsul comun al debit/credit — folosit de deposits-service (și,
+    mai târziu, de un eventual serviciu de investiții) pentru primitive
+    GENERICE, cu un singur cont — spre deosebire de InternalTransferResponse
+    (cont->cont) și InternalExchangeResponse (RON<->valută), niciuna nu se
+    potrivește cu "banii ies dintr-un cont și intră într-un depozit"."""
+
+    balance_minor: int
 
 
 class FraudHoldingAccountView(BaseModel):
