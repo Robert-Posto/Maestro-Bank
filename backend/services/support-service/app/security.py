@@ -16,14 +16,31 @@ def _decode(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid sau expirat.") from exc
 
 
-async def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
+def _extract_token(authorization: str | None) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Lipsește header-ul Authorization: Bearer <token>.",
         )
-    token = authorization.split(" ", 1)[1]
-    payload = _decode(token)
+    return authorization.split(" ", 1)[1]
+
+
+async def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
+    payload = _decode(_extract_token(authorization))
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
+    return user_id
+
+
+async def require_staff(authorization: str | None = Header(default=None)) -> str:
+    """Ca get_current_user_id, dar cere ȘI claim-ul "role"="staff" din JWT —
+    vezi accounts-service/app/security.py::require_staff, pattern identic,
+    reprodus aici, nu importat (fiecare serviciu își validează independent
+    JWT-ul, defense in depth)."""
+    payload = _decode(_extract_token(authorization))
+    if payload.get("role") != "staff":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acces permis doar personalului.")
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
@@ -31,3 +48,4 @@ async def get_current_user_id(authorization: str | None = Header(default=None)) 
 
 
 CurrentUserId = Depends(get_current_user_id)
+RequireStaff = Depends(require_staff)

@@ -76,6 +76,23 @@ export interface BlocklistEntryView {
   created_at: string;
 }
 
+export interface StaffCustomerSearchResult {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface StaffDocumentView {
+  id: string;
+  user_id: string;
+  customer_name: string;
+  title: string;
+  status: 'pending' | 'signed' | 'cancelled';
+  created_at: string;
+  signed_at: string | null;
+}
+
 export interface FraudEvaluationView {
   id: string;
   transaction_id: string;
@@ -145,5 +162,29 @@ export class StaffService {
 
   removeFromBlocklist(entryId: string): Observable<void> {
     return this.http.delete<void>(`${API_BASE_URL}/transactions/staff/blocklist/${entryId}`);
+  }
+
+  /** Documente de semnat (eSign) — support-service, prin /api/support/staff.
+   * Vezi features/staff-documents pentru pagina de personal. */
+  searchCustomers(query: string): Observable<StaffCustomerSearchResult[]> {
+    return this.http.get<StaffCustomerSearchResult[]>(`${API_BASE_URL}/support/staff/customers/search`, {
+      params: { q: query },
+    });
+  }
+
+  sendDocument(userId: string, title: string, pdfDataUri: string): Observable<StaffDocumentView> {
+    return this.http.post<StaffDocumentView>(`${API_BASE_URL}/support/staff/documents`, {
+      user_id: userId,
+      title,
+      pdf_data: pdfDataUri,
+    });
+  }
+
+  listSentDocuments(): Observable<StaffDocumentView[]> {
+    return this.http.get<StaffDocumentView[]>(`${API_BASE_URL}/support/staff/documents`);
+  }
+
+  cancelDocument(documentId: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/support/staff/documents/${documentId}`);
   }
 }
