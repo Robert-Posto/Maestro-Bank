@@ -196,6 +196,9 @@ services:
       - MONGO_URL=${MONGODB_URI_BASE}/support_db?appName=maestrobank
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      # Documente de semnat (eSign) — căutare de clienți + verificare
+      # step-up la semnare, ambele găzduite de auth-service.
+      - AUTH_SERVICE_URL=http://auth-service:8000
     volumes:
       - ./backend/services/support-service/app:/app/app
       - ./backend/services/support-service/tests:/app/tests

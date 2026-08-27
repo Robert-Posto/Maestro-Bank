@@ -2,8 +2,10 @@ import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, vie
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 import { AuthService } from '../../services/auth.service';
+import { DocumentSummary, DocumentView, DocumentsService } from '../../services/documents.service';
 import { PasskeyCredential, WebauthnService } from '../../services/webauthn.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -11,6 +13,8 @@ import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-di
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Icon } from '../../shared/components/icon/icon';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
+import { Modal } from '../../shared/components/modal/modal';
+import { StatusBadge, BadgeTone } from '../../shared/components/status-badge/status-badge';
 import { decodeJwtPayload } from '../../shared/jwt-utils';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
@@ -19,13 +23,26 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule, DatePipe, PageHeader, ActionButton, ConfirmDialog, EmptyState, Icon, LoadingSkeleton],
+  imports: [
+    FormsModule,
+    DatePipe,
+    PageHeader,
+    ActionButton,
+    ConfirmDialog,
+    EmptyState,
+    Icon,
+    LoadingSkeleton,
+    Modal,
+    StatusBadge,
+  ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
 export class Profile implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly webauthn = inject(WebauthnService);
+  private readonly documentsApi = inject(DocumentsService);
+  private readonly sanitizer = inject(DomSanitizer);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
@@ -243,6 +260,7 @@ export class Profile implements OnInit, OnDestroy {
     } else {
       this.passkeysLoading.set(false);
     }
+    this.loadDocuments();
   }
 
   private loadPasskeys(): void {
@@ -288,6 +306,130 @@ export class Profile implements OnInit, OnDestroy {
         this.toast.error(extractErrorMessage(err, 'Nu am putut revoca passkey-ul.'));
       },
     });
+  }
+
+  // --- Documente de semnat (eSign) ------------------------------------------
+
+  protected readonly documentsLoading = signal(true);
+  protected readonly documents = signal<DocumentSummary[]>([]);
+  protected readonly viewTarget = signal<DocumentView | null>(null);
+  protected readonly viewModalBusy = signal(false);
+  protected readonly signPassword = signal('');
+  protected readonly signBusy = signal(false);
+  protected readonly signBiometricBusy = signal(false);
+
+  /** La fel ca passkeyAvailable din features/cards/cards.ts — oferim
+   * opțiunea biometrică DOAR dacă browserul o suportă ȘI userul are deja
+   * cel puțin un passkey înrolat, nu doar suport teoretic. */
+  protected readonly signPasskeyAvailable = computed(() => this.passkeySupported && this.passkeys().length > 0);
+
+  /** <embed src> e context RESOURCE_URL pentru Angular — un data: URI
+   * "brut" (netratat explicit ca sigur) e respins de sanitizer înainte să
+   * ajungă în DOM, ceea ce lăsa tot conținutul modalului needarat (nu doar
+   * PDF-ul). bypassSecurityTrustResourceUrl e sigur aici — valoarea vine
+   * STRICT din propriul nostru backend (support-service), niciodată din
+   * input direct al userului. */
+  protected readonly documentViewerUrl = computed<SafeResourceUrl | null>(() => {
+    const doc = this.viewTarget();
+    return doc ? this.sanitizer.bypassSecurityTrustResourceUrl(doc.pdf_data) : null;
+  });
+
+  private loadDocuments(): void {
+    this.documentsLoading.set(true);
+    this.documentsApi.listMyDocuments().subscribe({
+      next: (documents) => {
+        this.documents.set(documents);
+        this.documentsLoading.set(false);
+      },
+      error: () => this.documentsLoading.set(false),
+    });
+  }
+
+  protected documentStatusTone(status: DocumentSummary['status']): BadgeTone {
+    if (status === 'signed') return 'success';
+    if (status === 'cancelled') return 'neutral';
+    return 'warning';
+  }
+
+  protected documentStatusLabel(status: DocumentSummary['status']): string {
+    if (status === 'signed') return 'Semnat';
+    if (status === 'cancelled') return 'Anulat';
+    return 'În așteptare';
+  }
+
+  protected openDocument(doc: DocumentSummary): void {
+    this.viewModalBusy.set(true);
+    this.signPassword.set('');
+    this.documentsApi.getDocument(doc.id).subscribe({
+      next: (full) => {
+        this.viewTarget.set(full);
+        this.viewModalBusy.set(false);
+      },
+      error: (err) => {
+        this.viewModalBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut deschide documentul.'));
+      },
+    });
+  }
+
+  protected closeDocumentModal(): void {
+    if (this.signBusy() || this.signBiometricBusy()) return;
+    this.viewTarget.set(null);
+    this.signPassword.set('');
+  }
+
+  private applySignSuccess(clearBusy: () => void): void {
+    const target = this.viewTarget();
+    clearBusy();
+    if (target) {
+      this.documents.update((list) =>
+        list.map((doc) => (doc.id === target.id ? { ...doc, status: 'signed', signed_at: new Date().toISOString() } : doc)),
+      );
+    }
+    this.viewTarget.set(null);
+    this.signPassword.set('');
+    this.toast.success('Documentul a fost semnat.');
+  }
+
+  protected submitSignWithPassword(): void {
+    const target = this.viewTarget();
+    if (!target || !this.signPassword()) {
+      this.toast.error('Introdu parola contului.');
+      return;
+    }
+
+    this.signBusy.set(true);
+    this.documentsApi.signDocument(target.id, { password: this.signPassword() }).subscribe({
+      next: () => this.applySignSuccess(() => this.signBusy.set(false)),
+      error: (err) => {
+        this.signBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'Parolă incorectă.'));
+      },
+    });
+  }
+
+  protected async submitSignWithBiometrics(): Promise<void> {
+    const target = this.viewTarget();
+    if (!target) return;
+
+    this.signBiometricBusy.set(true);
+    try {
+      const proof = await this.webauthn.getStepUpAssertion('document_sign', target.id);
+      this.documentsApi.signDocument(target.id, proof).subscribe({
+        next: () => this.applySignSuccess(() => this.signBiometricBusy.set(false)),
+        error: (err) => {
+          this.signBiometricBusy.set(false);
+          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi parola.'));
+        },
+      });
+    } catch (err) {
+      this.signBiometricBusy.set(false);
+      // Userul a anulat prompt-ul biometric (NotAllowedError) — nu e o
+      // eroare de afișat, câmpul parolei rămâne oricum disponibil mai jos.
+      if ((err as { name?: string })?.name !== 'NotAllowedError') {
+        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi parola.');
+      }
+    }
   }
 
   protected changePassword(): void {
