@@ -35,7 +35,7 @@ SERVICES: dict[str, dict[str, str | float]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
-    "deposits": {"base_url": settings.deposits_service_url, "internal_prefix": ""},
+    "deposits": {"base_url": settings.deposits_service_url, "internal_prefix": "/deposits"},
     # timeout mai mare decât restul — DeepFace (VGG-Face + detector
     # retinaface, alese pentru acuratețe pe poze reale de buletin, nu
     # pentru viteză — vezi verification-service/app/config.py) rulează pe
