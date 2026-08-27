@@ -22,9 +22,15 @@ export class Register {
   protected readonly email = signal('');
   protected readonly phoneNumber = signal('');
   protected readonly password = signal('');
+  /** Vezi login.ts — pornește mereu ascunsă, preferința nu se reține. */
+  protected readonly passwordVisible = signal(false);
   protected readonly isSubmitting = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal(false);
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
+  }
 
   submit(): void {
     this.error.set(null);

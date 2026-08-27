@@ -177,15 +177,66 @@
     <form class="profile-password-form" (ngSubmit)="changePassword()">
       <label>
         <span>Parola curentă</span>
-        <input type="password" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" name="currentPassword" />
+        <div class="profile-password-control">
+          <input
+            [type]="passwordVisible().current ? 'text' : 'password'"
+            autocomplete="current-password"
+            [ngModel]="currentPassword()"
+            (ngModelChange)="currentPassword.set($event)"
+            name="currentPassword"
+          />
+          <button
+            type="button"
+            class="profile-password-reveal"
+            [attr.aria-label]="passwordVisible().current ? 'Ascunde parola' : 'Arată parola'"
+            [attr.aria-pressed]="passwordVisible().current"
+            (click)="togglePasswordVisibility('current')"
+          >
+            <app-icon [name]="passwordVisible().current ? 'eye-off' : 'eye'" [size]="17" />
+          </button>
+        </div>
       </label>
       <label>
         <span>Parolă nouă</span>
-        <input type="password" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" name="newPassword" />
+        <div class="profile-password-control">
+          <input
+            [type]="passwordVisible().new ? 'text' : 'password'"
+            autocomplete="new-password"
+            [ngModel]="newPassword()"
+            (ngModelChange)="newPassword.set($event)"
+            name="newPassword"
+          />
+          <button
+            type="button"
+            class="profile-password-reveal"
+            [attr.aria-label]="passwordVisible().new ? 'Ascunde parola' : 'Arată parola'"
+            [attr.aria-pressed]="passwordVisible().new"
+            (click)="togglePasswordVisibility('new')"
+          >
+            <app-icon [name]="passwordVisible().new ? 'eye-off' : 'eye'" [size]="17" />
+          </button>
+        </div>
       </label>
       <label>
         <span>Confirmă parola nouă</span>
-        <input type="password" autocomplete="new-password" [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" name="confirmPassword" />
+        <div class="profile-password-control">
+          <input
+            [type]="passwordVisible().confirm ? 'text' : 'password'"
+            autocomplete="new-password"
+            [ngModel]="confirmPassword()"
+            (ngModelChange)="confirmPassword.set($event)"
+            name="confirmPassword"
+          />
+          <button
+            type="button"
+            class="profile-password-reveal"
+            [attr.aria-label]="passwordVisible().confirm ? 'Ascunde parola' : 'Arată parola'"
+            [attr.aria-pressed]="passwordVisible().confirm"
+            (click)="togglePasswordVisibility('confirm')"
+          >
+            <app-icon [name]="passwordVisible().confirm ? 'eye-off' : 'eye'" [size]="17" />
+          </button>
+        </div>
       </label>
 
       @if (passwordError()) {

@@ -53,7 +53,25 @@
 
       <label class="auth-field">
         <span>Parolă</span>
-        <input type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" autocomplete="new-password" placeholder="••••••••" />
+        <div class="auth-field__control">
+          <input
+            [type]="passwordVisible() ? 'text' : 'password'"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            name="password"
+            autocomplete="new-password"
+            placeholder="••••••••"
+          />
+          <button
+            type="button"
+            class="auth-field__reveal"
+            [attr.aria-label]="passwordVisible() ? 'Ascunde parola' : 'Arată parola'"
+            [attr.aria-pressed]="passwordVisible()"
+            (click)="togglePasswordVisibility()"
+          >
+            <app-icon [name]="passwordVisible() ? 'eye-off' : 'eye'" [size]="18" />
+          </button>
+        </div>
         <span class="auth-hint">Minimum 8 caractere, cel puțin o literă și o cifră.</span>
       </label>
 
