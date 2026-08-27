@@ -131,6 +131,42 @@
   border-color: var(--mb-blue-500);
 }
 
+/* Câmp de parolă cu buton de dezvăluire (ochiul). Wrapper-ul e necesar
+   pentru că butonul se poziționează față de input, nu față de tot
+   `.auth-field` — acela include și eticheta de deasupra, deci ochiul ar
+   fi ieșit centrat pe ea, nu pe casetă. */
+.auth-field__control {
+  position: relative;
+  display: flex;
+}
+
+.auth-field__control input {
+  flex: 1;
+  min-width: 0;
+  /* Loc pentru buton, ca textul lung să nu treacă pe sub el. */
+  padding-right: 2.75rem;
+}
+
+.auth-field__reveal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2.75rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0 var(--mb-radius-sm) var(--mb-radius-sm) 0;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  transition: color var(--mb-transition-fast);
+}
+
+.auth-field__reveal:hover {
+  color: var(--mb-text-secondary);
+}
+
 .auth-hint {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);

@@ -487,7 +487,13 @@
      pe toată lățimea mesajului, ca o bară. `align-self` îl lasă la lățimea
      conținutului, adică un buton normal. */
   align-self: flex-start;
-  margin-top: var(--mb-space-2);
+  /* Butonul stă ÎNTRE textul răspunsului și cardurile de context, deci are
+     nevoie de spațiu egal de-o parte și de alta. Deasupra există deja
+     `margin-bottom` de la `.copilot-answer` (--mb-space-5), așa că aici
+     punem 0 sus și aceeași valoare jos — altfel rezulta 28px deasupra și
+     0 dedesubt, adică butonul lipit de carduri. */
+  margin-top: 0;
+  margin-bottom: var(--mb-space-5);
   padding: 4px 10px;
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-pill);

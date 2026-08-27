@@ -21,10 +21,12 @@ class Settings:
     # construite deja pentru deposits-service, reutilizate identic aici).
     accounts_service_url: str = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-service:8000")
 
-    # Cât de des reîmprospătăm cache-ul de prețuri (16 simboluri) de la
-    # Yahoo — piața se mișcă mult mai rapid decât cursul valutar (BNR, 6h),
-    # dar tot nu are sens să batem endpoint-ul neoficial la fiecare cerere.
-    price_refresh_interval_seconds: int = int(os.getenv("PRICE_REFRESH_INTERVAL_SECONDS", str(15 * 60)))
+    # Cât de des reîmprospătăm cache-ul de prețuri (22 simboluri, catalog +
+    # indici) de la Yahoo — piața se mișcă mult mai rapid decât cursul
+    # valutar (BNR, 6h). 1 minut e cât de "live" are sens să pară un demo
+    # peste un endpoint NEOFICIAL (nu există websocket/streaming real aici;
+    # frontend-ul face polling la același interval — vezi investments.ts).
+    price_refresh_interval_seconds: int = int(os.getenv("PRICE_REFRESH_INTERVAL_SECONDS", "60"))
 
 
 settings = Settings()
