@@ -240,6 +240,35 @@ services:
     networks:
       - maestrobank-network
 
+  deposits-service:
+    build:
+      context: ./backend/services/deposits-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-deposits-service
+    restart: unless-stopped
+    ports:
+      - "8009:8000"
+    environment:
+      - MONGO_URL=${MONGODB_URI_BASE}/deposits_db?appName=maestrobank
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
+    volumes:
+      - ./backend/services/deposits-service/app:/app/app
+      - ./backend/services/deposits-service/tests:/app/tests
+      - ./backend/services/deposits-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      accounts-service:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
   # --- Verificare identitate (KYC demo) -----------------------------------
   # STATELESS — fără MONGO_URL, nu are bază proprie (vezi app/main.py).
   # Compară buletin vs. selfie cu DeepFace, apoi marchează userul verificat
