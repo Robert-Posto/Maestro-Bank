@@ -11,18 +11,33 @@
 } @else {
   <div class="investments-summary">
     <div class="investments-summary__card">
-      <span class="investments-summary__label">Valoare portofoliu</span>
-      <strong>{{ portfolioValueMinor() | money: 'USD' }}</strong>
+      <span class="investments-summary__icon investments-summary__icon--blue"><app-icon name="wallet" [size]="18" /></span>
+      <div>
+        <span class="investments-summary__label">Valoare portofoliu</span>
+        <strong>{{ portfolioValueMinor() | money: 'USD' }}</strong>
+      </div>
     </div>
     <div class="investments-summary__card">
-      <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
-      <strong class="change-text" [class.change-text--positive]="portfolioGainMinor() >= 0" [class.change-text--negative]="portfolioGainMinor() < 0">
-        {{ portfolioGainMinor() | money: 'USD' }}
-      </strong>
+      <span
+        class="investments-summary__icon"
+        [class.investments-summary__icon--green]="portfolioGainMinor() >= 0"
+        [class.investments-summary__icon--red]="portfolioGainMinor() < 0"
+      >
+        <app-icon [name]="portfolioGainMinor() >= 0 ? 'arrow-up-right' : 'arrow-down-right'" [size]="18" />
+      </span>
+      <div>
+        <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
+        <strong class="change-text" [class.change-text--positive]="portfolioGainMinor() >= 0" [class.change-text--negative]="portfolioGainMinor() < 0">
+          {{ portfolioGainMinor() | money: 'USD' }}
+        </strong>
+      </div>
     </div>
     <div class="investments-summary__card">
-      <span class="investments-summary__label">Sold disponibil (USD)</span>
-      <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
+      <span class="investments-summary__icon investments-summary__icon--navy"><app-icon name="building" [size]="18" /></span>
+      <div>
+        <span class="investments-summary__label">Sold disponibil (USD)</span>
+        <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
+      </div>
     </div>
   </div>
 
@@ -104,7 +119,13 @@
     } @else {
       @for (group of catalogGroups(); track group.label) {
         <div class="catalog-group">
-          <h3 class="catalog-group__label">{{ group.label }}</h3>
+          <div class="catalog-group__header">
+            <span class="category-pill" [class]="categoryPillClass(group.label)">
+              <app-icon [name]="categoryIcon(group.label)" [size]="13" />
+              {{ group.label }}
+            </span>
+            <span class="catalog-group__count">{{ group.items.length }} instrumente</span>
+          </div>
           <div class="instruments-grid">
             @for (instrument of group.items; track instrument.symbol) {
               <div

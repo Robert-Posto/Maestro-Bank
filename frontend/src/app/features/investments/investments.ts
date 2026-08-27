@@ -12,6 +12,7 @@ import {
   InvestmentsService,
 } from '../../services/investments.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
+import { Icon } from '../../shared/components/icon/icon';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
@@ -33,7 +34,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-investments',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, PageHeader, ActionButton, LoadingSkeleton, EmptyState, Modal, MoneyPipe],
+  imports: [FormsModule, DecimalPipe, PageHeader, Icon, ActionButton, LoadingSkeleton, EmptyState, Modal, MoneyPipe],
   templateUrl: './investments.html',
   styleUrl: './investments.css',
 })
@@ -78,6 +79,34 @@ export class Investments implements OnInit {
     }
     return groups;
   });
+
+  /** Iconiță + culoare distinctă pe categorie — doar cosmetic, ca eticheta
+   * fiecărui grup din catalog să se recunoască dintr-o privire. */
+  protected categoryIcon(label: string): 'flash' | 'building' | 'globe' | 'trending-up' {
+    switch (label) {
+      case 'Tehnologie':
+        return 'flash';
+      case 'Consum & Finanțe':
+        return 'building';
+      case 'ETF-uri':
+        return 'globe';
+      default:
+        return 'trending-up';
+    }
+  }
+
+  protected categoryPillClass(label: string): string {
+    switch (label) {
+      case 'Tehnologie':
+        return 'category-pill--blue';
+      case 'Consum & Finanțe':
+        return 'category-pill--navy';
+      case 'ETF-uri':
+        return 'category-pill--green';
+      default:
+        return 'category-pill--navy';
+    }
+  }
 
   // --- Detalii, la click (instrument SAU indice) ---------------------------
   protected readonly detailSymbol = signal<string | null>(null);

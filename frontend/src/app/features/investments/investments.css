@@ -1,23 +1,63 @@
 .investments-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--mb-space-5);
+  gap: 1px;
+  background: var(--mb-border);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(16, 24, 48, 0.04);
   margin-bottom: var(--mb-space-8);
 }
 
 .investments-summary__card {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
   background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-6);
+  padding: var(--mb-space-5);
+}
+
+.investments-summary__card > div {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-3);
+  gap: 2px;
+}
+
+.investments-summary__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.investments-summary__icon--blue {
+  color: var(--mb-blue-600);
+  background: var(--mb-blue-50);
+}
+
+.investments-summary__icon--navy {
+  color: var(--mb-text-primary);
+  background: var(--mb-blue-50);
+}
+
+.investments-summary__icon--green {
+  color: var(--mb-positive);
+  background: var(--mb-positive-bg);
+}
+
+.investments-summary__icon--red {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
 }
 
 .investments-summary__label {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
+  white-space: nowrap;
 }
 
 .investments-summary__card strong {
@@ -176,15 +216,44 @@
   margin-bottom: 0;
 }
 
-.catalog-group__label {
+.catalog-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-4);
+  padding-bottom: var(--mb-space-3);
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.catalog-group__count {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--mb-font-size-xs);
   font-weight: var(--mb-font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--mb-text-tertiary);
-  margin-bottom: var(--mb-space-4);
-  padding-bottom: var(--mb-space-2);
-  border-bottom: 1px solid var(--mb-border);
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--mb-radius-pill);
+}
+
+.category-pill--blue {
+  color: var(--mb-blue-600);
+  background: var(--mb-blue-50);
+}
+
+.category-pill--navy {
+  color: var(--mb-text-primary);
+  background: var(--mb-blue-50);
+}
+
+.category-pill--green {
+  color: var(--mb-positive);
+  background: var(--mb-positive-bg);
 }
 
 .instruments-grid {
