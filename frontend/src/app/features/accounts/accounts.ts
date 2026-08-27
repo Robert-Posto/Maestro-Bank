@@ -4,6 +4,13 @@ import { DatePipe, LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { AccountType, AccountView, BankingService, CreatableAccountType, PocketView } from '../../services/banking.service';
+import {
+  DepositCurrency,
+  DepositRateView,
+  DepositsService,
+  DepositTermMonths,
+  DepositView,
+} from '../../services/deposits.service';
 import { TransactionsService } from '../../services/transactions.service';
 import { ACCOUNT_TYPE_CATALOG, CREATABLE_ACCOUNT_TYPES } from '../../shared/account-types';
 import { PageHeader } from '../../shared/components/page-header/page-header';
@@ -19,7 +26,7 @@ import { AccountCreateEvent, AccountTypeCarousel } from '../../shared/components
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
-type Tab = 'accounts' | 'pockets';
+type Tab = 'accounts' | 'pockets' | 'deposits';
 
 /**
  * Conturi — vezi task-ul MaestroBank, secțiunea 8, extins cu deschiderea
@@ -56,6 +63,7 @@ type Tab = 'accounts' | 'pockets';
 })
 export class Accounts implements OnInit {
   private readonly banking = inject(BankingService);
+  private readonly depositsApi = inject(DepositsService);
   private readonly transactionsApi = inject(TransactionsService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
@@ -90,10 +98,11 @@ export class Accounts implements OnInit {
 
   protected readonly totalBalanceMinor = computed(() => this.accounts().reduce((sum, a) => sum + a.balance_minor, 0));
   protected readonly currentAccount = computed(() => this.accounts().find((a) => a.account_type === 'current') ?? null);
-  protected readonly setAsideMinor = computed(() =>
-    this.accounts()
-      .filter((a) => a.account_type === 'savings' || a.account_type === 'deposit')
-      .reduce((sum, a) => sum + a.balance_minor, 0),
+  protected readonly setAsideMinor = computed(
+    () =>
+      this.accounts()
+        .filter((a) => a.account_type === 'savings' || a.account_type === 'deposit')
+        .reduce((sum, a) => sum + a.balance_minor, 0) + this.lockedInRonDepositsMinor(),
   );
 
   // --- Pockets (obiective de economisire, în contul curent) ---------------
@@ -110,9 +119,40 @@ export class Accounts implements OnInit {
   protected readonly depositAmountRon = signal(50);
   protected readonly depositBusy = signal(false);
 
+  // --- Depozite la termen (RON/EUR/USD/GBP) --------------------------------
+  protected readonly termDeposits = signal<DepositView[]>([]);
+  protected readonly termDepositsLoading = signal(true);
+  protected readonly depositRates = signal<DepositRateView[]>([]);
+
+  protected readonly depositCreateModalOpen = signal(false);
+  protected readonly newDepositCurrency = signal<DepositCurrency>('RON');
+  protected readonly newDepositTerm = signal<DepositTermMonths>(12);
+  protected readonly newDepositAmount = signal(1000);
+  protected readonly newDepositRenew = signal(true);
+  protected readonly creatingTermDeposit = signal(false);
+
+  protected readonly pendingLiquidateDeposit = signal<DepositView | null>(null);
+  protected readonly liquidatingDeposit = signal(false);
+
+  protected readonly activeTermDeposits = computed(() => this.termDeposits().filter((d) => d.status === 'active'));
+
+  /** Doar depozitele RON intră în "Pus deoparte" (card RON-denominat de pe
+   * Conturi) — un depozit EUR/USD/GBP nu poate fi adunat direct la o sumă
+   * RON fără conversie, deci rămâne vizibil DOAR în tab-ul Depozite, în
+   * propria monedă. */
+  protected readonly lockedInRonDepositsMinor = computed(() =>
+    this.activeTermDeposits()
+      .filter((d) => d.currency === 'RON')
+      .reduce((sum, d) => sum + d.principal_minor, 0),
+  );
+
+  protected readonly depositTermOptions: DepositTermMonths[] = [3, 6, 12, 24];
+  protected readonly depositCurrencyOptions: DepositCurrency[] = ['RON', 'EUR', 'USD', 'GBP'];
+
   ngOnInit(): void {
     this.load();
     this.loadPockets();
+    this.loadTermDeposits();
   }
 
   private load(): void {
@@ -261,6 +301,100 @@ export class Accounts implements OnInit {
 
   protected canDelete(account: AccountView): boolean {
     return account.account_type !== 'current';
+  }
+
+  private loadTermDeposits(): void {
+    this.termDepositsLoading.set(true);
+    this.depositsApi.listRates().subscribe({
+      next: (rates) => this.depositRates.set(rates),
+      error: () => {
+        /* ratele sunt doar informative la deschidere — o eroare aici nu blochează restul tab-ului */
+      },
+    });
+    this.depositsApi.listMine().subscribe({
+      next: (deposits) => {
+        this.termDeposits.set(deposits);
+        this.termDepositsLoading.set(false);
+      },
+      error: () => this.termDepositsLoading.set(false),
+    });
+  }
+
+  protected rateFor(currency: DepositCurrency, term: DepositTermMonths): number | null {
+    const found = this.depositRates().find((r) => r.currency === currency && r.term_months === term);
+    return found?.rate_percent_annual ?? null;
+  }
+
+  protected openDepositCreateModal(): void {
+    this.newDepositCurrency.set('RON');
+    this.newDepositTerm.set(12);
+    this.newDepositAmount.set(1000);
+    this.newDepositRenew.set(true);
+    this.depositCreateModalOpen.set(true);
+  }
+
+  protected closeDepositCreateModal(): void {
+    if (this.creatingTermDeposit()) return;
+    this.depositCreateModalOpen.set(false);
+  }
+
+  protected createTermDeposit(): void {
+    const amountMinor = Math.round(this.newDepositAmount() * 100);
+    if (amountMinor <= 0) {
+      this.toast.error('Introdu o sumă validă.');
+      return;
+    }
+
+    this.creatingTermDeposit.set(true);
+    this.depositsApi
+      .open(this.newDepositCurrency(), this.newDepositTerm(), amountMinor, this.newDepositRenew())
+      .subscribe({
+        next: (deposit) => {
+          this.termDeposits.update((list) => [deposit, ...list]);
+          this.creatingTermDeposit.set(false);
+          this.depositCreateModalOpen.set(false);
+          this.toast.success('Depozit deschis cu succes.');
+        },
+        error: (err) => {
+          this.creatingTermDeposit.set(false);
+          this.toast.error(extractErrorMessage(err, 'Nu am putut deschide depozitul.'));
+        },
+      });
+  }
+
+  protected requestLiquidateDeposit(deposit: DepositView): void {
+    this.pendingLiquidateDeposit.set(deposit);
+  }
+
+  protected confirmLiquidateDeposit(): void {
+    const deposit = this.pendingLiquidateDeposit();
+    if (!deposit) return;
+
+    this.liquidatingDeposit.set(true);
+    this.depositsApi.liquidate(deposit.id).subscribe({
+      next: (updated) => {
+        this.termDeposits.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.liquidatingDeposit.set(false);
+        this.pendingLiquidateDeposit.set(null);
+        this.toast.success('Depozit lichidat — suma a revenit în cont.');
+      },
+      error: (err) => {
+        this.liquidatingDeposit.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut lichida depozitul.'));
+      },
+    });
+  }
+
+  protected depositDaysRemaining(deposit: DepositView): number {
+    const ms = new Date(deposit.matures_at).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+  }
+
+  protected depositProgressPercent(deposit: DepositView): number {
+    const total = new Date(deposit.matures_at).getTime() - new Date(deposit.opened_at).getTime();
+    const elapsed = Date.now() - new Date(deposit.opened_at).getTime();
+    if (total <= 0) return 100;
+    return Math.min(100, Math.max(0, (elapsed / total) * 100));
   }
 
   protected requestDelete(account: AccountView): void {
