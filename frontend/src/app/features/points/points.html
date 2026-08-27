@@ -1,0 +1,142 @@
+<app-page-header title="Puncte & Recompense" subtitle="Câștigi puncte la plățile către comercianți, le răscumperi pentru cashback sau le pariezi la roata norocului." />
+
+<div class="points-balance-card">
+  <span class="points-balance-card__label">Sold puncte</span>
+  @if (balanceLoading()) {
+    <app-loading-skeleton [rows]="1" [height]="40" />
+  } @else {
+    <strong class="points-balance-card__value">{{ balance() | number }}</strong>
+  }
+  <p class="points-balance-card__hint">
+    Câștigi puncte doar la plăți către comercianți (nu la transferuri către alți useri MaestroBank) — vezi ratele pe categorie mai jos.
+  </p>
+</div>
+
+<section class="points-section">
+  <h2>Rate de câștig, pe categorie</h2>
+  @if (earnRatesLoading()) {
+    <app-loading-skeleton [rows]="1" [height]="70" />
+  } @else {
+    <div class="earn-rates-row">
+      @for (category of categories; track category.value) {
+        @if (category.value !== 'income') {
+          <div class="earn-rate-chip">
+            <span class="earn-rate-chip__dot" [style.background]="'var(' + category.colorVar + ')'"></span>
+            <span class="earn-rate-chip__label">{{ category.label }}</span>
+            <span class="earn-rate-chip__rate">{{ earnRateFor(category.value) }}%</span>
+          </div>
+        }
+      }
+    </div>
+  }
+</section>
+
+<section class="points-section">
+  <h2>Recompense</h2>
+  @if (rewardsLoading()) {
+    <app-loading-skeleton [rows]="2" [height]="90" />
+  } @else if (rewards().length === 0) {
+    <app-empty-state icon="wallet" title="Niciun sold încă" description="Fă o plată la un comerciant ca să începi să câștigi puncte." />
+  } @else {
+    <div class="rewards-grid">
+      @for (reward of rewards(); track reward.id) {
+        <div class="reward-card" [class.reward-card--disabled]="!reward.affordable">
+          <p class="reward-card__title">{{ reward.title }}</p>
+          <p class="reward-card__description">{{ reward.description }}</p>
+          <div class="reward-card__footer">
+            <span class="reward-card__cost">{{ reward.cost_points | number }} puncte</span>
+            <app-action-button variant="secondary" [disabled]="!reward.affordable" (pressed)="openRedeemConfirm(reward)">
+              Răscumpără
+            </app-action-button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<section class="points-section">
+  <h2>Roata norocului</h2>
+  <p class="points-section__subtitle">
+    Alege câte puncte pariezi la o învârtire — mai multe puncte pariate înseamnă șanse mai bune la premii mai bune. Punctele pariate se scad imediat, indiferent de rezultat.
+  </p>
+
+  @if (wheelLoading()) {
+    <app-loading-skeleton [rows]="2" [height]="200" />
+  } @else {
+    <div class="wheel-panel">
+      <div class="wheel-wrap">
+        <div class="wheel-pointer" aria-hidden="true"></div>
+        <svg
+          class="wheel-svg"
+          [class.wheel-svg--spinning]="spinning()"
+          viewBox="0 0 100 100"
+          [style.transform]="'rotate(' + wheelRotationDeg() + 'deg)'"
+        >
+          @for (segment of wheelSegments(); track segment.id; let i = $index) {
+            <path [attr.d]="wedgePath(i)" [attr.fill]="segmentFill(i)" class="wheel-segment" />
+          }
+          @for (segment of wheelSegments(); track segment.id; let i = $index) {
+            <text
+              [attr.x]="labelPosition(i).x"
+              [attr.y]="labelPosition(i).y"
+              class="wheel-segment__label"
+              text-anchor="middle"
+              dominant-baseline="middle"
+            >
+              {{ segment.reward_value_minor ? (segment.reward_value_minor! / 100) + ' lei' : '—' }}
+            </text>
+          }
+        </svg>
+      </div>
+
+      <div class="wheel-controls">
+        <label class="wheel-wager">
+          <span>Puncte pariate</span>
+          <input
+            type="number"
+            min="1"
+            [max]="maxWager()"
+            [ngModel]="wagerAmount()"
+            (ngModelChange)="setWager($event)"
+            [disabled]="spinning()"
+          />
+        </label>
+        <p class="wheel-wager__hint">Sold disponibil: {{ balance() | number }} puncte</p>
+        <app-action-button
+          [fullWidth]="true"
+          [disabled]="balance() < 1 || wagerAmount() > balance()"
+          [loading]="spinning()"
+          (pressed)="spin()"
+        >
+          Rotește roata
+        </app-action-button>
+      </div>
+    </div>
+  }
+</section>
+
+@if (redeemModalReward(); as reward) {
+  <app-modal [title]="'Răscumpără ' + reward.title" (closed)="closeRedeemConfirm()">
+    <p class="reward-confirm__text">
+      Confirmi? Se scad <strong>{{ reward.cost_points | number }} puncte</strong> și primești
+      <strong>{{ reward.reward_value_minor | money: 'RON' }}</strong>, creditați direct în contul tău curent.
+    </p>
+    <app-action-button [fullWidth]="true" [loading]="redeeming()" (pressed)="confirmRedeem()">Confirmă</app-action-button>
+  </app-modal>
+}
+
+@if (spinResult(); as result) {
+  <app-modal title="Rezultatul învârtirii" (closed)="closeSpinResult()">
+    <div class="spin-result">
+      <p class="spin-result__label">{{ result.winning_label }}</p>
+      @if (result.ron_credited_minor) {
+        <p class="spin-result__prize">+{{ result.ron_credited_minor | money: 'RON' }} creditați în cont</p>
+      } @else {
+        <p class="spin-result__prize spin-result__prize--none">Mai încerci data viitoare.</p>
+      }
+      <p class="spin-result__balance">Sold rămas: {{ result.new_balance | number }} puncte</p>
+      <app-action-button [fullWidth]="true" (pressed)="closeSpinResult()">Am înțeles</app-action-button>
+    </div>
+  </app-modal>
+}

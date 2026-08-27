@@ -23,6 +23,7 @@ class Settings:
     ai_service_url: str = os.getenv("AI_SERVICE_URL", "http://ai-orchestrator-service:8000")
     deposits_service_url: str = os.getenv("DEPOSITS_SERVICE_URL", "http://deposits-service:8000")
     investments_service_url: str = os.getenv("INVESTMENTS_SERVICE_URL", "http://investments-service:8000")
+    points_service_url: str = os.getenv("POINTS_SERVICE_URL", "http://points-service:8000")
 
     cors_allowed_origins: list[str] = [
         origin.strip()

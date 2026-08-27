@@ -1,0 +1,269 @@
+.points-balance-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  margin-bottom: var(--mb-space-8);
+  box-shadow: 0 1px 3px rgba(16, 24, 48, 0.06);
+}
+
+.points-balance-card__label {
+  display: block;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+}
+
+.points-balance-card__value {
+  display: block;
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-bold);
+  color: var(--mb-blue-600);
+}
+
+.points-balance-card__hint {
+  margin-top: var(--mb-space-3);
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  max-width: 560px;
+}
+
+.points-section {
+  margin-bottom: var(--mb-space-8);
+}
+
+.points-section h2 {
+  font-size: var(--mb-font-size-base);
+  margin-bottom: var(--mb-space-2);
+}
+
+.points-section__subtitle {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+  max-width: 620px;
+}
+
+/* --- Rate pe categorie --------------------------------------------------------- */
+
+.earn-rates-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-3);
+}
+
+.earn-rate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill);
+  padding: 0.5rem 0.9rem;
+  font-size: var(--mb-font-size-sm);
+}
+
+.earn-rate-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.earn-rate-chip__label {
+  color: var(--mb-text-secondary);
+}
+
+.earn-rate-chip__rate {
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+}
+
+/* --- Recompense --------------------------------------------------------------- */
+
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--mb-space-4);
+}
+
+.reward-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.reward-card--disabled {
+  opacity: 0.55;
+}
+
+.reward-card__title {
+  font-size: var(--mb-font-size-md);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.reward-card__description {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  flex: 1;
+}
+
+.reward-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+}
+
+.reward-card__cost {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-secondary);
+}
+
+.reward-confirm__text {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-5);
+}
+
+/* --- Roata norocului ------------------------------------------------------------- */
+
+.wheel-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mb-space-8);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+}
+
+.wheel-wrap {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 18px solid var(--mb-text-primary);
+  z-index: 2;
+}
+
+.wheel-svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: var(--mb-shadow-md);
+  transition: transform 3.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wheel-segment {
+  stroke: var(--mb-surface);
+  stroke-width: 0.6;
+}
+
+.wheel-segment__label {
+  font-size: 5px;
+  font-weight: var(--mb-font-weight-semibold);
+  fill: #ffffff;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-svg {
+    transition: none;
+  }
+}
+
+.wheel-controls {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.wheel-wager {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.wheel-wager input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  min-height: 44px;
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.wheel-wager input:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.wheel-wager__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: -6px;
+}
+
+/* --- Rezultat spin -------------------------------------------------------------- */
+
+.spin-result {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.spin-result__label {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.spin-result__prize {
+  font-size: var(--mb-font-size-xl);
+  font-weight: var(--mb-font-weight-bold);
+  color: var(--mb-positive);
+}
+
+.spin-result__prize--none {
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-base);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.spin-result__balance {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-3);
+}
+
+@media (max-width: 640px) {
+  .wheel-panel {
+    justify-content: center;
+    text-align: center;
+  }
+}

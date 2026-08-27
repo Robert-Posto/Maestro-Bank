@@ -17,6 +17,11 @@ class Settings:
     # — un cont EUR/USD/GBP (sau latura RON a unui schimb, pe contul curent)
     # se mișcă prin exchange-service, nu prin tx_db.
     exchange_service_url: str = os.getenv("EXCHANGE_SERVICE_URL", "http://exchange-service:8000")
+    # Puncte de loialitate (vezi app/service.py::create_transfer, apelul
+    # best-effort către /internal/points/credit-for-transaction după un
+    # transfer FINALIZAT cu succes) — points-service decide singur
+    # eligibilitatea/rata, acest serviciu doar raportează faptele.
+    points_service_url: str = os.getenv("POINTS_SERVICE_URL", "http://points-service:8000")
 
     # Cât de des verificăm dacă există transferuri programate scadente —
     # vezi app/scheduler.py. 60s e suficient de responsiv pentru un demo

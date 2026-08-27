@@ -21,6 +21,8 @@ const NOTIFICATION_ROUTES: Record<NotificationKind, string[]> = {
   transfer_hold_cancelled: ['/app/transactions'],
   system: ['/app/overview'],
   document_sign: ['/app/profile'],
+  reward_redeemed: ['/app/points'],
+  raffle_win: ['/app/points'],
 };
 
 /** Tipuri care au un `referenceId` = id de tranzacție (vezi

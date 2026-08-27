@@ -11,7 +11,9 @@ export type NotificationKind =
   | 'transfer_hold'
   | 'transfer_hold_cancelled'
   | 'system'
-  | 'document_sign';
+  | 'document_sign'
+  | 'reward_redeemed'
+  | 'raffle_win';
 
 export interface AppNotification {
   id: string;

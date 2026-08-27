@@ -462,6 +462,13 @@ async def create_transfer(
                 insert_result.inserted_id,
             )
 
+        # Puncte de loialitate — DOAR pentru plăți către un cont fără user
+        # MaestroBank real (to_name is None), niciodată pentru transferuri
+        # între useri reali. Best-effort, ca mai sus.
+        await _credit_points_for_transaction(
+            user_id, payload.category, payload.amount_minor, is_merchant_payment=to_name is None
+        )
+
     final_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
     view = to_transaction_view(final_doc, viewer_account_id=source["id"])
 
@@ -523,6 +530,31 @@ async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | N
             )
     except httpx.HTTPError:
         logger.warning("transactions-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
+
+
+async def _credit_points_for_transaction(user_id: str, category: str, amount_minor: int, is_merchant_payment: bool) -> None:
+    """Raportează un transfer FINALIZAT către points-service, best-effort —
+    la fel ca _notify_user, un eșec aici NU strică transferul deja executat.
+    points-service decide singur eligibilitatea/rata (vezi
+    points-service/app/earn_rates.py) — aici doar raportăm faptele brute.
+
+    `is_merchant_payment` = to_name is None — semnalul deja folosit în acest
+    fișier pentru "plată către un cont fără user MaestroBank real atașat"
+    (vezi TransactionOut.counterparty_name). Un transfer către alt user
+    MaestroBank real NU dă niciodată puncte, indiferent de categorie/sumă."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{settings.points_service_url}/internal/points/credit-for-transaction",
+                json={
+                    "user_id": user_id,
+                    "category": category,
+                    "amount_minor": amount_minor,
+                    "is_merchant_payment": is_merchant_payment,
+                },
+            )
+    except httpx.HTTPError:
+        logger.warning("transactions-service: raportare puncte eșuată (user_id=%s)", user_id)
 
 
 # --- Transferuri programate/recurente ---------------------------------------
