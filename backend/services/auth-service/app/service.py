@@ -8,6 +8,7 @@ singurul care cheamă alte servicii (accounts-service, la provisioning).
 
 import asyncio
 import logging
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -347,6 +348,37 @@ async def get_user_contact(user_id: str) -> dict:
         "email": user["email"],
         "phone_number": user.get("phone_number"),
     }
+
+
+_USER_SEARCH_LIMIT = 20
+
+
+async def search_users(query: str) -> list[dict]:
+    """Rută INTERNĂ, DOAR pentru personal (support-service — trimitere
+    documente de semnat). Singura căutare „de la zero" (nume/email parțial)
+    din tot backend-ul — restul rutelor interne presupun un user_id deja
+    cunoscut. Regex case-insensitive, NU un index de text dedicat — volumul
+    de useri al acestui demo nu justifică unul, iar `limit` ține răspunsul
+    mic indiferent de câți useri s-ar potrivi."""
+    db = get_database()
+    trimmed = query.strip()
+    if not trimmed:
+        return []
+
+    pattern = {"$regex": re.escape(trimmed), "$options": "i"}
+    cursor = db.users.find(
+        {"$or": [{"email": pattern}, {"first_name": pattern}, {"last_name": pattern}]}
+    ).limit(_USER_SEARCH_LIMIT)
+
+    return [
+        {
+            "id": str(user["_id"]),
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
+            "email": user["email"],
+        }
+        async for user in cursor
+    ]
 
 
 async def get_security_facts(user_id: str) -> dict:

@@ -177,6 +177,19 @@ class InternalUserContactView(BaseModel):
     phone_number: str | None = None
 
 
+class InternalUserSearchResult(BaseModel):
+    """Vedere DOAR pentru personal (support-service — trimitere documente de
+    semnat, vezi planul fazei) — căutare de la zero (nume/email), spre
+    deosebire de InternalUserContactView, care presupune un user_id deja
+    cunoscut. Include `id` explicit, ca apelantul să poată alege UN rezultat
+    dintr-o listă."""
+
+    id: str
+    first_name: str
+    last_name: str
+    email: str
+
+
 class InternalPasswordVerifyRequest(BaseModel):
     """Folosit de accounts-service pentru a confirma parola userului curent
     înainte de a dezvălui datele complete ale unui card (PAN + CVV) —

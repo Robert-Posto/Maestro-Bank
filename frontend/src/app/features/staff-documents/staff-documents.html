@@ -1,0 +1,109 @@
+<app-page-header title="Documente de semnat" subtitle="Trimite documente (PDF) clienților pentru semnare virtuală — vezi statusul mai jos.">
+  <app-action-button variant="secondary" (pressed)="load()">
+    <app-icon name="reload" [size]="16" /> Reîmprospătează
+  </app-action-button>
+  <app-action-button variant="primary" (pressed)="openSend()">
+    <app-icon name="plus" [size]="16" /> Trimite document
+  </app-action-button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="64" [gap]="12" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca documentele" [description]="error()!" />
+} @else if (documents().length === 0) {
+  <app-empty-state icon="receipt" title="Niciun document trimis" description="Trimite primul document unui client pentru semnare virtuală." />
+} @else {
+  <div class="documents-list">
+    @for (doc of documents(); track doc.id) {
+      <div class="document-row">
+        <div class="document-row__main">
+          <app-icon name="receipt" [size]="18" />
+          <div>
+            <p class="document-row__title">{{ doc.title }}</p>
+            <p class="document-row__customer">{{ doc.customer_name }}</p>
+          </div>
+        </div>
+
+        <div class="document-row__meta">
+          <app-status-badge [status]="doc.status" [toneOverride]="statusTone(doc.status)" [labelOverride]="statusLabel(doc.status)" />
+          <span class="document-row__date">{{ doc.created_at | date: 'dd MMM yyyy, HH:mm' }}</span>
+        </div>
+
+        @if (doc.status === 'pending') {
+          <app-action-button variant="danger" (pressed)="askCancel(doc)">
+            <app-icon name="close" [size]="15" /> Anulează
+          </app-action-button>
+        }
+      </div>
+    }
+  </div>
+}
+
+@if (sendOpen()) {
+  <app-modal title="Trimite document" [maxWidth]="480" (closed)="closeSend()">
+    <form class="send-form" (ngSubmit)="submitSend()">
+      <label class="send-form__field">
+        <span>Client</span>
+        <input
+          type="text"
+          name="customerQuery"
+          [ngModel]="customerQuery()"
+          (ngModelChange)="onCustomerQueryChange($event)"
+          placeholder="Nume sau email..."
+          autocomplete="off"
+        />
+        @if (customerResults().length > 0) {
+          <ul class="send-form__results">
+            @for (customer of customerResults(); track customer.id) {
+              <li (click)="selectCustomer(customer)">
+                <span class="send-form__result-name">{{ customer.first_name }} {{ customer.last_name }}</span>
+                <span class="send-form__result-email">{{ customer.email }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </label>
+
+      <label class="send-form__field">
+        <span>Titlu document</span>
+        <input
+          type="text"
+          name="title"
+          [ngModel]="titleInput()"
+          (ngModelChange)="titleInput.set($event)"
+          placeholder="Ex: Contract de credit"
+        />
+      </label>
+
+      <label class="send-form__field">
+        <span>Fișier PDF (max 5MB)</span>
+        <input type="file" name="pdfFile" accept="application/pdf" (change)="onFileSelected($event)" />
+        @if (fileName()) {
+          <span class="send-form__filename"><app-icon name="check" [size]="13" /> {{ fileName() }}</span>
+        }
+      </label>
+
+      @if (sendError()) {
+        <p class="send-form__error">{{ sendError() }}</p>
+      }
+
+      <div class="send-form__actions">
+        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeSend()">Anulează</app-action-button>
+        <app-action-button type="submit" variant="primary" [loading]="saving()">Trimite</app-action-button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+@if (pendingCancel(); as doc) {
+  <app-confirm-dialog
+    title="Anulezi documentul?"
+    [message]="'Clientul (' + doc.customer_name + ') nu va mai putea semna \'' + doc.title + '\'.'"
+    confirmLabel="Anulează documentul"
+    [danger]="true"
+    [loading]="cancelling()"
+    (confirmed)="confirmCancel()"
+    (cancelled)="cancelDialogClose()"
+  />
+}

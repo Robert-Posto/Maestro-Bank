@@ -10,7 +10,8 @@ export type NotificationKind =
   | 'transfer_received'
   | 'transfer_hold'
   | 'transfer_hold_cancelled'
-  | 'system';
+  | 'system'
+  | 'document_sign';
 
 export interface AppNotification {
   id: string;

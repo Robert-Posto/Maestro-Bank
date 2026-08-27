@@ -5,6 +5,9 @@ class Settings:
     mongo_url: str = os.getenv("MONGO_URL", "mongodb://localhost:27017/support_db")
     jwt_secret: str = os.getenv("JWT_SECRET", "change-me-in-development")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    # Documente de semnat (eSign) — căutare de clienți + verificare step-up
+    # la semnare, ambele găzduite de auth-service.
+    auth_service_url: str = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
 
 
 settings = Settings()
