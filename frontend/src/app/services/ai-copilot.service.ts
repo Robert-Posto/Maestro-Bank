@@ -66,6 +66,7 @@ export interface SpendingForecastResponse {
   answer: string;
   affordable: boolean | null;
   requested_amount_minor: number | null;
+  conversation_id: string;
   analysis: SpendingForecastAnalysis;
   recurring_payments: SpendingForecastRecurringPayments;
   estimated_expenses: SpendingForecastEstimatedExpenses;
@@ -88,12 +89,25 @@ export interface ConfirmActionResponse {
   budget: Record<string, unknown> | null;
 }
 
-/** Un mesaj anterior din conversație, trimis înapoi la backend cu fiecare
- * cerere nouă — serviciul e stateless între cereri HTTP, dar conversația
- * rămâne coerentă pentru că istoricul recent e retrimis mereu. */
-export interface ChatHistoryMessage {
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+export interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
+  response: SpendingForecastResponse | null;
+  created_at: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ConversationMessage[];
 }
 
 /**
@@ -106,8 +120,23 @@ export interface ChatHistoryMessage {
 export class AiCopilotService {
   constructor(private readonly http: HttpClient) {}
 
-  sendMessage(message: string, history: ChatHistoryMessage[] = []): Observable<SpendingForecastResponse> {
-    return this.http.post<SpendingForecastResponse>(`${API_BASE_URL}/ai/spending-forecast/chat`, { message, history });
+  sendMessage(message: string, conversationId: string | null): Observable<SpendingForecastResponse> {
+    return this.http.post<SpendingForecastResponse>(`${API_BASE_URL}/ai/spending-forecast/chat`, {
+      message,
+      conversation_id: conversationId,
+    });
+  }
+
+  listConversations(): Observable<ConversationSummary[]> {
+    return this.http.get<ConversationSummary[]>(`${API_BASE_URL}/ai/spending-forecast/conversations`);
+  }
+
+  getConversation(id: string): Observable<ConversationDetail> {
+    return this.http.get<ConversationDetail>(`${API_BASE_URL}/ai/spending-forecast/conversations/${id}`);
+  }
+
+  deleteConversation(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/ai/spending-forecast/conversations/${id}`);
   }
 
   /** Execută REAL o acțiune de buget propusă anterior — apelată STRICT

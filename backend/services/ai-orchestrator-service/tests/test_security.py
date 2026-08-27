@@ -9,11 +9,14 @@ Rulare (din interiorul containerului ai-orchestrator-service):
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.security import get_current_user_id
 from app.services.moderation_service import REPHRASE_REQUEST_ANSWER
 from app.tools import support_accounts_tools
+from tests.conftest import make_token
 
 pytestmark = pytest.mark.asyncio
 
@@ -91,3 +94,22 @@ async def test_tools_never_send_user_id_only_forward_authorization(monkeypatch, 
     assert captured["authorization"] == support_auth_header["Authorization"]
     assert "user_id" not in captured["kwargs"]
     assert "user_id" not in captured["path"]
+
+
+async def test_get_current_user_id_returns_sub_claim():
+    user_id = "68a0f0f0f0f0f0f0f0f0f0f0"
+    token = make_token(user_id)
+    result = await get_current_user_id(authorization=f"Bearer {token}")
+    assert result == user_id
+
+
+async def test_get_current_user_id_rejects_missing_header():
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user_id(authorization=None)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_id_rejects_invalid_token():
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user_id(authorization="Bearer not-a-real-token")
+    assert exc_info.value.status_code == 401

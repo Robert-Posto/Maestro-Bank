@@ -31,7 +31,7 @@ docker compose exec -e MONGO_URL=mongodb://mongodb:27017/<db_name>_test <service
 
 Single test: append `::test_name` (or `::TestClass::test_name`) to the pytest invocation, e.g. `python -m pytest -q tests/test_auth.py::test_login_valid`.
 
-Service → db_name: `auth-service`→`auth_db`, `accounts-service`→`accounts_db`, `transactions-service`→`tx_db`, `budgets-service`→`budgets_db`, `support-service`→`support_db`, `exchange-service`→`exchange_db`. Test deps aren't baked into the image (keeps it lean); reinstall after every container recreate.
+Service → db_name: `auth-service`→`auth_db`, `accounts-service`→`accounts_db`, `transactions-service`→`tx_db`, `budgets-service`→`budgets_db`, `support-service`→`support_db`, `exchange-service`→`exchange_db`, `ai-orchestrator-service`→`ai_orchestrator_db`. Test deps aren't baked into the image (keeps it lean); reinstall after every container recreate.
 
 ### Frontend
 
@@ -54,16 +54,17 @@ No linter is configured on either side (no ESLint, no ruff/black) — only Prett
 ```
 Angular (4200) → Nginx (8080, reverse proxy) → API Gateway (8000: routing, JWT, CORS, rate limiting)
                                                         │
-        ┌───────────┬──────────────┬─────────────┬─────────────┬──────────────┬───────────────┬──────────────────┐
-        ▼           ▼              ▼             ▼             ▼              ▼               ▼                  ▼
-  auth-service  accounts-service  transactions  budgets       support       exchange     verification      ai-orchestrator
-    (8001)         (8002)        -service(8003) -service(8004) -service(8005) -service(8006)  -service(8007)  -service(8008)
-     auth_db       accounts_db       tx_db       budgets_db    support_db    exchange_db    (stateless)        (stateless)
+    ┌────────┬──────────┬────────────┬─────────┬─────────┬─────────┬────────────┬──────────────┬──────────┬──────────────┐
+    ▼        ▼          ▼            ▼         ▼         ▼         ▼            ▼              ▼          ▼
+  auth   accounts  transactions  budgets   support  exchange  verification  ai-orchestrator  deposits  investments
+ (8001)   (8002)    -service      -service  -service  -service   -service       -service       -service   -service
+          -service   (8003)       (8004)    (8005)    (8006)      (8007)         (8008)         (8009)     (8010)
+ auth_db  accounts_db  tx_db   budgets_db support_db exchange_db (stateless) ai_orchestrator_db deposits_db investments_db
 ```
 
-All services share **one MongoDB instance**, each with its **own database** — no service ever reads another's database directly. Cross-service data needs go through that service's HTTP API. `verification-service` and `ai-orchestrator-service` are stateless (no `MONGO_URL`, no `database.py`) — the former compares two images (ID photo + selfie) and discards them immediately after, the latter never touches MongoDB, calling the other services through the Gateway exactly like an external client (Angular), with the current user's JWT propagated.
+All services share **one MongoDB instance**, each with its **own database** — no service ever reads another's database directly. Cross-service data needs go through that service's HTTP API. `verification-service` is fully stateless (no `MONGO_URL`, no `database.py`), comparing two images (ID photo + selfie) and discarding them immediately after. `ai-orchestrator-service` now has a `database.py` for storing conversation history (see "MaestroAgent + Support Agent" below), but financial/account data still comes exclusively through the Gateway, exactly like an external client (Angular), with the current user's JWT propagated. `deposits-service` (term deposits) and `investments-service` (a demo brokerage catalog) are the two newest services — teammate-built, not yet covered in depth below; treat their own code/tests as the source of truth until this file catches up.
 
-### Per-service internal structure (identical across the 6 stateful FastAPI services)
+### Per-service internal structure (identical across the stateful FastAPI services)
 
 ```
 app/
@@ -76,7 +77,7 @@ app/
 └── service.py   # ALL business logic + the only place that touches the database directly
 ```
 
-`verification-service` and `ai-orchestrator-service` follow the same `routers/`+`service.py` split but skip `database.py` (nothing to connect to).
+`verification-service` follows the same `routers/`+`service.py` split but skips `database.py` (nothing to connect to). `ai-orchestrator-service` now includes `database.py` for conversation history persistence.
 
 `routers/*.py` never touches the database directly. Routes under `routers/internal.py` (`/internal/*`) are service-to-service only — the Gateway hard-blocks any path starting with `internal/` at the proxy layer (`backend/gateway/app/routers/proxy.py::_forward`), so they're unreachable from the browser regardless of auth. This is how services call each other (e.g. accounts-service → auth-service `/internal/auth/verify-password` and `/internal/auth/verify-webauthn`; auth-service → accounts-service `/internal/accounts/provision` at registration).
 
@@ -107,13 +108,17 @@ Money is always `*_minor` integers (cents/bani) end-to-end, both backend and fro
 
 `exchange-service` fetches the official daily rate from BNR's public XML feed (`app/bnr_rates.py`), refreshed on a fixed interval (`RATES_REFRESH_INTERVAL_SECONDS`, default 6h) with a static fallback if BNR is unreachable. Spread/commission on top of the mid-rate are simulated MaestroBank policy (no real bank publishes its own spread either way). Execution (`POST /exchange/execute`) is real — it calls `accounts-service`'s `/internal/accounts/exchange` to debit the source currency account and credit the destination one, same conditional-atomic-debit-plus-credit pattern as a normal transfer (see below), just with two different amounts (applied rate) instead of one.
 
+### MaestroAgent + Support Agent (AI, `ai-orchestrator-service`)
+
+Two agents over Azure OpenAI (GPT-5-mini), both stateless in their own reasoning (`app/agents/*.py`, `app/services/support_service.py` untouched by persistence) but now with real conversation history: `app/database.py`/`app/services/conversation_service.py` give the service its own `ai_orchestrator_db`, one `conversations` collection shared by both agents (`agent` field distinguishes them), messages embedded per document. `POST /spending-forecast/chat` and `POST /support` take a `conversation_id` (server loads/saves history from Mongo) instead of client-sent history; `GET/DELETE .../conversations[/{id}]` list/fetch/delete past conversations, all scoped to the JWT's `user_id` (never trusted from the client), 404 (not 403) on someone else's conversation. MaestroAgent does RAG + deterministic forecast/affordability + propose-not-execute for budgets; Support Agent answers account/card/transaction/ticket questions + propose-not-execute for a new support ticket. Both frontend pages surface a "Conversații" dropdown (list/switch/delete/new) in the chat header, next to the agent's identity — not a permanent side panel.
+
 ### Financial Guardian (LLM explanations for fraud holds)
 
 Lives in `transactions-service/app/guardian/` — when the deterministic fraud engine (18 fixed rules, see `app/fraud/catalogue.py`) holds a transfer for review, Guardian generates an async, separate LLM call (Azure OpenAI) explaining *why* in plain language for staff, plus a discreet phrase for the customer. It never decides whether to hold a transfer — that's 100% deterministic already; Guardian only explains a decision already made. Falls back to a static template if Azure OpenAI isn't configured or the call fails.
 
 ### Content screening (transfer descriptions)
 
-`transactions-service/app/content_screening.py` — a deliberately deterministic, keyword-based screen (not an LLM) for terrorism/violence/illegal-activity terms in a transfer's description, several hundred roots in RO+EN across ~14 categories, leetspeak-resilient normalization. Warns only — never blocks the transfer. Kept separate from both the fraud engine (not an 19th rule) and Guardian (no LLM judgment call here, same philosophy as the profanity filter in `ai-orchestrator-service`'s Support Agent).
+`transactions-service/app/content_screening.py` — a deliberately deterministic, keyword-based screen (not an LLM) for terrorism/violence/illegal-activity terms in a transfer's description, several hundred roots in RO+EN across ~14 categories, leetspeak-resilient normalization. Warns only for a normal transfer (never blocks) — a payment REQUEST is stricter and blocks creation outright, since a request link is more like a public announcement than a private, already-consumed transaction. Kept separate from both the fraud engine (not a 19th rule) and Guardian (no LLM judgment call here, same philosophy as the profanity filter in `ai-orchestrator-service`'s Support Agent).
 
 ### Account statement (PDF)
 
@@ -121,11 +126,11 @@ Lives in `transactions-service/app/guardian/` — when the deterministic fraud e
 
 ### Subscription detection (passive, from transaction history)
 
-`budgets-service`'s `detect_recurring_payments()` calls a new internal endpoint (`transactions-service`'s `GET /internal/transactions/by-user/{user_id}`) to fetch a user's raw history, groups outgoing completed transactions by description, and flags groups with 2+ occurrences, near-identical amount (±10%), and a real monthly cadence (every consecutive gap between 20-40 days) as suggestions (`GET /budgets/subscriptions/suggestions`) — never auto-created, the user confirms explicitly. Deterministic heuristic, not ML, same philosophy as content screening.
+`budgets-service`'s `detect_recurring_payments()` calls an internal endpoint (`transactions-service`'s `GET /internal/transactions/by-user/{user_id}`) to fetch a user's raw history, groups outgoing completed transactions by description, and flags groups with 2+ occurrences, near-identical amount (±10%), and a real monthly cadence (every consecutive gap between 20-40 days) as suggestions (`GET /budgets/subscriptions/suggestions`) — never auto-created, the user confirms explicitly. Deterministic heuristic, not ML, same philosophy as content screening.
 
 ### Staff/admin console (`/admin`, separate from `/app/*`)
 
-A `role="staff"` account (created only via `scripts/create_staff_user.py`, never through public registration) never reaches `/app/*` — both `authGuard`/`guestGuard` (frontend) and each backend service's own `require_staff` dependency redirect/reject it. Staff get a visually distinct shell (`AdminShell`, navy+amber, deliberately different from the customer app) at `/admin`, where they review fraud holds (approve/reject, see the Guardian explanation) and can open a read-only view of a specific customer's accounts/transactions, reached from a hold.
+A `role="staff"` account (created only via `scripts/create_staff_user.py`, never through public registration) never reaches `/app/*` — both `authGuard`/`guestGuard` (frontend) and each backend service's own `require_staff` dependency redirect/reject it. Staff get a visually distinct shell (`AdminShell`, navy+amber, deliberately different from the customer app) at `/admin`, where they review fraud holds (approve/reject, see the Guardian explanation, hover a fired rule code for a plain-language tooltip) and can open a read-only view of a specific customer's accounts/transactions (click a transaction for full details), reached from a hold.
 
 ## Frontend
 
@@ -148,3 +153,4 @@ Angular 22, **standalone components + signals** (no NgModules, no RxJS state sto
 - No RabbitMQ — scheduled transfers and fraud-hold expiry run through in-process `asyncio` loops (`transactions-service/app/scheduler.py`), started/stopped in `main.py`'s lifespan. Deliberate simplification for a single-worker demo, documented in the code itself, not a gap waiting to be filled.
 - Card security toggles (freeze, online/contactless/ATM/international payments, daily limit) persist real values and the UI reflects them correctly, but **nothing enforces them** — there's no "pay with card at a merchant" flow in this app (money only moves via IBAN-to-IBAN transfer), so there's no point in the code where these settings could even be checked. Change PIN, Transaction alerts and Payment confirmation (Cards → Security settings) are fully implemented and server-enforced (see `accounts-service`'s `change_card_pin`/`get_account_card_settings` and `transactions-service`'s `create_transfer` PIN-confirmation step, gated by `payment_confirmation_required`) — no longer placeholders.
 - Content screening (`content_screening.py`) and subscription detection (`budgets-service::detect_recurring_payments`) are both intentionally deterministic/heuristic, not ML — see their own sections above for why.
+- Conversation history (`ai_orchestrator_db`) has no retention policy or size cap on a single conversation — fine for a demo, would need one before this went anywhere real.

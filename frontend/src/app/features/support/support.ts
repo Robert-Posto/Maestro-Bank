@@ -1,18 +1,20 @@
-import { Component, ElementRef, OnDestroy, OnInit, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
+import { DatePipe } from '@angular/common';
+
 import {
-  AiChatMessage as AiHistoryMessage,
   AiPendingAction,
   AiRecommendedAction,
   AiSupportService,
+  ConversationDetail,
+  ConversationSummary,
 } from '../../services/ai-support.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
 import { ACCOUNT_TYPE_CATALOG } from '../../shared/account-types';
-import { SUPPORT_CHAT_STORAGE_KEY } from '../../core/storage-keys';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
@@ -68,6 +70,18 @@ const FAQ_ITEMS = [
   { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
 ];
 
+/** Cuvinte care se rotesc cât timp agentul lucrează — vezi
+ * copilot.ts::THINKING_WORDS, același concept (jocuri de cuvinte, stil
+ * Claude), listă proprie pentru Support Agent. */
+const THINKING_WORDS = [
+  'Maestroing',
+  'Detectivind',
+  'Răscolind',
+  'Percolând',
+  'Investigând',
+  'Chibzuind',
+];
+
 interface ChatMessage {
   id: number;
   role: 'support' | 'user';
@@ -84,39 +98,6 @@ function formatChatTime(date: Date): string {
   return date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Conversația se ține minte între vizite (refresh, navigare și înapoi) —
-// persistată în `sessionStorage` (ca JWT-ul, vezi AuthService), NU
-// `localStorage`: dispare la închiderea tab-ului, nu rămâne pe disc la
-// nesfârșit. Ștearsă explicit la logout (vezi AuthService.logout()), ca
-// userul următor de pe același tab să nu vadă conversația celui dinainte.
-// Backend-ul e tot stateless — istoricul persistat AICI e cel retrimis la
-// fiecare mesaj (vezi askAgent), plafonat server-side oricum (vezi
-// app/agents/support.py::_MAX_HISTORY_MESSAGES). Cap generos, DOAR pentru
-// spațiul de stocare local (transcriptul vizibil poate fi mai lung decât
-// ce se retrimite efectiv ca `history`).
-const _MAX_PERSISTED_MESSAGES = 100;
-
-function loadPersistedMessages(): ChatMessage[] {
-  try {
-    const raw = sessionStorage.getItem(SUPPORT_CHAT_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ChatMessage[]) : [];
-  } catch {
-    // Date corupte/format vechi — pornim curat, nu blocăm pagina.
-    return [];
-  }
-}
-
-function persistMessages(messages: ChatMessage[]): void {
-  try {
-    sessionStorage.setItem(SUPPORT_CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-_MAX_PERSISTED_MESSAGES)));
-  } catch {
-    // sessionStorage plin/indisponibil (mod privat etc.) — chat-ul tot
-    // funcționează în pagina curentă, doar nu supraviețuiește unui refresh.
-  }
-}
-
 /**
  * Support — chat live cu Support Agent (ai-orchestrator-service, prin
  * Gateway — vezi services/ai-support.service.ts). Vizual, aceeași familie
@@ -131,7 +112,7 @@ function persistMessages(messages: ChatMessage[]): void {
 @Component({
   selector: 'app-support',
   standalone: true,
-  imports: [FormsModule, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow],
+  imports: [FormsModule, DatePipe, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow],
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
@@ -143,6 +124,7 @@ export class Support implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
+  private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
   protected readonly faqItems = FAQ_ITEMS;
 
@@ -158,13 +140,25 @@ export class Support implements OnInit, OnDestroy {
    * (vezi timeout-ul de pe backend, app/llm/azure_openai.py) — ca userul
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly supportTypingSlow = signal(false);
+  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
+  private thinkingWordTimer?: ReturnType<typeof setInterval>;
   private readonly pendingAction = signal<AiPendingAction | null>(null);
-  /** Reia conversația din `sessionStorage`, dacă există (vezi
-   * loadPersistedMessages mai sus) — gol doar la prima vizită din tab-ul
-   * ăsta, caz în care arată ecranul de bun-venit cu sugestii, nu un mesaj
-   * seedat static (ca MaestroAssistent — vezi features/copilot/copilot.ts). */
-  protected readonly chatMessages = signal<ChatMessage[]>(loadPersistedMessages());
+  /** Gol doar la prima vizită/conversație nouă — caz în care arată ecranul
+   * de bun-venit cu sugestii, nu un mesaj seedat static (ca MaestroAssistent
+   * — vezi features/copilot/copilot.ts). */
+  protected readonly chatMessages = signal<ChatMessage[]>([]);
+  protected readonly conversations = signal<ConversationSummary[]>([]);
+  protected readonly activeConversationId = signal<string | null>(null);
+  protected readonly conversationsMenuOpen = signal(false);
+
+  /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
+   * Copilot::activeConversationTitle, același comportament. */
+  protected readonly activeConversationTitle = computed(() => {
+    const id = this.activeConversationId();
+    if (!id) return 'Conversație nouă';
+    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+  });
 
   constructor() {
     effect(() => {
@@ -173,16 +167,10 @@ export class Support implements OnInit, OnDestroy {
       const el = this.messagesEl()?.nativeElement;
       if (el) queueMicrotask(() => (el.scrollTop = el.scrollHeight));
     });
-
-    // Persistă conversația la fiecare schimbare — separat de efectul de
-    // mai sus (ăla mai reacționează și la `supportTyping`, ceea ce ar
-    // însemna scrieri inutile în sessionStorage la fiecare tick de "scrie...").
-    effect(() => {
-      persistMessages(this.chatMessages());
-    });
   }
 
   ngOnInit(): void {
+    this.loadConversations();
     const shouldOpen = this.route.snapshot.queryParamMap.get('newTicket') === '1';
     const presetCategory = this.route.snapshot.queryParamMap.get('category') as TicketCategory | null;
     if (presetCategory) this.category.set(presetCategory);
@@ -193,6 +181,73 @@ export class Support implements OnInit, OnDestroy {
     // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
     // plecat de pe pagină — vezi Copilot::ngOnDestroy, același motiv.
     this.speech.stopSpeaking();
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  private loadConversations(): void {
+    this.aiSupport.listConversations().subscribe({
+      next: (list) => this.conversations.set(list),
+    });
+  }
+
+  protected toggleConversationsMenu(): void {
+    this.conversationsMenuOpen.update((open) => !open);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.conversationsMenuOpen()) return;
+    const menu = this.conversationsMenuEl()?.nativeElement;
+    if (menu && !menu.contains(event.target as Node)) {
+      this.conversationsMenuOpen.set(false);
+    }
+  }
+
+  protected startNewConversation(): void {
+    this.conversationsMenuOpen.set(false);
+    this.activeConversationId.set(null);
+    this.pendingAction.set(null);
+    this.chatMessages.set([]);
+  }
+
+  protected openConversation(id: string): void {
+    this.conversationsMenuOpen.set(false);
+    if (id === this.activeConversationId()) return;
+    this.aiSupport.getConversation(id).subscribe({
+      next: (detail: ConversationDetail) => {
+        this.activeConversationId.set(detail.id);
+        this.pendingAction.set(null);
+        this.chatMessages.set(
+          detail.messages.map((m, index) => {
+            const response = m.response;
+            const context = response?.context as ChatContext | undefined;
+            return {
+              id: index,
+              role: m.role === 'assistant' ? 'support' : 'user',
+              text: m.content,
+              time: formatChatTime(new Date(m.created_at)),
+              context: context && Object.keys(context).length > 0 ? context : undefined,
+              recommendedActions:
+                response?.recommended_actions && response.recommended_actions.length > 0
+                  ? response.recommended_actions
+                  : undefined,
+            };
+          }),
+        );
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut încărca conversația.')),
+    });
+  }
+
+  protected deleteConversation(event: Event, id: string): void {
+    event.stopPropagation();
+    this.aiSupport.deleteConversation(id).subscribe({
+      next: () => {
+        this.conversations.update((list) => list.filter((c) => c.id !== id));
+        if (this.activeConversationId() === id) this.startNewConversation();
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut șterge conversația.')),
+    });
   }
 
   protected openModal(): void {
@@ -256,10 +311,6 @@ export class Support implements OnInit, OnDestroy {
   private askAgent(text: string): void {
     if (!text || this.supportTyping()) return;
 
-    const history: AiHistoryMessage[] = this.chatMessages().map((m) => ({
-      role: m.role === 'support' ? 'assistant' : 'user',
-      content: m.text,
-    }));
     const pending = this.pendingAction();
     this.pendingAction.set(null);
 
@@ -272,10 +323,15 @@ export class Support implements OnInit, OnDestroy {
     // Majoritatea răspunsurilor vin în 10-20s (tool-calling GPT-5-mini) —
     // dacă trece mai mult, arătăm un indiciu, ca să nu pară că s-a blocat.
     this.slowTimer = setTimeout(() => this.supportTypingSlow.set(true), 15_000);
+    this.startThinkingWords();
 
-    this.aiSupport.chat({ message: text, history, pending_action: pending }).subscribe({
+    this.aiSupport.chat({ message: text, conversation_id: this.activeConversationId(), pending_action: pending }).subscribe({
       next: (response) => {
         this.stopTyping();
+        if (!this.activeConversationId()) {
+          this.activeConversationId.set(response.conversation_id);
+          this.loadConversations();
+        }
         const context = response.context as ChatContext | undefined;
         this.chatMessages.update((messages) => [
           ...messages,
@@ -304,6 +360,18 @@ export class Support implements OnInit, OnDestroy {
     this.supportTyping.set(false);
     this.supportTypingSlow.set(false);
     clearTimeout(this.slowTimer);
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  /** Vezi Copilot::startThinkingWords, același comportament. */
+  private startThinkingWords(): void {
+    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    this.thinkingWordTimer = setInterval(() => {
+      this.thinkingWord.update((current) => {
+        const options = THINKING_WORDS.filter((w) => w !== current);
+        return options[Math.floor(Math.random() * options.length)];
+      });
+    }, 1800);
   }
 
   /** Eticheta reală a unui tip de cont (ex. "Cont de economii") — REFOLOSEȘTE

@@ -5,8 +5,34 @@ import { DatePipe } from '@angular/common';
 
 import { AuthService } from '../../../services/auth.service';
 import { ThemeService } from '../../../services/theme.service';
-import { AppNotification, NotificationsService } from '../notifications/notifications.service';
+import { AppNotification, NotificationKind, NotificationsService } from '../notifications/notifications.service';
 import { Icon } from '../icon/icon';
+
+/** Unde duce click-ul pe o notificare, după tipul ei — vezi
+ * NotificationKind (support-service/app/models.py e sursa reală a
+ * valorilor). Nu avem un id de resursă atașat notificării (doar `kind` +
+ * `text`), deci mapăm pe pagina relevantă tipului, nu pe o resursă exactă. */
+const NOTIFICATION_ROUTES: Record<NotificationKind, string[]> = {
+  budget: ['/app/budgets'],
+  card: ['/app/cards'],
+  transfer: ['/app/transactions'],
+  transfer_received: ['/app/transactions'],
+  transfer_hold: ['/app/transactions'],
+  transfer_hold_cancelled: ['/app/transactions'],
+  system: ['/app/overview'],
+  document_sign: ['/app/profile'],
+};
+
+/** Tipuri care au un `referenceId` = id de tranzacție (vezi
+ * transactions-service::_notify_user) — la click, deschidem direct
+ * descrierea acelei tranzacții (vezi Transactions::ngOnInit,
+ * query param `highlight`), nu doar lista generică. */
+const TRANSACTION_NOTIFICATION_KINDS = new Set<NotificationKind>([
+  'transfer',
+  'transfer_received',
+  'transfer_hold',
+  'transfer_hold_cancelled',
+]);
 
 /**
  * Bara de sus — search, buton rapid "Tranzacție nouă" (duce la formularul
@@ -82,6 +108,27 @@ export class Topbar implements OnInit, OnDestroy {
     // și dropdown-ul (vezi listener-ul de click din afara componentei).
     event.stopPropagation();
     this.notificationsService.remove(notification.id);
+  }
+
+  protected openNotification(notification: AppNotification): void {
+    this.notificationsOpen.set(false);
+    // Dispare din listă imediat ce a servit scopul (te-a dus unde trebuie)
+    // — o notificare citită și folosită nu are motiv să mai rămână acolo.
+    this.notificationsService.remove(notification.id);
+
+    const commands = NOTIFICATION_ROUTES[notification.kind];
+    if (notification.kind === 'document_sign') {
+      // Fragment, nu query param — pagina de Profil e cu totul o singură
+      // pagină derulabilă (fără taburi), deci "navigarea corectă" aici
+      // înseamnă și scroll direct la secțiunea relevantă, nu doar pagina.
+      this.router.navigate(commands, { fragment: 'documente-de-semnat' });
+      return;
+    }
+    if (TRANSACTION_NOTIFICATION_KINDS.has(notification.kind) && notification.referenceId) {
+      this.router.navigate(commands, { queryParams: { highlight: notification.referenceId } });
+      return;
+    }
+    this.router.navigate(commands);
   }
 
   protected toggleProfileMenu(): void {
