@@ -166,7 +166,26 @@
   color: var(--mb-text-tertiary);
 }
 
-/* --- Catalog ------------------------------------------------------------------ */
+/* --- Catalog, grupat pe categorii ---------------------------------------------- */
+
+.catalog-group {
+  margin-bottom: var(--mb-space-8);
+}
+
+.catalog-group:last-child {
+  margin-bottom: 0;
+}
+
+.catalog-group__label {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+  padding-bottom: var(--mb-space-2);
+  border-bottom: 1px solid var(--mb-border);
+}
 
 .instruments-grid {
   display: grid;

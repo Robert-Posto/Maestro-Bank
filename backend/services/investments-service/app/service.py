@@ -15,7 +15,7 @@ import logging
 import httpx
 from fastapi import HTTPException, status
 
-from app.catalog import INDEX_SYMBOLS, SYMBOLS, is_known_symbol, is_valid_symbol, name_for
+from app.catalog import INDEX_SYMBOLS, SYMBOLS, category_for, is_known_symbol, is_valid_symbol, name_for
 from app.config import settings
 from app.database import get_database
 from app.models import BuyRequest, HistoryPoint, HoldingOut, InstrumentDetailOut, InstrumentOut, SellRequest
@@ -110,6 +110,7 @@ def _to_instrument_out(symbol: str, cached: dict) -> InstrumentOut:
         previous_close_minor=previous_close_minor,
         change_percent=_change_percent(price_minor, previous_close_minor),
         updated_at=cached.get("updated_at"),
+        category=category_for(symbol),
     )
 
 

@@ -17,6 +17,7 @@ class InstrumentOut(BaseModel):
     previous_close_minor: int | None
     change_percent: float | None  # (price - previous_close) / previous_close * 100
     updated_at: datetime | None
+    category: str | None  # None pt. indici — vezi app/catalog.py::CATEGORIES
 
 
 class HistoryPoint(BaseModel):

@@ -61,6 +61,24 @@ export class Investments implements OnInit {
     this.portfolio().reduce((sum, h) => sum + h.unrealized_gain_minor, 0),
   );
 
+  /** Catalogul, grupat pe categorii (Tehnologie / Consum & Finanțe / ETF-uri)
+   * — ordinea grupurilor urmează ordinea în care apar prima dată în
+   * instruments() (backend-ul le trimite deja grupate, vezi app/catalog.py
+   * ::CATALOG), nu e hardcodată aici ca să rămână sincronizată automat. */
+  protected readonly catalogGroups = computed(() => {
+    const groups: { label: string; items: InstrumentView[] }[] = [];
+    for (const instrument of this.instruments()) {
+      const label = instrument.category ?? 'Altele';
+      let group = groups.find((g) => g.label === label);
+      if (!group) {
+        group = { label, items: [] };
+        groups.push(group);
+      }
+      group.items.push(instrument);
+    }
+    return groups;
+  });
+
   // --- Detalii, la click (instrument SAU indice) ---------------------------
   protected readonly detailSymbol = signal<string | null>(null);
   protected readonly detailData = signal<InstrumentDetailView | null>(null);

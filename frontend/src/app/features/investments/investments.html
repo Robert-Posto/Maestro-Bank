@@ -27,30 +27,6 @@
   </div>
 
   <section class="investments-section">
-    <h2>Indici bursieri</h2>
-    <p class="investments-section__subtitle">Informativ — un indice nu se cumpără direct; SPY/QQQ din catalogul de mai jos sunt ETF-urile care-l urmăresc.</p>
-    @if (indicesLoading()) {
-      <app-loading-skeleton [rows]="1" [height]="90" />
-    } @else {
-      <div class="indices-row">
-        @for (index of indices(); track index.symbol) {
-          <button type="button" class="index-chip" (click)="openDetail(index.symbol)">
-            <span class="index-chip__name">{{ index.name }}</span>
-            @if (index.price_minor !== null) {
-              <span class="index-chip__price">{{ index.price_minor | money: 'USD' }}</span>
-              @if (index.change_percent !== null) {
-                <span class="change-badge" [class.change-badge--positive]="index.change_percent >= 0" [class.change-badge--negative]="index.change_percent < 0">
-                  {{ index.change_percent >= 0 ? '▲' : '▼' }} {{ (index.change_percent >= 0 ? '+' : '') + index.change_percent }}%
-                </span>
-              }
-            }
-          </button>
-        }
-      </div>
-    }
-  </section>
-
-  <section class="investments-section">
     <h2>Portofoliul tău</h2>
     @if (portfolioLoading()) {
       <app-loading-skeleton [rows]="2" [height]="60" />
@@ -98,42 +74,71 @@
   </section>
 
   <section class="investments-section">
+    <h2>Indici bursieri</h2>
+    <p class="investments-section__subtitle">Informativ — un indice nu se cumpără direct; SPY/QQQ din catalogul de mai jos sunt ETF-urile care-l urmăresc.</p>
+    @if (indicesLoading()) {
+      <app-loading-skeleton [rows]="1" [height]="90" />
+    } @else {
+      <div class="indices-row">
+        @for (index of indices(); track index.symbol) {
+          <button type="button" class="index-chip" (click)="openDetail(index.symbol)">
+            <span class="index-chip__name">{{ index.name }}</span>
+            @if (index.price_minor !== null) {
+              <span class="index-chip__price">{{ index.price_minor | money: 'USD' }}</span>
+              @if (index.change_percent !== null) {
+                <span class="change-badge" [class.change-badge--positive]="index.change_percent >= 0" [class.change-badge--negative]="index.change_percent < 0">
+                  {{ index.change_percent >= 0 ? '▲' : '▼' }} {{ (index.change_percent >= 0 ? '+' : '') + index.change_percent }}%
+                </span>
+              }
+            }
+          </button>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="investments-section">
     <h2>Catalog</h2>
     @if (instrumentsLoading()) {
       <app-loading-skeleton [rows]="3" [height]="90" />
     } @else {
-      <div class="instruments-grid">
-        @for (instrument of instruments(); track instrument.symbol) {
-          <div
-            class="instrument-card"
-            [class.instrument-card--positive]="(instrument.change_percent ?? 0) >= 0"
-            [class.instrument-card--negative]="(instrument.change_percent ?? 0) < 0"
-            (click)="openDetail(instrument.symbol)"
-          >
-            <div class="instrument-card__top">
-              <strong>{{ instrument.symbol }}</strong>
-              @if (instrument.change_percent !== null) {
-                <span class="change-badge" [class.change-badge--positive]="instrument.change_percent >= 0" [class.change-badge--negative]="instrument.change_percent < 0">
-                  {{ instrument.change_percent >= 0 ? '▲' : '▼' }} {{ (instrument.change_percent >= 0 ? '+' : '') + instrument.change_percent }}%
-                </span>
-              }
-            </div>
-            <p class="instrument-card__name">{{ instrument.name }}</p>
-            @if (instrument.price_minor !== null) {
-              <p class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</p>
+      @for (group of catalogGroups(); track group.label) {
+        <div class="catalog-group">
+          <h3 class="catalog-group__label">{{ group.label }}</h3>
+          <div class="instruments-grid">
+            @for (instrument of group.items; track instrument.symbol) {
+              <div
+                class="instrument-card"
+                [class.instrument-card--positive]="(instrument.change_percent ?? 0) >= 0"
+                [class.instrument-card--negative]="(instrument.change_percent ?? 0) < 0"
+                (click)="openDetail(instrument.symbol)"
+              >
+                <div class="instrument-card__top">
+                  <strong>{{ instrument.symbol }}</strong>
+                  @if (instrument.change_percent !== null) {
+                    <span class="change-badge" [class.change-badge--positive]="instrument.change_percent >= 0" [class.change-badge--negative]="instrument.change_percent < 0">
+                      {{ instrument.change_percent >= 0 ? '▲' : '▼' }} {{ (instrument.change_percent >= 0 ? '+' : '') + instrument.change_percent }}%
+                    </span>
+                  }
+                </div>
+                <p class="instrument-card__name">{{ instrument.name }}</p>
+                @if (instrument.price_minor !== null) {
+                  <p class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</p>
+                }
+                <app-action-button
+                  variant="secondary"
+                  [fullWidth]="true"
+                  [disabled]="instrument.price_minor === null"
+                  (click)="$event.stopPropagation()"
+                  (pressed)="openBuyModal(instrument)"
+                >
+                  Cumpără
+                </app-action-button>
+              </div>
             }
-            <app-action-button
-              variant="secondary"
-              [fullWidth]="true"
-              [disabled]="instrument.price_minor === null"
-              (click)="$event.stopPropagation()"
-              (pressed)="openBuyModal(instrument)"
-            >
-              Cumpără
-            </app-action-button>
           </div>
-        }
-      </div>
+        </div>
+      }
     }
   </section>
 }

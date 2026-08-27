@@ -11,6 +11,7 @@ export interface InstrumentView {
   previous_close_minor: number | null;
   change_percent: number | null;
   updated_at: string | null;
+  category: string | null;
 }
 
 export interface HistoryPointView {
