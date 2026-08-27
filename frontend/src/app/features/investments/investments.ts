@@ -1,7 +1,8 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { interval, Subscription } from 'rxjs';
 
 import { AccountView, BankingService } from '../../services/banking.service';
 import {
@@ -38,11 +39,12 @@ import { extractErrorMessage } from '../../shared/error-utils';
   templateUrl: './investments.html',
   styleUrl: './investments.css',
 })
-export class Investments implements OnInit {
+export class Investments implements OnInit, OnDestroy {
   private readonly investmentsApi = inject(InvestmentsService);
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private pollSubscription?: Subscription;
 
   protected readonly accounts = signal<AccountView[]>([]);
   protected readonly usdAccount = computed(() => this.accounts().find((a) => a.account_type === 'usd') ?? null);
@@ -157,6 +159,28 @@ export class Investments implements OnInit {
     this.loadInstruments();
     this.loadIndices();
     this.loadPortfolio();
+
+    // Backend-ul reîmprospătează prețurile Yahoo o dată pe minut (vezi
+    // investments-service/app/config.py::price_refresh_interval_seconds) —
+    // pagina face polling la același interval, ca prețul/câștigul să se
+    // vadă mișcând fără refresh manual. Fără loading skeleton la
+    // reîncărcările astea — doar la cea inițială (loadInstruments etc.).
+    this.pollSubscription = interval(60_000).subscribe(() => this.refreshPricesSilently());
+  }
+
+  ngOnDestroy(): void {
+    this.pollSubscription?.unsubscribe();
+  }
+
+  private refreshPricesSilently(): void {
+    this.investmentsApi.listInstruments().subscribe({ next: (instruments) => this.instruments.set(instruments) });
+    this.investmentsApi.listIndices().subscribe({ next: (indices) => this.indices.set(indices) });
+    this.investmentsApi.getPortfolio().subscribe({ next: (portfolio) => this.portfolio.set(portfolio) });
+
+    const openSymbol = this.detailSymbol();
+    if (openSymbol) {
+      this.investmentsApi.getDetail(openSymbol).subscribe({ next: (detail) => this.detailData.set(detail) });
+    }
   }
 
   private loadInstruments(): void {
