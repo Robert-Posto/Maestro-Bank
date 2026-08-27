@@ -383,6 +383,24 @@
   white-space: nowrap;
 }
 
+.card-control__link {
+  font-family: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-blue-600);
+  background: var(--mb-blue-50);
+  border: 1px solid transparent;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--mb-radius-pill);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.card-control__link:hover {
+  background: var(--mb-blue-100);
+}
+
 .card-control__limit-value {
   display: inline-flex;
   align-items: center;
@@ -451,28 +469,6 @@
   margin-top: 4px;
 }
 
-.cards-guardian {
-  background: var(--mb-surface-muted);
-}
-
-.cards-guardian__header {
-  display: flex;
-  align-items: center;
-  gap: var(--mb-space-2);
-  margin-bottom: var(--mb-space-2);
-  font-size: var(--mb-font-size-sm);
-}
-
-.cards-guardian__header .card-control__soon {
-  margin-left: auto;
-}
-
-.cards-guardian p {
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-text-secondary);
-  line-height: var(--mb-line-height-base);
-}
-
 /* Modal: card nou */
 
 .add-card-form {
@@ -500,6 +496,29 @@
 
 .add-card-section__warning {
   color: var(--mb-negative);
+}
+
+.add-card-pin-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mb-space-3);
+  margin-top: var(--mb-space-2);
+}
+
+.add-card-pin-row input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  letter-spacing: 0.3em;
+  padding: 0.6rem var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+  text-align: center;
+}
+
+.add-card-pin-row input:focus {
+  border-color: var(--mb-blue-500);
 }
 
 .design-picker {

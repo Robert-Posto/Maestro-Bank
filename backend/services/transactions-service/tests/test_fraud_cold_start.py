@@ -13,6 +13,7 @@ from app.fraud.models import (
     DeviceFacts,
     HistorySample,
     RuleContext,
+    SecurityFacts,
     TransactionSnapshot,
     UserProfileSnapshot,
     WindowFacts,
@@ -40,6 +41,7 @@ def _ctx(*, transaction_count: int, history_samples=(), cohort: CohortBaseline, 
         window=WindowFacts(),
         cohort=cohort,
         device=DeviceFacts(),
+        security=SecurityFacts(),
         evaluated_at=evaluated_at,
     )
 

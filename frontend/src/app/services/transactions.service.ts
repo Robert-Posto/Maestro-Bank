@@ -101,6 +101,17 @@ export class TransactionsService {
     return this.http.get(`${API_BASE_URL}/transactions/export`, { params, responseType: 'blob' });
   }
 
+  /** Extras de cont (PDF) — spre deosebire de exportCsv, perioada e
+   * OBLIGATORIE (vezi backend GET /transactions/statement); `dateFrom`/
+   * `dateTo` sunt ISO datetime strings complete (nu doar "yyyy-MM-dd").
+   * `accountId` OPȚIONAL — implicit contul curent (ca până acum), sau
+   * orice alt cont al userului (vezi pagina Conturi). */
+  downloadStatement(dateFrom: string, dateTo: string, accountId?: string): Observable<Blob> {
+    let params = new HttpParams().set('date_from', dateFrom).set('date_to', dateTo);
+    if (accountId) params = params.set('account_id', accountId);
+    return this.http.get(`${API_BASE_URL}/transactions/statement`, { params, responseType: 'blob' });
+  }
+
   getSpendingAnalytics(): Observable<SpendingAnalytics> {
     return this.http.get<SpendingAnalytics>(`${API_BASE_URL}/transactions/analytics/spending`);
   }

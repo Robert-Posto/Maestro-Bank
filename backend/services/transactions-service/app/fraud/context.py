@@ -23,8 +23,11 @@ from app.fraud import profile as profile_module
 from app.fraud.models import (
     BeneficiaryWindow,
     CohortBaseline,
+    CredentialEvent,
     DeviceFacts,
+    LoginEvent,
     RuleContext,
+    SecurityFacts,
     TransactionSnapshot,
     WindowFacts,
 )
@@ -33,6 +36,7 @@ from app.fraud.ruleset_config import RulesetConfig
 logger = logging.getLogger("transactions-service")
 
 _DEV03_TIMEOUT_SECONDS = 0.4
+_SECURITY_FACTS_TIMEOUT_SECONDS = 0.6  # un singur apel, dar întoarce mai multe date decât DEV-03 — puțin mai generos
 _NOT_FAILED = {"$ne": "failed"}
 
 
@@ -66,6 +70,7 @@ async def build_rule_context(
         ruleset=ruleset,
     )
     device = await _build_device_facts(user_id=user_id)
+    security = await _build_security_facts(user_id=user_id)
 
     return RuleContext(
         transaction=TransactionSnapshot(
@@ -79,6 +84,7 @@ async def build_rule_context(
         profile=user_profile,
         window=window,
         cohort=cohort_baseline,
+        security=security,
         device=device,
         evaluated_at=evaluated_at,
     )
@@ -150,6 +156,13 @@ async def _build_window_facts(
         },
     )
 
+    new_beneficiaries_60min = await _count_new_beneficiaries_last_60min(
+        db, account_id=account_id, evaluated_at=evaluated_at, ruleset=ruleset
+    )
+    near_threshold_24h = await _count_near_threshold_last_24h(
+        db, account_id=account_id, evaluated_at=evaluated_at, ruleset=ruleset
+    )
+
     incoming_cutoff = evaluated_at - timedelta(hours=ruleset.beh03_window_hours)
     incoming_rows = await (
         db.transactions.find(
@@ -172,6 +185,77 @@ async def _build_window_facts(
         ),
         identical_amount_distinct_beneficiaries_60min=len(distinct_beneficiaries),
         recent_incoming_credit_minor=recent_incoming,
+        new_beneficiaries_last_60min=new_beneficiaries_60min,
+        near_threshold_count_last_24h=near_threshold_24h,
+    )
+
+
+_VEL03_WINDOW_ROWS_CAP = 500  # gardă — VEL-01 (>5/10min) s-ar fi declanșat deja cu mult înainte de acest plafon
+
+
+def _first_seen_per_iban(rows: list[dict]) -> dict[str, datetime]:
+    """Pură — prima apariție a fiecărui to_iban distinct, presupunând
+    `rows` deja sortate crescător după created_at."""
+    first_seen: dict[str, datetime] = {}
+    for row in rows:
+        first_seen.setdefault(row["to_iban"], row["created_at"])
+    return first_seen
+
+
+async def _count_new_beneficiaries_last_60min(
+    db, *, account_id: str, evaluated_at: datetime, ruleset: RulesetConfig
+) -> int:
+    """VEL-03 — reia forma EXACTĂ a lui seen_before_count de mai sus
+    (BEN-01), aplicată o dată per beneficiar DISTINCT din fereastra de 60
+    min, nu doar pentru beneficiarul tranzacției curente. NU e un
+    $lookup — vezi planul fazei pentru motiv (context.py face doar
+    agregări cu un singur stagiu azi; N-ul practic e mic, tiparul vizat e
+    diversificarea de beneficiari, nu volumul brut — ăla îl prinde deja
+    VEL-01)."""
+    window_start = evaluated_at - timedelta(minutes=ruleset.vel03_window_minutes)
+    rows = await (
+        db.transactions.find(
+            {"from_account_id": account_id, "status": _NOT_FAILED, "created_at": {"$gte": window_start}},
+            {"to_iban": 1, "created_at": 1},
+        )
+        .sort("created_at", 1)
+        .to_list(length=_VEL03_WINDOW_ROWS_CAP)
+    )
+    first_seen = _first_seen_per_iban(rows)
+
+    new_count = 0
+    for iban, first_seen_at in first_seen.items():
+        # NU filtrăm status aici — reutilizăm semantica EXACTĂ a lui
+        # BEN-01 ("a mai plătit userul acest beneficiar VREODATĂ înainte").
+        # $lt first_seen_at exclude implicit tranzacțiile din fereastra
+        # curentă (niciuna nu poate avea created_at < propria ei primă
+        # apariție), deci nu mai e nevoie de o excludere explicită pe _id.
+        seen_before = await db.transactions.count_documents(
+            {"from_account_id": account_id, "to_iban": iban, "created_at": {"$lt": first_seen_at}}, limit=1
+        )
+        if seen_before == 0:
+            new_count += 1
+    return new_count
+
+
+async def _count_near_threshold_last_24h(
+    db, *, account_id: str, evaluated_at: datetime, ruleset: RulesetConfig
+) -> int:
+    """STR-01 — tranzacții proprii, ultimele 24h, sumă în banda
+    [90%, 99%] a unui prag de "raportare" configurabil (implicit 50.000
+    RON — decizie de PRODUS pentru acest demo, NU un prag legal real, vezi
+    ruleset_config.py). Ambele capete ale benzii sunt INCLUSIVE — citire
+    literală a "90-99%", ca AMT-04, nu strict ca AMT-03 (niciun precedent
+    unic în acest fișier pentru un interval închis ca ăsta)."""
+    lower_bound = round(ruleset.str01_reporting_threshold_minor * ruleset.str01_lower_ratio)
+    upper_bound = round(ruleset.str01_reporting_threshold_minor * ruleset.str01_upper_ratio)
+    return await db.transactions.count_documents(
+        {
+            "from_account_id": account_id,
+            "status": _NOT_FAILED,
+            "amount_minor": {"$gte": lower_bound, "$lte": upper_bound},
+            "created_at": {"$gte": evaluated_at - timedelta(hours=ruleset.str01_window_hours)},
+        }
     )
 
 
@@ -194,3 +278,47 @@ async def _build_device_facts(*, user_id: str) -> DeviceFacts:
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         logger.warning("fraud: DEV-03 indisponibil (auth-service, user_id=%s): %s", user_id, exc)
         return DeviceFacts(latest_passkey_created_at=None, data_available=False)
+
+
+async def _build_security_facts(*, user_id: str) -> SecurityFacts:
+    """VEL-04, DEV-01/02/04/05/06 — AL DOILEA (și ultimul) network hop din
+    acest motor, separat de DEV-03 (apel diferit, mai vechi) — UN SINGUR
+    apel către auth-service adună istoricul de login + schimbări de
+    credențiale, ca să nu multiplicăm hop-uri HTTP pe calea de evaluare
+    fraud (vezi planul fazei). Timeout scurt + fail-open, exact ca DEV-03:
+    orice eroare -> NICIUNA din cele 6 reguli care depind de asta nu se
+    declanșează, niciodată confundată tacit cu "nu există istoric"."""
+    try:
+        async with httpx.AsyncClient(timeout=_SECURITY_FACTS_TIMEOUT_SECONDS) as client:
+            response = await client.get(f"{settings.auth_service_url}/internal/security-facts/{user_id}")
+        if response.status_code != 200:
+            raise httpx.HTTPError(f"status neașteptat {response.status_code}")
+        body = response.json()
+
+        recent_logins = tuple(
+            LoginEvent(
+                success=item["success"],
+                device_signature=item.get("device_signature"),
+                country=item.get("country"),
+                lat=item.get("lat"),
+                lon=item.get("lon"),
+                created_at=datetime.fromisoformat(item["created_at"]),
+            )
+            for item in body.get("recent_logins", [])
+        )
+        password_changed_raw = body.get("password_changed_at")
+        password_changed_at = datetime.fromisoformat(password_changed_raw) if password_changed_raw else None
+        recent_credential_events = tuple(
+            CredentialEvent(event=item["event"], created_at=datetime.fromisoformat(item["created_at"]))
+            for item in body.get("recent_credential_events", [])
+        )
+
+        return SecurityFacts(
+            recent_logins=recent_logins,
+            password_changed_at=password_changed_at,
+            recent_credential_events=recent_credential_events,
+            data_available=True,
+        )
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        logger.warning("fraud: security-facts indisponibile (auth-service, user_id=%s): %s", user_id, exc)
+        return SecurityFacts(data_available=False)

@@ -13,6 +13,10 @@ class Settings:
     budgets_service_url: str = os.getenv("BUDGETS_SERVICE_URL", "http://budgets-service:8000")
     auth_service_url: str = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
     support_service_url: str = os.getenv("SUPPORT_SERVICE_URL", "http://support-service:8000")
+    # Doar pentru extrasul de cont (vezi app/service.py::generate_account_statement)
+    # — un cont EUR/USD/GBP (sau latura RON a unui schimb, pe contul curent)
+    # se mișcă prin exchange-service, nu prin tx_db.
+    exchange_service_url: str = os.getenv("EXCHANGE_SERVICE_URL", "http://exchange-service:8000")
 
     # Cât de des verificăm dacă există transferuri programate scadente —
     # vezi app/scheduler.py. 60s e suficient de responsiv pentru un demo

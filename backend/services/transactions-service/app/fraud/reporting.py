@@ -63,8 +63,14 @@ async def build_shadow_report(since: datetime | None, until: datetime | None) ->
         "total_evaluations": total,
         "by_status": {row["_id"]: row["count"] for row in status_rows},
         "by_decision_band": {row["_id"]: row["count"] for row in band_rows if row["_id"] is not None},
+        # score=None (BEN-04 — refuz direct, fără scoring, vezi
+        # app/blocklist.py) produce bucket=None din pipeline-ul Mongo de mai
+        # sus ($divide pe null propagă null) — exclus aici, la fel ca
+        # by_decision_band mai sus, NU un scor real de agregat într-o bandă.
         "score_histogram": {
-            f"{int(row['_id'])}-{int(row['_id']) + _SCORE_BUCKET_SIZE - 1}": row["count"] for row in score_rows
+            f"{int(row['_id'])}-{int(row['_id']) + _SCORE_BUCKET_SIZE - 1}": row["count"]
+            for row in score_rows
+            if row["_id"] is not None
         },
         "rule_fire_counts": {
             row["_id"]: {"fire_count": row["fire_count"], "excluded_from_score": row["excluded_from_score"]}

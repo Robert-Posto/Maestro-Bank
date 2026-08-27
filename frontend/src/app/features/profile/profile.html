@@ -3,6 +3,60 @@
 <div class="profile-grid">
   <section class="profile-panel">
     <h2>Profil</h2>
+
+    <div class="profile-avatar-row">
+      <span class="profile-avatar">
+        @if (currentUser()?.profile_picture; as picture) {
+          <img [src]="picture" alt="Poză de profil" />
+        } @else {
+          <app-icon name="profile" [size]="22" />
+        }
+      </span>
+      <div class="profile-avatar-actions">
+        <label class="profile-avatar-upload" [class.profile-avatar-upload--busy]="profilePictureBusy()">
+          <input type="file" accept="image/*" (change)="onProfilePictureSelected($event)" [disabled]="profilePictureBusy()" hidden />
+          {{ currentUser()?.profile_picture ? 'Schimbă poza' : 'Adaugă poză (opțional)' }}
+        </label>
+        <button
+          type="button"
+          class="profile-avatar-camera"
+          [disabled]="profilePictureBusy() || cameraActive()"
+          (click)="startCamera()"
+        >
+          <app-icon name="camera" [size]="14" /> Fă poza acum
+        </button>
+        @if (currentUser()?.profile_picture) {
+          <button type="button" class="profile-avatar-remove" [disabled]="profilePictureBusy()" (click)="removeProfilePicture()">
+            Șterge
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (cameraActive() || capturedPreviewUrl()) {
+      <div class="profile-camera-panel">
+        @if (capturedPreviewUrl(); as preview) {
+          <img class="profile-camera-panel__preview" [src]="preview" alt="Previzualizare poză capturată" />
+          <div class="profile-camera-panel__actions">
+            <app-action-button variant="secondary" [disabled]="profilePictureBusy()" (pressed)="retakePhoto()">
+              Refă poza
+            </app-action-button>
+            <app-action-button [loading]="profilePictureBusy()" (pressed)="saveCapturedPhoto()">Salvează</app-action-button>
+          </div>
+        } @else {
+          <div class="profile-camera-panel__video-wrap">
+            <video #profileCameraVideo [srcObject]="cameraStream()" autoplay playsinline muted></video>
+            <button type="button" class="profile-camera-panel__shutter" aria-label="Fă poza" (click)="capturePhoto()"></button>
+          </div>
+          <app-action-button variant="ghost" (pressed)="cancelCameraCapture()">Renunță</app-action-button>
+        }
+        @if (cameraError()) {
+          <p class="profile-password-error">{{ cameraError() }}</p>
+        }
+      </div>
+    }
+    <canvas #profileCameraCanvas hidden></canvas>
+
     <div class="profile-field">
       <span>Prenume</span>
       <p>{{ currentUser()?.first_name ?? '—' }}</p>

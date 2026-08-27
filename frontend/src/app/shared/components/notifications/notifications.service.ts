@@ -68,6 +68,21 @@ export class NotificationsService {
       error: () => {},
     });
   }
+
+  /**
+   * Șterge o notificare. Dispare din listă IMEDIAT, înainte de răspunsul
+   * serverului — e o acțiune mică și previzibilă, iar o pauză de câteva
+   * sute de milisecunde între click și dispariție ar face butonul să pară
+   * stricat. Dacă apelul chiar eșuează, o punem înapoi.
+   */
+  remove(id: string): void {
+    const previous = this._notifications();
+    this._notifications.set(previous.filter((n) => n.id !== id));
+
+    this.http.delete<void>(`${API_BASE_URL}/support/notifications/${id}`).subscribe({
+      error: () => this._notifications.set(previous),
+    });
+  }
 }
 
 function toAppNotification(view: NotificationApiView): AppNotification {

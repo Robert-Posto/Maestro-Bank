@@ -6,13 +6,17 @@ evaluări deja scrise. Nu scrie NICIODATĂ score/fired_rules/decision_would_appl
 cu RequireStaff — app/security.py) care apelează acest modul.
 """
 
+import logging
 from datetime import datetime
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app import blocklist
 from app.database import get_database
+
+logger = logging.getLogger("transactions-service")
 
 _MAX_LIMIT = 100
 
@@ -85,4 +89,28 @@ async def review_evaluation(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluare inexistentă.")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această evaluare a fost deja revizuită.")
 
-    return await db.fraud_evaluations.find_one({"_id": object_id})
+    updated = await db.fraud_evaluations.find_one({"_id": object_id})
+
+    if outcome == "confirmed_fraud":
+        # BEN-04 — vezi app/blocklist.py. Best-effort: dacă tranzacția
+        # legată nu mai există (n-ar trebui să se-ntâmple) sau scrierea
+        # eșuează, revizuirea de mai sus tot rămâne validă — nu o anulăm
+        # retroactiv pentru un eșec secundar de blocklist.
+        try:
+            transaction = await db.transactions.find_one({"_id": updated["transaction_id"]})
+            if transaction is not None:
+                await blocklist.add_to_blocklist(
+                    iban=transaction["to_iban"],
+                    added_by=staff_user_id,
+                    reason=f"Confirmat fraudulos la revizuirea evaluării {evaluation_id}.",
+                    source="confirmed_fraud_review",
+                    evaluation_id=object_id,
+                )
+        except Exception as exc:
+            logger.warning(
+                "fraud: adăugarea pe blocklist a eșuat (evaluation_id=%s) — revizuirea rămâne validă: %s",
+                evaluation_id,
+                exc,
+            )
+
+    return updated

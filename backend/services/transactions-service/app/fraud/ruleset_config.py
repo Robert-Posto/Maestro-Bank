@@ -10,7 +10,7 @@ să încapă mai târziu fără să atingă context.py/scoring.py.
 
 from dataclasses import dataclass
 
-RULESET_VERSION = "2026-08-20.1"
+RULESET_VERSION = "2026-08-26.1"
 COLD_START_MIN_TRANSACTIONS = 20
 
 
@@ -50,6 +50,13 @@ class RulesetConfig:
     vel05_weight: int = 40
     vel05_min_sequence: int = 3  # include tranzacția curentă
 
+    vel03_weight: int = 25
+    vel03_min_new_beneficiaries: int = 3
+    vel03_window_minutes: int = 60
+
+    vel04_weight: int = 35
+    vel04_min_failed_attempts: int = 3
+
     # --- Beneficiary --------------------------------------------------------
     ben01_weight: int = 15
     ben03_weight: int = 20
@@ -62,9 +69,22 @@ class RulesetConfig:
     time02_weight: int = 25
     time02_dormant_days: int = 90
 
-    # --- Device (doar DEV-03 în Faza 1) --------------------------------------
+    # --- Device -----------------------------------------------------------
     dev03_weight: int = 40
     dev03_window_minutes: int = 60
+
+    dev01_weight: int = 25  # dispozitiv nou — semnal moderat, oamenii chiar schimbă telefonul/browserul legitim
+
+    dev02_weight: int = 35  # parolă/credențială schimbată recent
+    dev02_window_hours: int = 24
+
+    dev04_weight: int = 45  # "călătorie imposibilă" — semnal puternic, rar fals-pozitiv
+    dev04_max_plausible_kmh: float = 900.0
+
+    dev05_weight: int = 20  # țară nouă — oamenii chiar călătoresc legitim
+    dev05_window_days: int = 30
+
+    dev06_weight: int = 70  # combo dispozitiv nou + beneficiar nou + sumă mare — cel mai puternic semnal din catalog
 
     # --- Behaviour ------------------------------------------------------------
     beh01_weight: int = 15
@@ -78,6 +98,17 @@ class RulesetConfig:
     str02_weight: int = 35
     str02_min_distinct_beneficiaries: int = 3
     str02_window_minutes: int = 60
+
+    # STR-01 — prag de "raportare" ALES pentru acest demo (electronic, nu
+    # numerar — nu există un regim AML real de urmărit aici), NU un prag
+    # legal real. Configurabil, ca să poată fi recalibrat fără să atingă
+    # logica regulii.
+    str01_weight: int = 40
+    str01_reporting_threshold_minor: int = 5_000_000  # 50.000 RON
+    str01_min_count_24h: int = 3
+    str01_window_hours: int = 24
+    str01_lower_ratio: float = 0.90
+    str01_upper_ratio: float = 0.99
 
     # --- Scoring --------------------------------------------------------------
     diminishing_multipliers: tuple[float, ...] = (1.0, 0.6, 0.3)  # a 3-a+ regulă dintr-o familie = ultima valoare

@@ -104,11 +104,6 @@
   box-shadow: 0 3px 10px rgba(47, 111, 237, 0.35);
 }
 
-.transfer-mode-toggle button.transfer-mode-toggle__btn--active .transfers-tabs__count {
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
-}
-
 .transfer-stepper,
 .scheduled-section {
   animation: transfers-tab-fade 200ms ease;

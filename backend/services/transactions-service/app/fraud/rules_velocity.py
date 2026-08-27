@@ -1,5 +1,5 @@
-"""Familia "velocity" (VEL-01, VEL-02, VEL-05 — VEL-03/VEL-04 excluse din
-Faza 1, vezi planul) — pure, vezi rules_amount.py pentru convenția generală.
+"""Familia "velocity" (VEL-01, VEL-02, VEL-03, VEL-04, VEL-05) — pure,
+vezi rules_amount.py pentru convenția generală.
 """
 
 from datetime import timedelta
@@ -48,6 +48,56 @@ def check_vel_02(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None
             "daily_average_minor": round(daily_average),
             "multiplier_used": ruleset.vel02_multiplier,
         },
+    )
+
+
+def check_vel_03(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
+    """>= 3 beneficiari NOI (niciodată plătiți înainte de fereastra
+    curentă) în 60 min — diversificare bruscă, distinctă de VEL-01 (volum
+    brut, orice beneficiar) și VEL-05 (escaladare către UN SINGUR
+    beneficiar)."""
+    count = ctx.window.new_beneficiaries_last_60min
+    if count < ruleset.vel03_min_new_beneficiaries:
+        return None
+    return RuleOutcome(
+        rule_id="VEL-03",
+        family="velocity",
+        weight=ruleset.vel03_weight,
+        contributes_to_score=True,
+        values={"new_beneficiaries_last_60min": count, "threshold": ruleset.vel03_min_new_beneficiaries},
+    )
+
+
+def check_vel_04(ctx: RuleContext, ruleset: RulesetConfig) -> RuleOutcome | None:
+    """>= N încercări de login EȘUATE, imediat înainte de cea mai recentă
+    reușită — tipar de ghicire a parolei/credential stuffing urmat de
+    succes. `recent_logins` vine deja sortat descrescător (cele mai
+    recente primele) — găsim cea mai recentă reușită oriunde-ar fi în
+    listă (nu presupunem că e neapărat chiar primul element — un login
+    ulterior, irelevant, ar putea fi urmat de-o încercare eșuată la o altă
+    sesiune, fără legătură cu autentificarea CHIAR folosită la transferul
+    curent — vezi planul fazei despre aproximarea "sesiunea curentă")."""
+    if not ctx.security.data_available:
+        return None
+    logins = ctx.security.recent_logins
+    success_index = next((i for i, event in enumerate(logins) if event.success), None)
+    if success_index is None:
+        return None
+
+    consecutive_failures = 0
+    for event in logins[success_index + 1 :]:
+        if event.success:
+            break
+        consecutive_failures += 1
+
+    if consecutive_failures < ruleset.vel04_min_failed_attempts:
+        return None
+    return RuleOutcome(
+        rule_id="VEL-04",
+        family="velocity",
+        weight=ruleset.vel04_weight,
+        contributes_to_score=True,
+        values={"consecutive_failed_attempts": consecutive_failures, "threshold": ruleset.vel04_min_failed_attempts},
     )
 
 

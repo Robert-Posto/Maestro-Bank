@@ -107,6 +107,13 @@ class UserMeOut(UserOut):
     phone_number: str | None = None
     email_verified: bool = False
     identity_verified: bool = False
+    # Poză de profil — OPȚIONALĂ (la cererea userului: "daca vrei sa ti pui
+    # poza de profil"), NU obligatorie. Data URI base64 (ex.
+    # "data:image/jpeg;base64,..."), redimensionată/comprimată ÎN BROWSER
+    # înainte de trimitere (vezi frontend/.../profile.ts) — accounts_db
+    # rămâne mic, fără nevoie de storage extern (S3 etc.) într-un demo.
+    # None -> topbar/profil cad pe inițiale, ca până acum.
+    profile_picture: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -127,6 +134,24 @@ class ChangePasswordRequest(BaseModel):
     def validate_password_strength(cls, value: str) -> str:
         if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
             raise ValueError("Parola trebuie să conțină cel puțin o literă și o cifră.")
+        return value
+
+
+class ProfilePictureUpdate(BaseModel):
+    """PATCH /auth/me/profile-picture. `profile_picture` e un data URI
+    base64 (ex. "data:image/jpeg;base64,..."), redimensionat/comprimat ÎN
+    BROWSER înainte de trimitere (vezi frontend/.../profile.ts) — cap de
+    500 KB aici e o plasă de siguranță, nu limita "normală" (o poză demo,
+    redimensionată la ~200x200, ajunge la câțiva KB). `None` șterge poza
+    (revine la inițiale)."""
+
+    profile_picture: str | None = Field(default=None, max_length=500_000)
+
+    @field_validator("profile_picture")
+    @classmethod
+    def validate_data_uri(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("data:image/"):
+            raise ValueError("Poza de profil trebuie trimisă ca data URI (data:image/...).")
         return value
 
 
@@ -172,3 +197,36 @@ class InternalMarkIdentityVerifiedRequest(BaseModel):
     Nu circulă imagini aici — doar rezultatul (userul e deja confirmat)."""
 
     user_id: str
+
+
+class InternalLoginEventView(BaseModel):
+    """O încercare de login, succes SAU eșec — vezi app/login_events.py.
+    Consumată DOAR de transactions-service (motorul de fraudă: VEL-04,
+    DEV-01/04/05/06)."""
+
+    success: bool
+    ip_address: str | None = None
+    device_signature: str | None = None
+    country: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    created_at: datetime
+
+
+class InternalCredentialEventView(BaseModel):
+    """Înrolare SAU revocare de passkey — vezi
+    webauthn_service.py::get_recent_credential_events. Consumată DOAR de
+    transactions-service (regula fraud DEV-02)."""
+
+    event: Literal["enrolled", "revoked"]
+    created_at: datetime
+
+
+class InternalSecurityFactsView(BaseModel):
+    """Vedere combinată, UN SINGUR apel HTTP — vezi
+    service.py::get_security_facts pentru de ce sunt adunate împreună (evită
+    multiplicarea hop-urilor pe calea de evaluare fraud)."""
+
+    recent_logins: list[InternalLoginEventView]
+    password_changed_at: datetime | None = None
+    recent_credential_events: list[InternalCredentialEventView]

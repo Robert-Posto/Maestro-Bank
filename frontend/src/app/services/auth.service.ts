@@ -33,6 +33,10 @@ export interface AuthUser {
   phone_number?: string | null;
   email_verified?: boolean;
   identity_verified?: boolean;
+  /** Data URI base64 ("data:image/...") — OPȚIONALĂ, la cererea userului.
+   * Absent pe /auth/register (UserOut), prezent DOAR pe /auth/me
+   * (UserMeOut) — `null`/absent -> topbar/profil cad pe inițiale. */
+  profile_picture?: string | null;
 }
 
 export interface TokenResponse {
@@ -76,6 +80,14 @@ export class AuthService {
 
   changePassword(payload: ChangePasswordPayload): Observable<void> {
     return this.http.post<void>(`${API_BASE_URL}/auth/change-password`, payload);
+  }
+
+  /** `dataUri` — redimensionată/comprimată ÎN BROWSER înainte de apel (vezi
+   * features/profile/profile.ts) — `null` șterge poza (revine la inițiale). */
+  updateProfilePicture(dataUri: string | null): Observable<AuthUser> {
+    return this.http
+      .patch<AuthUser>(`${API_BASE_URL}/auth/me/profile-picture`, { profile_picture: dataUri })
+      .pipe(tap((user) => this.currentUser.set(user)));
   }
 
   verifyEmail(code: string): Observable<void> {

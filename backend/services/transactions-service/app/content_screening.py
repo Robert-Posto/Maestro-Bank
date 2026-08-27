@@ -21,8 +21,8 @@ SDN/UN/EU, care chiar au mii de nume de persoane/entități desemnate) — un
 tip de verificare diferit (potrivire de nume, nu cuvinte-cheie), spune-mi
 dacă vrei asta ca pas următor.
 
-Separat DELIBERAT de motorul de fraudă (`app/fraud/`, 18 reguli, "registru
-FIX pentru Faza 1", vezi catalogue.py) — nu adăugăm o a 19-a regulă acolo.
+Separat DELIBERAT de motorul de fraudă (`app/fraud/`, 20 de reguli,
+"registru FIX", vezi catalogue.py) — nu adăugăm o regulă în plus acolo.
 Separat și de `guardian/` — NU lăsăm un LLM să decidă dacă descrierea e
 îngrijorătoare (la fel ca la filtrul de injurii din
 ai-orchestrator-service/app/services/moderation_service.py, o listă de

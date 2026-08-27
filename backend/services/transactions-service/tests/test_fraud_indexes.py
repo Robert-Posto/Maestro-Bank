@@ -25,6 +25,7 @@ async def test_ensure_fraud_indexes_is_idempotent():
     assert "status_1" in evaluation_index_names
     assert "from_account_id_1_created_at_-1" in transaction_index_names
     assert "to_account_id_1_created_at_-1" in transaction_index_names
+    assert "from_account_id_1_to_iban_1_created_at_-1" in transaction_index_names
 
 
 async def test_fraud_profiles_user_id_index_is_unique():

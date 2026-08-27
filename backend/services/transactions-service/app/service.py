@@ -23,9 +23,12 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import BackgroundTasks, HTTPException, status
 
+from app import blocklist, content_screening, holds
 from app import content_screening, holds
+from app import statement as statement_module
 from app.config import settings
 from app.database import get_database
+from app.fraud.audit import record_blocklist_rejection
 from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
 from app.guardian import service as guardian_service
 from app.money import format_minor_amount
@@ -114,6 +117,54 @@ async def _apply_transfer(from_account_id: str, to_account_id: str, amount_minor
     return response.json()
 
 
+# --- "Payment confirmation" + "Transaction alerts" (Security settings,
+# Cardul meu — vezi accounts-service/app/models.py::CardOut) ---------------
+#
+# Ambele sunt setări PER-CARD, dar transferurile MaestroBank sunt cont-la-
+# cont, nu card-la-card (vezi task-ul userului) — de-aia pragul/alertele se
+# verifică la nivel de CONT (accounts-service agregă "oricare card" —
+# vezi get_account_card_settings acolo), nu per card individual.
+
+_PAYMENT_CONFIRMATION_THRESHOLD_MINOR = 50_000  # 500,00 RON — prag implicit, fix (nu configurabil per-card acum)
+
+_DEFAULT_CARD_SETTINGS = {
+    "transaction_alerts_enabled": True,
+    "payment_confirmation_required": False,
+    "payment_confirmation_card_id": None,
+}
+
+
+async def _get_account_card_settings(account_id: str) -> dict:
+    """Degradare grațioasă: dacă accounts-service nu răspunde, presupunem
+    alertele ACTIVE (comportamentul de dinainte de acest control — nu
+    lăsăm userul brusc fără notificări din cauza unui apel opțional eșuat)
+    și confirmarea de plată DEZACTIVATĂ (nu blocăm un transfer normal doar
+    pentru că un serviciu extern e temporar jos — vezi și restul funcțiilor
+    "best-effort" din acest fișier, ex. _get_user_name)."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.accounts_service_url}/internal/accounts/{account_id}/card-settings")
+        if response.status_code == 200:
+            return response.json()
+    except httpx.RequestError:
+        logger.warning("transactions-service: accounts-service indisponibil la citirea setărilor de card (account_id=%s)", account_id)
+    return dict(_DEFAULT_CARD_SETTINGS)
+
+
+async def _verify_card_pin(card_id: str, pin: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.accounts_service_url}/internal/accounts/cards/{card_id}/verify-pin",
+                json={"pin": pin},
+            )
+        if response.status_code == 200:
+            return bool(response.json().get("valid", False))
+    except httpx.RequestError:
+        logger.error("transactions-service: verificarea PIN-ului cardului a eșuat (card_id=%s)", card_id)
+    return False
+
+
 def check_description_content(description: str) -> str | None:
     """Verificare LIVE, apelată de frontend pe măsură ce userul scrie în
     câmpul de descriere (vezi app/routers/transfers.py, POST
@@ -193,6 +244,12 @@ async def create_transfer(
     if destination["status"] != "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul destinație nu este activ.")
 
+    # 5.5. beneficiar pe blocklist (BEN-04) — SINGURA regulă din catalog
+    # care NU trece prin scoring (vezi app/blocklist.py) — verificată aici,
+    # devreme, dar transaction_doc-ul complet (mai jos) tot se construiește
+    # normal, ca refuzul să lase o urmă bogată în istoricul expeditorului.
+    blocklist_entry = await blocklist.is_blocked(destination["iban"])
+
     # 6. amount_minor > 0 — garantat de validarea Pydantic (TransferRequest)
 
     # 7. monedă compatibilă
@@ -207,6 +264,26 @@ async def create_transfer(
     # 9. nu permite transfer către același cont
     if source["id"] == destination["id"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu poți transfera către același cont.")
+
+    # "Payment confirmation" (Security settings, Cardul meu) — verificăm
+    # ÎNAINTE de orice altceva costisitor (rezolvare nume, screening, motor
+    # de fraudă): dacă transferul depășește pragul ȘI contul sursă are
+    # controlul activat pe vreun card, cerem PIN-ul cardului. Fără el
+    # (prima încercare, din frontend) -> 428, frontend-ul cere PIN-ul și
+    # RETRIMITE exact același request, cu `card_pin` completat.
+    source_card_settings = await _get_account_card_settings(source["id"])
+    if (
+        payload.amount_minor >= _PAYMENT_CONFIRMATION_THRESHOLD_MINOR
+        and source_card_settings["payment_confirmation_required"]
+    ):
+        if payload.card_pin is None:
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail=f"Transferurile peste {format_minor_amount(_PAYMENT_CONFIRMATION_THRESHOLD_MINOR)} "
+                f"{source['currency']} necesită confirmare cu PIN-ul cardului.",
+            )
+        if not await _verify_card_pin(source_card_settings["payment_confirmation_card_id"], payload.card_pin):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="PIN incorect.")
 
     # 10. descriere limitată rezonabil — garantat de validarea Pydantic (max_length=140)
 
@@ -241,13 +318,26 @@ async def create_transfer(
         "description": payload.description,
         "category": payload.category,
         "type": "transfer",
-        "status": "pending",
+        "status": "rejected" if blocklist_entry else "pending",
         "recognized": False,
         "reported": False,
         "created_at": now,
         "content_warning": content_warning,
     }
     insert_result = await db.transactions.insert_one(transaction_doc)
+
+    if blocklist_entry:
+        # BEN-04 — refuz direct: NICIODATĂ nu ajunge la accounts-service,
+        # soldul destinatarului/expeditorului rămâne complet neatins. Tot
+        # scrisă o evaluare de audit (GDPR — vezi fraud/audit.py), cu banda
+        # specială "reject", separată de scoring-ul normal 0-100.
+        await record_blocklist_rejection(transaction_id=insert_result.inserted_id, user_id=user_id, evaluated_at=now)
+        logger.warning(
+            "transactions-service: transfer REFUZAT — beneficiar pe blocklist (tx_id=%s, iban=%s)",
+            insert_result.inserted_id,
+            destination["iban"],
+        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acest beneficiar este pe lista de blocare a băncii.")
 
     # Scor fraud + audit. Când `fraud_shadow_mode` e activ (Faza 1), banda
     # întoarsă e ÎNTOTDEAUNA None — create_transfer nu are cum să ramifice
@@ -333,22 +423,28 @@ async def create_transfer(
         await db.transactions.update_one({"_id": insert_result.inserted_id}, {"$set": {"status": "completed"}})
         logger.info("transactions-service: transfer reușit (tx_id=%s)", insert_result.inserted_id)
 
-        await _notify_user(
-            user_id,
-            "transfer",
-            f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
-        )
+        # "Transaction alerts" (Security settings, Cardul meu) — vezi
+        # source_card_settings, calculat mai sus pentru "Payment confirmation";
+        # refolosit aici, nu mai facem un apel suplimentar pentru expeditor.
+        if source_card_settings["transaction_alerts_enabled"]:
+            await _notify_user(
+                user_id,
+                "transfer",
+                f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+            )
 
         # Destinatarul primea bani fără NICIO notificare — doar expeditorul
         # era anunțat mai sus. Excepție: transfer între propriile conturi
         # (destination["user_id"] == user_id) — notificarea de mai sus e
         # deja suficientă, a doua ar fi doar zgomot ("ai primit de la tine").
         if destination["user_id"] != user_id:
-            await _notify_user(
-                destination["user_id"],
-                "transfer_received",
-                f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
-            )
+            destination_card_settings = await _get_account_card_settings(destination["id"])
+            if destination_card_settings["transaction_alerts_enabled"]:
+                await _notify_user(
+                    destination["user_id"],
+                    "transfer_received",
+                    f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+                )
 
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
         # actualizează DOAR la transferuri efectiv "completed" — vezi
@@ -818,6 +914,157 @@ async def export_transactions_csv(user_id: str, filters: TransactionFilters) -> 
             ]
         )
     return buffer.getvalue()
+
+
+# Ce monedă de schimb valutar afectează fiecare tip de cont — vezi
+# exchange-service/app/service.py::_account_type_for_currency (mapping-ul
+# INVERS, folosit acolo la EXECUȚIE: RON -> "current", altfel lowercase).
+# savings/deposit/student sunt RON, DAR schimbul valutar NU le atinge
+# niciodată (doar "current" primește latura RON) — absente intenționat
+# din acest dict, nu doar "= RON" din greșeală.
+_EXCHANGE_CURRENCY_FOR_ACCOUNT_TYPE = {"current": "RON", "eur": "EUR", "usd": "USD", "gbp": "GBP"}
+
+
+async def _get_account_by_id(account_id: str, user_id: str) -> dict:
+    """Rezolvă UN cont anume al userului (nu doar "current") — folosit
+    STRICT de extrasul de cont (generate_account_statement), unde userul
+    alege contul din pagina Conturi. 404 dacă nu există SAU nu e al lui
+    (nu distingem cele două cazuri, ca să nu confirmăm existența unui cont
+    al altcuiva — același principiu ca restul aplicației)."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.get(f"{settings.accounts_service_url}/internal/accounts/{account_id}/for-user/{user_id}")
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+    if response.status_code == 404:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+    return response.json()
+
+
+async def _get_exchanges_for_user(user_id: str) -> list[dict]:
+    """Best-effort, la fel ca restul apelurilor cross-service din acest
+    fișier (ex. _get_user_name) — dacă exchange-service e indisponibil,
+    extrasul de cont tot se generează, doar fără liniile de schimb valutar
+    (mai bine incomplet decât să pice toată generarea extrasului)."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.exchange_service_url}/internal/exchanges/by-user/{user_id}")
+        if response.status_code == 200:
+            return response.json()
+    except httpx.RequestError:
+        logger.warning("transactions-service: exchange-service indisponibil la generarea extrasului de cont (user_id=%s)", user_id)
+    return []
+
+
+async def generate_account_statement(
+    user_id: str, date_from: datetime, date_to: datetime, account_id: str | None = None
+) -> tuple[bytes, str]:
+    """Extrasul de cont (PDF) pentru [date_from, date_to] (inclusiv) — al
+    contului curent (implicit, `account_id=None`) SAU al oricărui alt cont
+    al userului (economii/depozit/student/eur/usd/gbp — vezi pagina
+    Conturi, unde userul alege contul).
+
+    Combină DOUĂ surse de mișcări, ca soldul reconstruit să fie corect
+    indiferent de tipul contului:
+      - transferuri IBAN (tx_db, acest serviciu) — singura sursă pentru
+        economii/depozit/student (unica lor cale de alimentare) și una
+        dintre sursele contului curent.
+      - schimburi valutare (exchange-service) — un cont EUR/USD/GBP se
+        alimentează/debitează prin schimb, nu prin transfer IBAN; iar
+        latura RON a unui schimb chiar afectează și contul curent,
+        invizibilă pentru tx_db dacă n-am aduna-o aici (vezi
+        _EXCHANGE_CURRENCY_FOR_ACCOUNT_TYPE) — omisă, ar fi produs un sold
+        de început GREȘIT pentru orice user care a schimbat valută vreodată.
+
+    Soldul de început/sfârșit se reconstruiește din soldul CURENT al
+    contului + istoricul complet — vezi app/statement.py::
+    reconstruct_statement_balances.
+    """
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="Data de start trebuie să fie înaintea datei de final.")
+
+    # Normalizare la naive-UTC — Motor întoarce created_at fără tzinfo chiar
+    # dacă a fost scris tz-aware (același gotcha ca în
+    # _payment_request_effective_status); comparăm tot ce urmează în
+    # aceeași reprezentare, ca să evităm TypeError naive vs aware.
+    date_from = date_from.replace(tzinfo=None)
+    date_to = date_to.replace(tzinfo=None)
+
+    db = get_database()
+    source = await _get_account_by_user(user_id) if account_id is None else await _get_account_by_id(account_id, user_id)
+    holder_name = await _get_user_name(user_id) or "Titular MaestroBank"
+    account_type = source.get("account_type", "current")
+
+    cursor = db.transactions.find(
+        {"$or": [{"from_account_id": source["id"]}, {"to_account_id": source["id"]}], "status": "completed"}
+    ).sort("created_at", 1)
+    docs = await cursor.to_list(length=20_000)
+
+    movements: list[dict] = []
+    for doc in docs:
+        created_at = doc["created_at"]
+        if created_at.tzinfo is not None:
+            created_at = created_at.replace(tzinfo=None)
+        is_outgoing = doc["from_account_id"] == source["id"]
+        counterparty = doc.get("to_name") if is_outgoing else doc.get("from_name")
+        counterparty_iban = doc["to_iban"] if is_outgoing else doc["from_iban"]
+        movements.append(
+            {
+                "created_at": created_at,
+                "delta_minor": -doc["amount_minor"] if is_outgoing else doc["amount_minor"],
+                "description": doc.get("description") or counterparty or counterparty_iban,
+                "category": doc.get("category", "other"),
+            }
+        )
+
+    exchange_currency = _EXCHANGE_CURRENCY_FOR_ACCOUNT_TYPE.get(account_type)
+    if exchange_currency is not None:
+        for exch in await _get_exchanges_for_user(user_id):
+            created_at = datetime.fromisoformat(exch["created_at"])
+            if created_at.tzinfo is not None:
+                created_at = created_at.replace(tzinfo=None)
+            description = f"Schimb valutar {exch['from_currency']} → {exch['to_currency']}"
+            if exch["to_currency"] == exchange_currency:
+                movements.append(
+                    {
+                        "created_at": created_at,
+                        "delta_minor": exch["received_minor"],
+                        "description": description,
+                        "category": "exchange",
+                    }
+                )
+            elif exch["from_currency"] == exchange_currency:
+                movements.append(
+                    {
+                        "created_at": created_at,
+                        "delta_minor": -exch["amount_minor"],
+                        "description": description,
+                        "category": "exchange",
+                    }
+                )
+
+    opening_balance_minor, closing_balance_minor, period_lines = statement_module.reconstruct_statement_balances(
+        current_balance_minor=source["balance_minor"],
+        movements=movements,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    pdf_bytes = statement_module.render_statement_pdf(
+        holder_name=holder_name,
+        iban=source["iban"],
+        account_type=account_type,
+        currency=source["currency"],
+        date_from=date_from,
+        date_to=date_to,
+        opening_balance_minor=opening_balance_minor,
+        closing_balance_minor=closing_balance_minor,
+        lines=period_lines,
+    )
+    filename = f"extras-cont-{source['iban']}-{date_from.date().isoformat()}_{date_to.date().isoformat()}.pdf"
+    return pdf_bytes, filename
 
 
 async def recognize_transaction(transaction_id: str, user_id: str) -> dict:

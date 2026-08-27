@@ -1,0 +1,75 @@
+<app-page-header title="Blocklist beneficiari" subtitle="IBAN-uri refuzate direct la transfer, înainte de orice scoring — vezi BEN-04.">
+  <app-action-button variant="secondary" (pressed)="load()">
+    <app-icon name="reload" [size]="16" /> Reîmprospătează
+  </app-action-button>
+  <app-action-button variant="primary" (pressed)="openAdd()">
+    <app-icon name="plus" [size]="16" /> Adaugă IBAN
+  </app-action-button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="64" [gap]="12" />
+} @else if (error()) {
+  <app-empty-state icon="info" title="Nu am putut încărca lista" [description]="error()!" />
+} @else if (entries().length === 0) {
+  <app-empty-state icon="shield" title="Niciun beneficiar blocat" description="Adaugă un IBAN pentru a-l refuza direct la orice transfer, indiferent de scor." />
+} @else {
+  <div class="blocklist">
+    @for (entry of entries(); track entry.id) {
+      <div class="blocklist-row">
+        <div class="blocklist-row__main">
+          <app-icon name="lock" [size]="18" />
+          <div>
+            <p class="blocklist-row__iban">{{ entry.iban }}</p>
+            @if (entry.reason) {
+              <p class="blocklist-row__reason">{{ entry.reason }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="blocklist-row__meta">
+          <app-status-badge status="source" [toneOverride]="entry.source === 'manual' ? 'neutral' : 'warning'" [labelOverride]="sourceLabel(entry)" />
+          <span class="blocklist-row__date">{{ entry.created_at | date: 'dd MMM yyyy, HH:mm' }}</span>
+        </div>
+
+        <app-action-button variant="danger" (pressed)="askRemove(entry)">
+          <app-icon name="trash" [size]="15" /> Elimină
+        </app-action-button>
+      </div>
+    }
+  </div>
+}
+
+@if (addOpen()) {
+  <app-modal title="Adaugă beneficiar pe blocklist" [maxWidth]="440" (closed)="closeAdd()">
+    <form class="add-form" (ngSubmit)="submitAdd()">
+      <label class="add-form__field">
+        <span>IBAN</span>
+        <input type="text" name="iban" [ngModel]="ibanInput()" (ngModelChange)="ibanInput.set($event)" placeholder="RO49MAES1234567890123456" autocomplete="off" />
+      </label>
+      <label class="add-form__field">
+        <span>Motiv (opțional)</span>
+        <textarea name="reason" rows="3" [ngModel]="reasonInput()" (ngModelChange)="reasonInput.set($event)" placeholder="Ex: semnalat de intel extern, cont mulă cunoscut..."></textarea>
+      </label>
+      @if (addError()) {
+        <p class="add-form__error">{{ addError() }}</p>
+      }
+      <div class="add-form__actions">
+        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeAdd()">Anulează</app-action-button>
+        <app-action-button type="submit" variant="primary" [loading]="saving()">Adaugă pe listă</app-action-button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+@if (pendingRemoval(); as entry) {
+  <app-confirm-dialog
+    title="Elimini beneficiarul de pe listă?"
+    [message]="'Transferurile către ' + entry.iban + ' vor fi din nou permise (supuse scoring-ului normal, ca orice alt beneficiar).'"
+    confirmLabel="Elimină"
+    [danger]="true"
+    [loading]="removing()"
+    (confirmed)="confirmRemove()"
+    (cancelled)="cancelRemove()"
+  />
+}

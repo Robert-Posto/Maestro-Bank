@@ -15,9 +15,9 @@ Extern (prin Gateway) acestea devin:
   POST   /api/auth/webauthn/stepup/options     (JWT)
 """
 
-from fastapi import APIRouter, Header, status
+from fastapi import APIRouter, Header, Request, status
 
-from app import webauthn_service
+from app import login_events, webauthn_service
 from app.models import TokenResponse
 from app.models_webauthn import (
     CredentialOut,
@@ -57,8 +57,12 @@ async def login_options(payload: WebauthnLoginOptionsRequest):
 
 
 @router.post("/login/verify", response_model=TokenResponse)
-async def login_verify(payload: WebauthnLoginVerifyRequest):
-    token, _user = await webauthn_service.finish_login(payload.challenge_id, payload.credential)
+async def login_verify(payload: WebauthnLoginVerifyRequest, request: Request):
+    ip_address = login_events.extract_client_ip(request)
+    user_agent = request.headers.get("user-agent")
+    token, _user = await webauthn_service.finish_login(
+        payload.challenge_id, payload.credential, ip_address=ip_address, user_agent=user_agent
+    )
     return TokenResponse(access_token=token)
 
 

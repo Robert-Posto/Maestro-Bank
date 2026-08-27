@@ -94,6 +94,8 @@ class WindowFacts(BaseModel):
     beneficiary: BeneficiaryWindow = BeneficiaryWindow()
     identical_amount_distinct_beneficiaries_60min: int = 0
     recent_incoming_credit_minor: int | None = None  # cel mai recent credit intrat, în fereastră, pt BEH-03
+    new_beneficiaries_last_60min: int = 0  # VEL-03
+    near_threshold_count_last_24h: int = 0  # STR-01
 
 
 class DeviceFacts(BaseModel):
@@ -101,6 +103,44 @@ class DeviceFacts(BaseModel):
 
     latest_passkey_created_at: datetime | None = None
     data_available: bool = True  # False dacă auth-service a picat/timeout — fail-open, regula nu se declanșează
+
+
+class LoginEvent(BaseModel):
+    """O încercare de login, succes SAU eșec — vezi auth-service
+    app/login_events.py. `device_signature` e o aproximare (hash IP+UA),
+    NU un fingerprint real de dispozitiv — vezi planul fazei."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    device_signature: str | None = None
+    country: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    created_at: datetime
+
+
+class CredentialEvent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    event: Literal["enrolled", "revoked"]
+    created_at: datetime
+
+
+class SecurityFacts(BaseModel):
+    """Istoric login/credențiale — UN SINGUR apel către auth-service
+    (/internal/security-facts/{user_id}), consumat de VEL-04 și de
+    DEV-01/02/04/05/06. Separat de DeviceFacts (DOAR DEV-03, apel diferit,
+    deja existent înainte de această fază) — vezi planul fazei.
+    `recent_logins` vine deja sortat descrescător (cele mai recente
+    primele) de la auth-service."""
+
+    model_config = ConfigDict(frozen=True)
+
+    recent_logins: tuple[LoginEvent, ...] = ()
+    password_changed_at: datetime | None = None
+    recent_credential_events: tuple[CredentialEvent, ...] = ()
+    data_available: bool = True  # False dacă auth-service a picat/timeout — fail-open
 
 
 class RuleContext(BaseModel):
@@ -115,6 +155,7 @@ class RuleContext(BaseModel):
     window: WindowFacts
     cohort: CohortBaseline
     device: DeviceFacts
+    security: SecurityFacts
     evaluated_at: datetime
 
 

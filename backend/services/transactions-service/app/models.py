@@ -31,6 +31,13 @@ class TransferRequest(BaseModel):
     amount_minor: int = Field(gt=0, le=100_000_000)  # cap defensiv: max 1.000.000,00 RON/transfer
     description: str = Field(default="", max_length=140)
     category: str = Field(default="other")
+    # PIN-ul cardului — necesar DOAR dacă transferul depășește pragul de
+    # "Payment confirmation" (Security settings, Cardul meu) ȘI contul
+    # sursă are acest control activat pe vreun card — vezi
+    # service.py::_PAYMENT_CONFIRMATION_THRESHOLD_MINOR. Frontend-ul
+    # retrimite EXACT același request, cu acest câmp completat, după ce
+    # backend-ul respinge prima încercare cu 428 (vezi create_transfer).
+    card_pin: str | None = Field(default=None, min_length=4, max_length=4)
 
     @field_validator("to_iban")
     @classmethod
@@ -340,3 +347,36 @@ class HoldResolutionOut(BaseModel):
     @classmethod
     def from_transaction_doc(cls, doc: dict) -> "HoldResolutionOut":
         return cls(_id=doc["_id"], status=doc["status"], resolution=(doc.get("hold") or {}).get("resolution"))
+
+
+# --- Personal — blocklist de beneficiari (vezi app/blocklist.py, BEN-04) ---
+#
+# Scriere DOAR de personal — niciodată dintr-un raport de fraudă al unui
+# client (vezi motivul în docstring-ul app/blocklist.py).
+
+
+class BlocklistCreateRequest(BaseModel):
+    iban: str = Field(min_length=10, max_length=34)
+    reason: str = Field(default="", max_length=280)
+
+    @field_validator("iban")
+    @classmethod
+    def normalize_iban(cls, value: str) -> str:
+        return value.strip().upper().replace(" ", "")
+
+
+class BlocklistEntryOut(BaseModel):
+    id: str = Field(alias="_id")
+    iban: str
+    added_by: str
+    reason: str
+    source: Literal["confirmed_fraud_review", "manual"]
+    evaluation_id: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("id", "evaluation_id", mode="before")
+    @classmethod
+    def convert_object_id(cls, value: Any) -> str | None:
+        return str(value) if value is not None else None

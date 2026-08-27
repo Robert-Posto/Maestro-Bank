@@ -8,6 +8,7 @@ user_id trimis de frontend.
 Extern (prin Gateway) acestea devin:
   POST  /api/accounts/cards
   POST  /api/accounts/cards/{card_id}/reveal
+  PATCH /api/accounts/cards/{card_id}/pin
   PATCH /api/accounts/cards/{card_id}/freeze
   PATCH /api/accounts/cards/{card_id}/unfreeze
   PATCH /api/accounts/cards/{card_id}/settings
@@ -21,7 +22,15 @@ de rutare între cele două.
 from fastapi import APIRouter, status
 
 from app import service
-from app.models import CardCreateRequest, CardLimitUpdate, CardOut, CardRevealOut, CardRevealRequest, CardSettingsUpdate
+from app.models import (
+    CardCreateRequest,
+    CardLimitUpdate,
+    CardOut,
+    CardPinChangeRequest,
+    CardRevealOut,
+    CardRevealRequest,
+    CardSettingsUpdate,
+)
 from app.security import CurrentUserId
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -35,6 +44,11 @@ async def create_card(payload: CardCreateRequest, user_id: str = CurrentUserId):
 @router.post("/{card_id}/reveal", response_model=CardRevealOut)
 async def reveal_card(card_id: str, payload: CardRevealRequest, user_id: str = CurrentUserId):
     return await service.reveal_card(card_id, user_id, payload)
+
+
+@router.patch("/{card_id}/pin", response_model=CardOut, response_model_by_alias=False)
+async def change_card_pin(card_id: str, payload: CardPinChangeRequest, user_id: str = CurrentUserId):
+    return await service.change_card_pin(card_id, user_id, payload)
 
 
 @router.patch("/{card_id}/freeze", response_model=CardOut, response_model_by_alias=False)

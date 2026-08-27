@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
@@ -23,13 +23,195 @@ import { extractErrorMessage } from '../../shared/error-utils';
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
-export class Profile implements OnInit {
+export class Profile implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly webauthn = inject(WebauthnService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
   protected readonly currentUser = this.auth.currentUser;
+
+  // --- Poză de profil (opțională, la cererea userului) ---------------------
+  protected readonly profilePictureBusy = signal(false);
+
+  protected onProfilePictureSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = ''; // reset — re-selectarea ACELUIAȘI fișier trebuie să declanșeze din nou (change)
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Alege un fișier imagine (JPEG, PNG etc.).');
+      return;
+    }
+
+    this.profilePictureBusy.set(true);
+    this.resizeImageToDataUri(file, 200, 200, 0.85)
+      .then((dataUri) =>
+        this.auth.updateProfilePicture(dataUri).subscribe({
+          next: () => {
+            this.profilePictureBusy.set(false);
+            this.toast.success('Poza de profil a fost actualizată.');
+          },
+          error: (err) => {
+            this.profilePictureBusy.set(false);
+            this.toast.error(extractErrorMessage(err, 'Nu am putut salva poza de profil.'));
+          },
+        }),
+      )
+      .catch(() => {
+        this.profilePictureBusy.set(false);
+        this.toast.error('Nu am putut procesa imaginea — încearcă alt fișier.');
+      });
+  }
+
+  // --- Poză de profil, LIVE cu camera — la cererea userului, la fel ca
+  // pasul de verificare a identității (onboarding/verify-identity), dar
+  // aici e opțional și fără comparație DeepFace: doar captură + salvare
+  // directă. Reutilizăm ACELAȘI pipeline de redimensionare
+  // (resizeImageToDataUri) ca la upload din fișier, ca poza să iasă
+  // identică indiferent de sursă — wrapăm blob-ul capturat într-un File.
+  private readonly cameraVideo = viewChild<ElementRef<HTMLVideoElement>>('profileCameraVideo');
+  private readonly cameraCanvas = viewChild<ElementRef<HTMLCanvasElement>>('profileCameraCanvas');
+  private mediaStream: MediaStream | null = null;
+
+  protected readonly cameraActive = signal(false);
+  protected readonly cameraStream = signal<MediaStream | null>(null);
+  protected readonly cameraError = signal<string | null>(null);
+  protected readonly capturedPreviewUrl = signal<string | null>(null);
+  private capturedFile: File | null = null;
+
+  ngOnDestroy(): void {
+    this.stopCamera();
+  }
+
+  protected async startCamera(): Promise<void> {
+    this.cameraError.set(null);
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      // [srcObject] din template e legat de acest signal — nu depindem de
+      // timing-ul randării <video>-ului (ascuns până acum de @if).
+      this.cameraStream.set(this.mediaStream);
+      this.cameraActive.set(true);
+    } catch {
+      this.cameraError.set('Nu am putut accesa camera. Verifică permisiunile browserului.');
+    }
+  }
+
+  protected capturePhoto(): void {
+    const videoEl = this.cameraVideo()?.nativeElement;
+    const canvasEl = this.cameraCanvas()?.nativeElement;
+    if (!videoEl || !canvasEl) return;
+
+    canvasEl.width = videoEl.videoWidth;
+    canvasEl.height = videoEl.videoHeight;
+    const ctx = canvasEl.getContext('2d');
+    ctx?.drawImage(videoEl, 0, 0);
+
+    canvasEl.toBlob(
+      (blob) => {
+        if (!blob) return;
+        this.capturedFile = new File([blob], 'poza-profil.jpg', { type: 'image/jpeg' });
+        this.capturedPreviewUrl.set(URL.createObjectURL(blob));
+        this.stopCamera();
+      },
+      'image/jpeg',
+      0.92,
+    );
+  }
+
+  protected retakePhoto(): void {
+    this.capturedFile = null;
+    this.capturedPreviewUrl.set(null);
+    this.startCamera();
+  }
+
+  protected cancelCameraCapture(): void {
+    this.stopCamera();
+    this.capturedFile = null;
+    this.capturedPreviewUrl.set(null);
+  }
+
+  private stopCamera(): void {
+    this.mediaStream?.getTracks().forEach((track) => track.stop());
+    this.mediaStream = null;
+    this.cameraStream.set(null);
+    this.cameraActive.set(false);
+  }
+
+  protected saveCapturedPhoto(): void {
+    const file = this.capturedFile;
+    if (!file) return;
+
+    this.profilePictureBusy.set(true);
+    this.resizeImageToDataUri(file, 200, 200, 0.85)
+      .then((dataUri) =>
+        this.auth.updateProfilePicture(dataUri).subscribe({
+          next: () => {
+            this.profilePictureBusy.set(false);
+            this.capturedFile = null;
+            this.capturedPreviewUrl.set(null);
+            this.toast.success('Poza de profil a fost actualizată.');
+          },
+          error: (err) => {
+            this.profilePictureBusy.set(false);
+            this.toast.error(extractErrorMessage(err, 'Nu am putut salva poza de profil.'));
+          },
+        }),
+      )
+      .catch(() => {
+        this.profilePictureBusy.set(false);
+        this.toast.error('Nu am putut procesa imaginea — încearcă din nou.');
+      });
+  }
+
+  protected removeProfilePicture(): void {
+    this.profilePictureBusy.set(true);
+    this.auth.updateProfilePicture(null).subscribe({
+      next: () => {
+        this.profilePictureBusy.set(false);
+        this.toast.success('Poza de profil a fost ștearsă.');
+      },
+      error: (err) => {
+        this.profilePictureBusy.set(false);
+        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge poza de profil.'));
+      },
+    });
+  }
+
+  /** Redimensionează + comprimă imaginea ÎN BROWSER (canvas) înainte de a o
+   * trimite — backend-ul o stochează direct în Mongo, fără storage extern
+   * (vezi auth-service/app/models.py::ProfilePictureUpdate), deci ținem
+   * poza mică intenționat (crop pătrat centrat, ~200x200, JPEG). */
+  private resizeImageToDataUri(file: File, targetWidth: number, targetHeight: number, quality: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Imagine invalidă.'));
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas indisponibil.'));
+            return;
+          }
+          // Crop pătrat centrat, apoi scalare la dimensiunea țintă — poza
+          // nu apare distorsionată dacă originalul nu e deja pătrat.
+          const side = Math.min(img.width, img.height);
+          const sx = (img.width - side) / 2;
+          const sy = (img.height - side) / 2;
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, targetWidth, targetHeight);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   protected readonly currentPassword = signal('');
   protected readonly newPassword = signal('');
