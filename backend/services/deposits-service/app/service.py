@@ -168,3 +168,16 @@ async def _get_own_active_deposit(deposit_id: str, user_id: str) -> dict:
     if doc["status"] != "active":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Depozitul nu mai este activ.")
     return doc
+
+
+async def liquidate_early(deposit_id: str, user_id: str) -> DepositOut:
+    """Lichidare anticipată — userul primește ÎNAPOI DOAR principalul,
+    dobânda acumulată se pierde integral (decizie confirmată în spec)."""
+    doc = await _get_own_active_deposit(deposit_id, user_id)
+    await _credit_account(doc["source_account_id"], doc["principal_minor"])
+
+    db = get_database()
+    await db.deposits.update_one({"_id": doc["_id"]}, {"$set": {"status": "liquidated_early"}})
+    doc["status"] = "liquidated_early"
+    logger.info("deposits-service: depozit lichidat anticipat (id=%s, user_id=%s)", doc["_id"], user_id)
+    return _to_deposit_out(doc)

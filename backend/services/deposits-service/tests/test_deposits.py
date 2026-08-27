@@ -124,3 +124,36 @@ async def test_list_my_deposits_returns_only_own(mock_accounts):
 async def test_open_deposit_http_endpoint_requires_auth(client: AsyncClient):
     response = await client.post("/deposits", json={"currency": "RON", "term_months": 12, "amount_minor": 100_000})
     assert response.status_code == 401
+
+
+async def test_liquidate_early_returns_only_principal_no_interest(mock_accounts):
+    from app.service import liquidate_early, open_deposit
+
+    deposit = await open_deposit(USER_ID, DepositOpenRequest(currency="RON", term_months=12, amount_minor=100_000))
+    balance_after_open = mock_accounts["balance_minor"]  # 100.000
+
+    result = await liquidate_early(deposit.id, USER_ID)
+    assert result.status == "liquidated_early"
+    # Doar principalul revine — NU principal + interest_minor (5.750)
+    assert mock_accounts["balance_minor"] == balance_after_open + 100_000
+
+
+async def test_liquidate_early_rejects_other_users_deposit(mock_accounts):
+    from app.service import liquidate_early, open_deposit
+
+    deposit = await open_deposit(USER_ID, DepositOpenRequest(currency="RON", term_months=12, amount_minor=100_000))
+
+    with pytest.raises(Exception) as exc_info:
+        await liquidate_early(deposit.id, str(ObjectId()))
+    assert exc_info.value.status_code == 404
+
+
+async def test_liquidate_early_rejects_already_liquidated(mock_accounts):
+    from app.service import liquidate_early, open_deposit
+
+    deposit = await open_deposit(USER_ID, DepositOpenRequest(currency="RON", term_months=12, amount_minor=100_000))
+    await liquidate_early(deposit.id, USER_ID)
+
+    with pytest.raises(Exception) as exc_info:
+        await liquidate_early(deposit.id, USER_ID)
+    assert exc_info.value.status_code == 409
