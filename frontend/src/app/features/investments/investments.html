@@ -1,0 +1,143 @@
+<app-page-header title="Investiții" subtitle="Cumpără și vinde acțiuni și ETF-uri, cu preț real de piață." />
+
+@if (!usdAccount()) {
+  <app-empty-state
+    icon="globe"
+    title="Ai nevoie de un cont USD"
+    description="Toate instrumentele se tranzacționează în USD — deschide un cont USD din pagina Conturi înainte de a investi."
+  >
+    <app-action-button (pressed)="goToOpenAccount()">Deschide cont USD</app-action-button>
+  </app-empty-state>
+} @else {
+  <div class="investments-summary">
+    <div class="investments-summary__card">
+      <span class="investments-summary__label">Valoare portofoliu</span>
+      <strong>{{ portfolioValueMinor() | money: 'USD' }}</strong>
+    </div>
+    <div class="investments-summary__card">
+      <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
+      <strong [class.investments-summary__gain--positive]="portfolioGainMinor() >= 0" [class.investments-summary__gain--negative]="portfolioGainMinor() < 0">
+        {{ portfolioGainMinor() | money: 'USD' }}
+      </strong>
+    </div>
+    <div class="investments-summary__card">
+      <span class="investments-summary__label">Sold disponibil (USD)</span>
+      <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
+    </div>
+  </div>
+
+  <section class="investments-section">
+    <h2>Portofoliul tău</h2>
+    @if (portfolioLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="60" />
+    } @else if (portfolio().length === 0) {
+      <app-empty-state icon="trending-up" title="Niciun instrument încă" description="Alege ceva din catalogul de mai jos ca să începi." />
+    } @else {
+      <div class="holdings-table-wrap">
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th>Simbol</th>
+              <th>Cantitate</th>
+              <th>Preț mediu</th>
+              <th>Preț curent</th>
+              <th>Valoare</th>
+              <th>Câștig/pierdere</th>
+              <th aria-label="Acțiuni"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (holding of portfolio(); track holding.symbol) {
+              <tr>
+                <td>
+                  <strong>{{ holding.symbol }}</strong>
+                  <span class="holdings-table__name">{{ holding.name }}</span>
+                </td>
+                <td>{{ holding.quantity | number: '1.0-4' }}</td>
+                <td>{{ holding.avg_cost_minor_per_share | money: 'USD' }}</td>
+                <td>{{ holding.current_price_minor | money: 'USD' }}</td>
+                <td>{{ holding.current_value_minor | money: 'USD' }}</td>
+                <td [class.holdings-table__gain--positive]="holding.unrealized_gain_minor >= 0" [class.holdings-table__gain--negative]="holding.unrealized_gain_minor < 0">
+                  {{ holding.unrealized_gain_minor | money: 'USD' }} ({{ holding.unrealized_gain_percent }}%)
+                </td>
+                <td>
+                  <app-action-button variant="ghost" (pressed)="openSellModal(holding)">Vinde</app-action-button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section class="investments-section">
+    <h2>Catalog</h2>
+    @if (instrumentsLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="70" />
+    } @else {
+      <div class="instruments-grid">
+        @for (instrument of instruments(); track instrument.symbol) {
+          <div class="instrument-card">
+            <div class="instrument-card__top">
+              <strong>{{ instrument.symbol }}</strong>
+              @if (instrument.price_minor !== null) {
+                <span class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</span>
+              }
+            </div>
+            <p class="instrument-card__name">{{ instrument.name }}</p>
+            <app-action-button
+              variant="secondary"
+              [fullWidth]="true"
+              [disabled]="instrument.price_minor === null"
+              (pressed)="openBuyModal(instrument)"
+            >
+              Cumpără
+            </app-action-button>
+          </div>
+        }
+      </div>
+    }
+  </section>
+}
+
+@if (buyModalInstrument(); as instrument) {
+  <app-modal [title]="'Cumpără ' + instrument.symbol" (closed)="closeBuyModal()">
+    <div class="trade-form">
+      <p class="trade-form__price">Preț curent: {{ instrument.price_minor | money: 'USD' }} / acțiune</p>
+      <label>
+        <span>Sumă (USD)</span>
+        <input type="number" min="1" step="1" [ngModel]="buyAmountUsd()" (ngModelChange)="buyAmountUsd.set($event)" />
+      </label>
+      @if (instrument.price_minor) {
+        <p class="trade-form__hint">
+          ≈ {{ (buyAmountUsd() * 100 / instrument.price_minor) | number: '1.0-4' }} acțiuni
+        </p>
+      }
+      <app-action-button [fullWidth]="true" [loading]="buying()" (pressed)="confirmBuy()">Confirmă cumpărarea</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (sellModalHolding(); as holding) {
+  <app-modal [title]="'Vinde ' + holding.symbol" (closed)="sellModalHolding.set(null)">
+    <div class="trade-form">
+      <p class="trade-form__price">Deții {{ holding.quantity | number: '1.0-4' }} · preț curent {{ holding.current_price_minor | money: 'USD' }} / acțiune</p>
+      <label>
+        <span>Cantitate</span>
+        <input
+          type="number"
+          min="0"
+          [max]="holding.quantity"
+          step="0.0001"
+          [ngModel]="sellQuantity()"
+          (ngModelChange)="sellQuantity.set($event)"
+        />
+      </label>
+      <p class="trade-form__hint">
+        ≈ {{ (sellQuantity() * holding.current_price_minor) | money: 'USD' }} încasați
+      </p>
+      <app-action-button [fullWidth]="true" [loading]="selling()" (pressed)="confirmSell()">Confirmă vânzarea</app-action-button>
+    </div>
+  </app-modal>
+}

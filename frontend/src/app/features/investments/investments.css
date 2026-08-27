@@ -1,0 +1,184 @@
+.investments-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mb-space-4);
+  margin-bottom: var(--mb-space-6);
+}
+
+.investments-summary__card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+}
+
+.investments-summary__label {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.investments-summary__card strong {
+  font-size: var(--mb-font-size-xl);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.investments-summary__gain--positive {
+  color: var(--mb-positive);
+}
+
+.investments-summary__gain--negative {
+  color: var(--mb-negative);
+}
+
+.investments-section {
+  margin-bottom: var(--mb-space-8);
+}
+
+.investments-section h2 {
+  font-size: var(--mb-font-size-base);
+  margin-bottom: var(--mb-space-4);
+}
+
+/* --- Portofoliu ------------------------------------------------------------ */
+
+.holdings-table-wrap {
+  overflow-x: auto;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.holdings-table th {
+  text-align: left;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  font-weight: var(--mb-font-weight-medium);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+  white-space: nowrap;
+}
+
+.holdings-table td {
+  padding: var(--mb-space-3) var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+  font-size: var(--mb-font-size-sm);
+  white-space: nowrap;
+}
+
+.holdings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.holdings-table__name {
+  display: block;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.holdings-table__gain--positive {
+  color: var(--mb-positive);
+}
+
+.holdings-table__gain--negative {
+  color: var(--mb-negative);
+}
+
+/* --- Catalog ----------------------------------------------------------------- */
+
+.instruments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--mb-space-4);
+}
+
+.instrument-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+}
+
+.instrument-card__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.instrument-card__top strong {
+  font-size: var(--mb-font-size-base);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.instrument-card__price {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.instrument-card__name {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+  min-height: 2.4em;
+}
+
+/* --- Formulare cumpărare/vânzare (modale) ------------------------------------ */
+
+.trade-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.trade-form__price {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.trade-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.trade-form input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  min-height: 44px;
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.trade-form input:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.trade-form__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: -8px;
+}
+
+@media (max-width: 900px) {
+  .investments-summary {
+    grid-template-columns: 1fr;
+  }
+}
