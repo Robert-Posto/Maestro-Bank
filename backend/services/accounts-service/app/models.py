@@ -418,6 +418,24 @@ class InternalExchangeResponse(BaseModel):
     to_balance_minor: int
 
 
+class InternalDebitRequest(BaseModel):
+    amount_minor: int = Field(gt=0)
+
+
+class InternalCreditRequest(BaseModel):
+    amount_minor: int = Field(gt=0)
+
+
+class InternalBalanceOut(BaseModel):
+    """Răspunsul comun al debit/credit — folosit de deposits-service (și,
+    mai târziu, de un eventual serviciu de investiții) pentru primitive
+    GENERICE, cu un singur cont — spre deosebire de InternalTransferResponse
+    (cont->cont) și InternalExchangeResponse (RON<->valută), niciuna nu se
+    potrivește cu "banii ies dintr-un cont și intră într-un depozit"."""
+
+    balance_minor: int
+
+
 class FraudHoldingAccountView(BaseModel):
     """Contul-pseudo intern în care staționează fondurile unui transfer
     reținut de motorul de fraud — vezi service.py::ensure_fraud_holding_account

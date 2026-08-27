@@ -15,6 +15,7 @@ import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
+from pymongo import ReturnDocument
 
 from app import pin as pin_module
 from app.config import settings
@@ -31,6 +32,7 @@ from app.models import (
     CardSettingsUpdate,
     CreatableAccountType,
     InternalAccountView,
+    InternalBalanceOut,
     InternalCardSettingsView,
     InternalExchangeResponse,
     InternalTransferResponse,
@@ -889,6 +891,66 @@ async def get_account_by_user(user_id: str) -> InternalAccountView:
     account = await db.accounts.find_one({"user_id": user_id, "account_type": "current"})
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu există cont pentru acest user_id.")
+    return _to_internal_view(account)
+
+
+async def debit_account(account_id: str, amount_minor: int) -> InternalBalanceOut:
+    """Primitivă GENERICĂ, cu un singur cont — spre deosebire de
+    apply_internal_transfer (cont->cont) și apply_internal_exchange
+    (RON<->valută), niciuna nu se potrivește cu "banii ies dintr-un cont și
+    intră într-un depozit" (sau, mai târziu, într-o investiție) — depozitul/
+    investiția nu e un document accounts_db.accounts. Aceeași atomicitate
+    condiționată ca apply_internal_transfer (vezi acolo nota completă despre
+    limitele ei — MongoDB standalone, fără tranzacții multi-document reale).
+    Apelat DOAR de deposits-service (și, mai târziu, de un eventual serviciu
+    de investiții)."""
+    db = get_database()
+    try:
+        oid = ObjectId(account_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+
+    result = await db.accounts.find_one_and_update(
+        {"_id": oid, "status": "active", "balance_minor": {"$gte": amount_minor}},
+        {"$inc": {"balance_minor": -amount_minor}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient sau cont inactiv/inexistent."
+        )
+    return InternalBalanceOut(balance_minor=result["balance_minor"])
+
+
+async def credit_account(account_id: str, amount_minor: int) -> InternalBalanceOut:
+    """Partenerul lui debit_account — vezi acolo pentru context."""
+    db = get_database()
+    try:
+        oid = ObjectId(account_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+
+    result = await db.accounts.find_one_and_update(
+        {"_id": oid, "status": "active"},
+        {"$inc": {"balance_minor": amount_minor}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent sau inactiv.")
+    return InternalBalanceOut(balance_minor=result["balance_minor"])
+
+
+async def get_account_by_user_and_type(user_id: str, account_type: str) -> InternalAccountView:
+    """Rezolvă contul userului pt UN tip anume — la fel ca rezolvarea din
+    apply_internal_exchange, extrasă aici ca primitivă separată, reutilizabilă
+    de deposits-service (care are nevoie DOAR de rezolvare, nu de un schimb
+    complet cont->cont)."""
+    db = get_database()
+    account = await db.accounts.find_one({"user_id": user_id, "account_type": account_type})
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Nu ai un cont de tipul '{account_type}'."
+        )
     return _to_internal_view(account)
 
 

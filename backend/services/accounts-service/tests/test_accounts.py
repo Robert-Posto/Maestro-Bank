@@ -536,3 +536,63 @@ async def test_get_account_by_id_public_route_rejects_other_users_account(client
     other_user_id = str(ObjectId())
     response = await client.get(f"/{account_id}", headers={"Authorization": f"Bearer {_make_token(other_user_id)}"})
     assert response.status_code == 404
+
+
+# --- Primitive generice (debit/credit UN cont, rezolvare cont per user+tip)
+# folosite de deposits-service (și, mai târziu, de un eventual serviciu de
+# investiții) — vezi app/service.py::debit_account / credit_account /
+# get_account_by_user_and_type.
+
+
+async def test_debit_account_succeeds_with_sufficient_funds(client: AsyncClient):
+    user_id, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+    await client.post("/dev/fund", json={"amount_minor": 100_000}, headers={"Authorization": f"Bearer {_make_token(user_id)}"})
+
+    response = await client.post(f"/internal/accounts/{account_id}/debit", json={"amount_minor": 30_000})
+    assert response.status_code == 200
+    assert response.json()["balance_minor"] == 70_000
+
+
+async def test_debit_account_rejects_insufficient_funds(client: AsyncClient):
+    user_id, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+
+    response = await client.post(f"/internal/accounts/{account_id}/debit", json={"amount_minor": 500_000})
+    assert response.status_code == 409
+
+
+async def test_debit_account_rejects_invalid_id(client: AsyncClient):
+    response = await client.post("/internal/accounts/not-an-object-id/debit", json={"amount_minor": 100})
+    assert response.status_code == 400
+
+
+async def test_credit_account_succeeds(client: AsyncClient):
+    _, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+
+    response = await client.post(f"/internal/accounts/{account_id}/credit", json={"amount_minor": 25_000})
+    assert response.status_code == 200
+    assert response.json()["balance_minor"] == 25_000
+
+
+async def test_credit_account_rejects_unknown_account(client: AsyncClient):
+    response = await client.post(f"/internal/accounts/{ObjectId()}/credit", json={"amount_minor": 1_000})
+    assert response.status_code == 404
+
+
+async def test_get_account_by_user_and_type_returns_current(client: AsyncClient):
+    user_id, provisioned = await _provision(client)
+    account_id = provisioned["account"]["_id"]
+
+    response = await client.get(f"/internal/accounts/by-user-and-type/{user_id}/current")
+    assert response.status_code == 200
+    assert response.json()["id"] == account_id
+    assert response.json()["account_type"] == "current"
+
+
+async def test_get_account_by_user_and_type_404_when_missing(client: AsyncClient):
+    user_id, _ = await _provision(client)
+
+    response = await client.get(f"/internal/accounts/by-user-and-type/{user_id}/eur")
+    assert response.status_code == 404

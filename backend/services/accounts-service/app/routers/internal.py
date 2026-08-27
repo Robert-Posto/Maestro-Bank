@@ -18,7 +18,10 @@ from app.models import (
     AccountPublicOut,
     FraudHoldingAccountView,
     InternalAccountView,
+    InternalBalanceOut,
     InternalCardSettingsView,
+    InternalCreditRequest,
+    InternalDebitRequest,
     InternalExchangeRequest,
     InternalExchangeResponse,
     InternalTransferRequest,
@@ -94,3 +97,20 @@ async def apply_internal_exchange(payload: InternalExchangeRequest):
     return await service.apply_internal_exchange(
         payload.user_id, payload.from_account_type, payload.to_account_type, payload.debit_minor, payload.credit_minor
     )
+
+
+@router.post("/{account_id}/debit", response_model=InternalBalanceOut)
+async def debit_account_internal(account_id: str, payload: InternalDebitRequest):
+    """Primitivă GENERICĂ folosită de deposits-service (și, mai târziu, de
+    un eventual serviciu de investiții) — vezi app/service.py::debit_account."""
+    return await service.debit_account(account_id, payload.amount_minor)
+
+
+@router.post("/{account_id}/credit", response_model=InternalBalanceOut)
+async def credit_account_internal(account_id: str, payload: InternalCreditRequest):
+    return await service.credit_account(account_id, payload.amount_minor)
+
+
+@router.get("/by-user-and-type/{user_id}/{account_type}", response_model=InternalAccountView)
+async def get_account_by_user_and_type_internal(user_id: str, account_type: str):
+    return await service.get_account_by_user_and_type(user_id, account_type)
