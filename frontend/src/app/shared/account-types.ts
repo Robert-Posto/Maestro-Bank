@@ -95,4 +95,4 @@ export const ACCOUNT_TYPE_CATALOG: Record<AccountType, AccountTypeMeta> = {
 };
 
 /** Tipurile pe care userul le poate deschide manual (nu include "current" — acela vine automat la înregistrare). */
-export const CREATABLE_ACCOUNT_TYPES: CreatableAccountType[] = ['savings', 'deposit', 'student', 'eur', 'usd', 'gbp'];
+export const CREATABLE_ACCOUNT_TYPES: CreatableAccountType[] = ['savings', 'student', 'eur', 'usd', 'gbp'];
