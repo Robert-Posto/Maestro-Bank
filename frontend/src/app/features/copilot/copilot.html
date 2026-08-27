@@ -1,7 +1,58 @@
+<div class="copilot-page">
 <app-page-header title="MaestroAssistent" subtitle="Întreabă orice despre banii tăi." />
 
 <div class="copilot-layout">
   <section class="copilot-chat" [class.copilot-chat--empty]="chatMessages().length === 0" aria-label="Chat MaestroAssistent">
+    <header class="copilot-chat__bar">
+      <div class="copilot-chat__identity">
+        <span class="copilot-chat__identity-avatar"><app-icon name="sparkles" [size]="17" /></span>
+        <div class="copilot-chat__identity-text">
+          <strong>MaestroAssistent</strong>
+          <span>Spending + Forecast Agent</span>
+        </div>
+      </div>
+
+      <div class="copilot-chat__conversations" #conversationsMenuEl>
+        <button
+          type="button"
+          class="copilot-chat__conversations-trigger"
+          [class.copilot-chat__conversations-trigger--open]="conversationsMenuOpen()"
+          (click)="toggleConversationsMenu()"
+        >
+          <span>{{ activeConversationTitle() }}</span>
+          <app-icon name="chevron-down" [size]="14" />
+        </button>
+
+        @if (conversationsMenuOpen()) {
+          <div class="copilot-chat__conversations-menu">
+            <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
+              <app-icon name="plus" [size]="14" /> Conversație nouă
+            </button>
+            @if (conversations().length === 0) {
+              <p class="copilot-conversations__empty">Nicio conversație salvată încă.</p>
+            } @else {
+              <div class="copilot-conversations__list">
+                @for (conversation of conversations(); track conversation.id) {
+                  <button
+                    type="button"
+                    class="copilot-conversations__item"
+                    [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
+                    (click)="openConversation(conversation.id)"
+                  >
+                    <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
+                    <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+                    <span class="copilot-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                      <app-icon name="trash" [size]="13" />
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </header>
+
     <div class="copilot-chat__messages" #messagesEl aria-live="polite">
       @if (chatMessages().length === 0) {
         <div class="copilot-welcome">
@@ -174,8 +225,9 @@
           <span class="copilot-message-avatar"><app-icon name="sparkles" [size]="16" /></span>
           <div class="copilot-message-col">
             <span class="copilot-message-name">MaestroAssistent</span>
-            <div class="copilot-bubble copilot-bubble--typing" aria-label="MaestroAssistent analizează datele tale...">
-              <span></span><span></span><span></span>
+            <div class="copilot-thinking" aria-label="MaestroAssistent analizează datele tale...">
+              <span class="copilot-thinking__word">{{ thinkingWord() }}</span>
+              <span class="copilot-thinking__dots"><span></span><span></span><span></span></span>
             </div>
             @if (sendingSlow()) {
               <span class="copilot-slow-hint">Analizez cheltuielile, forecast-ul și abonamentele tale — mai durează puțin.</span>
@@ -225,35 +277,6 @@
 
   <aside class="copilot-side">
     <div class="copilot-side-card">
-      <div class="copilot-side-card__header">
-        <strong>Conversații</strong>
-        <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
-          <app-icon name="plus" [size]="14" /> Nouă
-        </button>
-      </div>
-      @if (conversations().length === 0) {
-        <p class="copilot-conversations__empty">Nicio conversație salvată încă.</p>
-      } @else {
-        <div class="copilot-conversations__list">
-          @for (conversation of conversations(); track conversation.id) {
-            <button
-              type="button"
-              class="copilot-conversations__item"
-              [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
-              (click)="openConversation(conversation.id)"
-            >
-              <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
-              <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-              <span class="copilot-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
-                <app-icon name="trash" [size]="13" />
-              </span>
-            </button>
-          }
-        </div>
-      }
-    </div>
-
-    <div class="copilot-side-card">
       <div class="copilot-side-card__header"><strong>Context financiar</strong></div>
       @if (lastResponse(); as ctx) {
         <div class="copilot-context-grid">
@@ -294,16 +317,6 @@
         </div>
       }
     </div>
-
-    <div class="copilot-side-card">
-      <div class="copilot-side-card__header"><strong>Agentul folosit</strong></div>
-      <div class="copilot-agent">
-        <span class="copilot-agent__icon"><app-icon name="copilot" [size]="16" /></span>
-        <div>
-          <strong>Spending + Forecast Agent</strong>
-          <p>Analizează cheltuielile curente, proiectează soldul de final de lună și evaluează dacă îți permiți o sumă — cu date reale din contul tău, prin GPT-5-mini.</p>
-        </div>
-      </div>
-    </div>
   </aside>
+</div>
 </div>

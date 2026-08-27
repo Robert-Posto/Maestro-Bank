@@ -417,6 +417,7 @@ async def create_transfer(
             "transfer_hold",
             f"Transferul de {format_minor_amount(payload.amount_minor)} {source['currency']} către "
             f"{payload.to_iban} este în verificare de securitate — vei fi anunțat imediat ce e rezolvat.",
+            reference_id=str(insert_result.inserted_id),
         )
     else:
         # NU returnăm "completed" înainte ca accounts-service să fi confirmat.
@@ -431,6 +432,7 @@ async def create_transfer(
                 user_id,
                 "transfer",
                 f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+                reference_id=str(insert_result.inserted_id),
             )
 
         # Destinatarul primea bani fără NICIO notificare — doar expeditorul
@@ -444,6 +446,7 @@ async def create_transfer(
                     destination["user_id"],
                     "transfer_received",
                     f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+                    reference_id=str(insert_result.inserted_id),
                 )
 
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
@@ -495,21 +498,28 @@ async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:
     updated_doc = await holds.cancel_hold(transaction_id)
     logger.info("transactions-service: hold anulat de client (tx_id=%s)", transaction_id)
     await _notify_user(
-        user_id, "transfer_hold_cancelled", "Ai anulat transferul reținut — fondurile au revenit în cont."
+        user_id,
+        "transfer_hold_cancelled",
+        "Ai anulat transferul reținut — fondurile au revenit în cont.",
+        reference_id=transaction_id,
     )
     return to_transaction_view(updated_doc, viewer_account_id=source["id"])
 
 
-async def _notify_user(user_id: str, kind: str, text: str) -> None:
+async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
     """Trimite o notificare persistentă către support-service. NU blochează
     și NU eșuează operația principală dacă support-service e indisponibil —
     la fel ca provisioning-ul de cont din auth-service, o notificare
-    pierdută nu trebuie să strice fluxul de bani."""
+    pierdută nu trebuie să strice fluxul de bani.
+
+    `reference_id` (id-ul tranzacției) e opțional — folosit de frontend ca
+    să deschidă direct tranzacția respectivă la click pe notificare, în loc
+    de doar pagina generică de Tranzacții (vezi Topbar::openNotification)."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text},
+                json={"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id},
             )
     except httpx.HTTPError:
         logger.warning("transactions-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)

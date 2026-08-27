@@ -291,6 +291,24 @@
 .topbar__notification-body {
   flex: 1;
   min-width: 0;
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--mb-radius-sm);
+}
+
+.topbar__notification-body:hover p,
+.topbar__notification-body:focus-visible p {
+  color: var(--mb-blue-600);
+}
+
+.topbar__notification-body:focus-visible {
+  outline: 2px solid var(--mb-blue-500);
+  outline-offset: 2px;
 }
 
 /* „X"-ul de ștergere: apare la hover pe rând, ca lista să nu fie plină de

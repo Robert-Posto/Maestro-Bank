@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -70,6 +70,18 @@ const FAQ_ITEMS = [
   { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
 ];
 
+/** Cuvinte care se rotesc cât timp agentul lucrează — vezi
+ * copilot.ts::THINKING_WORDS, același concept (jocuri de cuvinte, stil
+ * Claude), listă proprie pentru Support Agent. */
+const THINKING_WORDS = [
+  'Maestroing',
+  'Detectivind',
+  'Răscolind',
+  'Percolând',
+  'Investigând',
+  'Chibzuind',
+];
+
 interface ChatMessage {
   id: number;
   role: 'support' | 'user';
@@ -112,6 +124,7 @@ export class Support implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
+  private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
   protected readonly faqItems = FAQ_ITEMS;
 
@@ -127,7 +140,9 @@ export class Support implements OnInit, OnDestroy {
    * (vezi timeout-ul de pe backend, app/llm/azure_openai.py) — ca userul
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly supportTypingSlow = signal(false);
+  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
+  private thinkingWordTimer?: ReturnType<typeof setInterval>;
   private readonly pendingAction = signal<AiPendingAction | null>(null);
   /** Gol doar la prima vizită/conversație nouă — caz în care arată ecranul
    * de bun-venit cu sugestii, nu un mesaj seedat static (ca MaestroAssistent
@@ -135,6 +150,15 @@ export class Support implements OnInit, OnDestroy {
   protected readonly chatMessages = signal<ChatMessage[]>([]);
   protected readonly conversations = signal<ConversationSummary[]>([]);
   protected readonly activeConversationId = signal<string | null>(null);
+  protected readonly conversationsMenuOpen = signal(false);
+
+  /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
+   * Copilot::activeConversationTitle, același comportament. */
+  protected readonly activeConversationTitle = computed(() => {
+    const id = this.activeConversationId();
+    if (!id) return 'Conversație nouă';
+    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+  });
 
   constructor() {
     effect(() => {
@@ -157,6 +181,7 @@ export class Support implements OnInit, OnDestroy {
     // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
     // plecat de pe pagină — vezi Copilot::ngOnDestroy, același motiv.
     this.speech.stopSpeaking();
+    clearInterval(this.thinkingWordTimer);
   }
 
   private loadConversations(): void {
@@ -165,13 +190,28 @@ export class Support implements OnInit, OnDestroy {
     });
   }
 
+  protected toggleConversationsMenu(): void {
+    this.conversationsMenuOpen.update((open) => !open);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.conversationsMenuOpen()) return;
+    const menu = this.conversationsMenuEl()?.nativeElement;
+    if (menu && !menu.contains(event.target as Node)) {
+      this.conversationsMenuOpen.set(false);
+    }
+  }
+
   protected startNewConversation(): void {
+    this.conversationsMenuOpen.set(false);
     this.activeConversationId.set(null);
     this.pendingAction.set(null);
     this.chatMessages.set([]);
   }
 
   protected openConversation(id: string): void {
+    this.conversationsMenuOpen.set(false);
     if (id === this.activeConversationId()) return;
     this.aiSupport.getConversation(id).subscribe({
       next: (detail: ConversationDetail) => {
@@ -283,6 +323,7 @@ export class Support implements OnInit, OnDestroy {
     // Majoritatea răspunsurilor vin în 10-20s (tool-calling GPT-5-mini) —
     // dacă trece mai mult, arătăm un indiciu, ca să nu pară că s-a blocat.
     this.slowTimer = setTimeout(() => this.supportTypingSlow.set(true), 15_000);
+    this.startThinkingWords();
 
     this.aiSupport.chat({ message: text, conversation_id: this.activeConversationId(), pending_action: pending }).subscribe({
       next: (response) => {
@@ -319,6 +360,18 @@ export class Support implements OnInit, OnDestroy {
     this.supportTyping.set(false);
     this.supportTypingSlow.set(false);
     clearTimeout(this.slowTimer);
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  /** Vezi Copilot::startThinkingWords, același comportament. */
+  private startThinkingWords(): void {
+    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    this.thinkingWordTimer = setInterval(() => {
+      this.thinkingWord.update((current) => {
+        const options = THINKING_WORDS.filter((w) => w !== current);
+        return options[Math.floor(Math.random() * options.length)];
+      });
+    }, 1800);
   }
 
   /** Eticheta reală a unui tip de cont (ex. "Cont de economii") — REFOLOSEȘTE

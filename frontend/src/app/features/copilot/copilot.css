@@ -1,26 +1,188 @@
+/* Rădăcina paginii — o coloană flex cu înălțime FIXĂ (100vh minus topbar
+   minus padding-ul vertical al .app-shell__content — ambele tokenuri
+   EXACTE, nu o estimare). PageHeader ia înălțimea lui naturală, iar
+   .copilot-layout ia tot ce rămâne (flex: 1; min-height: 0) — flexbox
+   calculează asta automat, indiferent cât de lung e titlul/subtitlul, deci
+   nu mai ghicim nimic. Rezultatul: UN SINGUR loc care derulează —
+   .copilot-chat__messages mai jos — nu pagina, nu cutia, nu panoul lateral. */
+.copilot-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--mb-topbar-height) - var(--mb-space-6) - var(--mb-space-10));
+}
+
+@media (max-width: 900px) {
+  /* Sub pragul ăsta layout-ul devine cu totul o coloană (chat + context sub
+     el) — o înălțime fixă n-ar mai avea sens (ar înghesui totul pe un ecran
+     mic, unde 100vh e oricum nesigur din cauza barelor de browser).
+     Revenim la comportamentul normal: pagina întreagă derulează. */
+  .copilot-page {
+    height: auto;
+  }
+}
+
 .copilot-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(280px, 360px);
+  /* minmax(0, 1fr) — rândul umple exact înălțimea disponibilă (de la
+     .copilot-page mai sus), ca .copilot-chat (height:100%) și .copilot-side
+     (max-height:100%) să aibă față de ce să se raporteze. */
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--mb-space-5);
   align-items: start;
+  flex: 1;
+  min-height: 0;
 }
 
-/* --- Chat ---
-   Înălțime FIXĂ, într-un singur loc, NICIODATĂ recalculată — nici din
-   viewport, nici din conținut. Am încercat variante "exacte" (100vh minus
-   diverse tokenuri) — tot arătau instabil, pagina/cutia tot "se mișcau".
-   O valoare statică e garantat stabilă: cutia e mereu la fel, indiferent
-   de conversație. Dacă pe un ecran mic pagina trebuie să deruleze puțin ca
-   să vezi tot chat-ul, e un compromis acceptat — mai bine decât mișcare. */
+/* --- Chat --- */
+
 .copilot-chat {
   display: flex;
   flex-direction: column;
-  height: 720px;
+  height: 100%;
+  min-height: 480px;
   overflow: hidden;
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-lg);
   background: var(--mb-surface);
   box-shadow: var(--mb-shadow-sm);
+}
+
+/* --- Header: identitatea agentului + dropdown de conversații ---
+   Înlocuiește cele două carduri separate ("Conversații", "Agentul folosit")
+   care erau înainte în sidebar — informația e mai la îndemână aici (chiar
+   deasupra chat-ului) și panoul lateral rămâne doar pentru context, nu
+   pentru navigare/identitate. */
+.copilot-chat__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  padding: var(--mb-space-3) var(--mb-space-5);
+  border-bottom: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+}
+
+.copilot-chat__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  min-width: 0;
+}
+
+.copilot-chat__identity-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--mb-navy-800), var(--mb-navy-950));
+  box-shadow: 0 5px 12px rgba(10, 18, 38, 0.16);
+}
+
+.copilot-chat__identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.copilot-chat__identity-text strong {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-primary);
+}
+
+.copilot-chat__identity-text span {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.copilot-chat__conversations {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.copilot-chat__conversations-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  max-width: 220px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--mb-border-strong);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  font: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  cursor: pointer;
+  transition: border-color var(--mb-transition-fast), background var(--mb-transition-fast);
+}
+
+.copilot-chat__conversations-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-chat__conversations-trigger app-icon {
+  flex-shrink: 0;
+  color: var(--mb-text-tertiary);
+  transition: transform var(--mb-transition-fast);
+}
+
+.copilot-chat__conversations-trigger:hover,
+.copilot-chat__conversations-trigger--open {
+  border-color: var(--mb-blue-500);
+  background: var(--mb-surface);
+}
+
+.copilot-chat__conversations-trigger--open app-icon {
+  transform: rotate(180deg);
+}
+
+.copilot-chat__conversations-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  max-width: 80vw;
+  padding: var(--mb-space-3);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-md);
+  animation: copilot-conversations-menu-in 140ms ease;
+}
+
+@keyframes copilot-conversations-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-chat__conversations-menu {
+    animation: none;
+  }
+}
+
+.copilot-chat__conversations-menu .copilot-conversations__new {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: var(--mb-space-2);
+}
+
+.copilot-chat__conversations-menu .copilot-conversations__empty {
+  padding: var(--mb-space-2) var(--mb-space-1);
 }
 
 .copilot-chat__messages {
@@ -161,29 +323,68 @@
   color: #fff;
 }
 
-.copilot-bubble--typing {
+/* --- "Gândește" — cuvinte care se rotesc cât timp agentul lucrează, stil
+   Claude ("Thinking...", "Pondering...") — vezi copilot.ts::THINKING_WORDS.
+   Fără bulă/chenar, ca restul răspunsurilor (vezi .copilot-answer) — un
+   text cu un shimmer discret, nu o cutie separată. */
+.copilot-thinking {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  font-size: var(--mb-font-size-base);
 }
 
-.copilot-bubble--typing span {
-  width: 6px;
-  height: 6px;
+.copilot-thinking__word {
+  font-weight: var(--mb-font-weight-medium);
+  background: linear-gradient(90deg, var(--mb-text-tertiary) 0%, var(--mb-blue-600) 50%, var(--mb-text-tertiary) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .copilot-thinking__word {
+    animation: copilot-thinking-shimmer 1.8s linear infinite;
+  }
+}
+
+@keyframes copilot-thinking-shimmer {
+  to {
+    background-position: -200% center;
+  }
+}
+
+.copilot-thinking__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.copilot-thinking__dots span {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--mb-text-tertiary);
   opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .copilot-bubble--typing span {
+  .copilot-thinking__dots span {
     animation: copilot-typing-bounce 1.1s ease-in-out infinite;
   }
-  .copilot-bubble--typing span:nth-child(2) {
+  .copilot-thinking__dots span:nth-child(2) {
     animation-delay: 0.15s;
   }
-  .copilot-bubble--typing span:nth-child(3) {
+  .copilot-thinking__dots span:nth-child(3) {
     animation-delay: 0.3s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-thinking__word {
+    background: none;
+    color: var(--mb-text-secondary);
   }
 }
 
@@ -271,7 +472,7 @@
 .copilot-card {
   padding: var(--mb-space-4);
   border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-md);
+  border-radius: var(--mb-radius-lg);
   background: var(--mb-surface);
 }
 
@@ -524,23 +725,16 @@
 
 /* --- Sidebar --- */
 
-/* Coloana din grid nu se "întinde" (.copilot-layout are align-items:
-   start), deci înălțimea RÂNDULUI de grid = maximul dintre .copilot-chat
-   (înălțime 100%, vezi mai jos) și .copilot-side. Fără o limită și aici,
-   .copilot-side (care devine mai înalt exact când sosește un răspuns —
-   apare grila de context financiar) putea împinge rândul, deci pagina
-   întreagă, mai sus decât viewport-ul. max-height: 100% se raportează la
-   înălțimea DEFINITĂ a .copilot-layout (vezi .copilot-page mai sus) — cu
-   scroll intern propriu dacă vreodată conținutul nu încape. */
-/* max-height fix, IDENTIC cu .copilot-chat — dacă panoul de context devine
-   mai înalt (apare grila de context financiar la primul răspuns), n-are
-   voie să împingă rândul de grid, deci pagina, mai jos. Scroll intern
-   propriu dacă vreodată conținutul nu încape. */
+/* .copilot-layout are grid-template-rows: minmax(0, 1fr), deci rândul are
+   o înălțime DEFINITĂ (moștenită din .copilot-page). max-height: 100% se
+   raportează la ea — dacă panoul de context devine mai înalt (apare grila
+   de context financiar la primul răspuns), n-are voie să împingă rândul,
+   deci pagina, mai jos; derulează intern, propriu, dacă nu încape. */
 .copilot-side {
   display: flex;
   flex-direction: column;
   gap: var(--mb-space-4);
-  max-height: 720px;
+  max-height: 100%;
   overflow-y: auto;
 }
 
@@ -593,37 +787,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.copilot-agent {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--mb-space-3);
-}
-
-.copilot-agent__icon {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--mb-radius-sm);
-  color: var(--mb-blue-600);
-  background: var(--mb-blue-50);
-}
-
-.copilot-agent strong {
-  display: block;
-  margin-bottom: 3px;
-  font-size: var(--mb-font-size-sm);
-  color: var(--mb-text-primary);
-}
-
-.copilot-agent p {
-  margin: 0;
-  color: var(--mb-text-secondary);
-  font-size: var(--mb-font-size-xs);
-  line-height: 1.5;
-}
-
 @media (max-width: 1100px) {
   .copilot-layout {
     grid-template-columns: 1fr;
@@ -647,27 +810,39 @@
 
 /* Compact, intentional initial state: keeps the composer above the fold —
    starea goală (doar mesajul de bun venit) rămâne compactă, nu întinsă la
-   cei 720px fixați mai sus (vezi .copilot-chat). */
+   toată înălțimea rândului de grid (vezi .copilot-chat). */
 .copilot-chat.copilot-chat--empty {
   height: auto;
+  /* Plasă de siguranță: pe un viewport mic (ecran mic + bare de browser),
+     "auto" tot poate ieși mai înalt decât rândul de grid disponibil (vezi
+     .copilot-page). max-height + overflow: hidden aici garantează că
+     pagina NICIODATĂ nu ajunge să deruleze din cauza stării goale — în cel
+     mai rău caz se pierde din vedere doar rândul de jos (nota legală), nu
+     bara de scriere. */
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .copilot-chat--empty .copilot-chat__messages {
   flex: 0 0 auto;
-  min-height: 430px;
+  min-height: 300px;
   padding-bottom: var(--mb-space-4);
 }
 
 .copilot-welcome {
   width: 100%;
-  min-height: 410px;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  padding: clamp(2rem, 5vw, 3.5rem);
+  /* Redus față de clamp(2rem, 5vw, 3.5rem) — cu bara nouă de sus
+     (.copilot-chat__bar) plus acest ecran de bun-venit, era prea înalt
+     pentru pagină pe viewport-uri mai mici, dădea scroll la PAGINĂ înainte
+     să înceapă conversația (nu doar la chat). */
+  padding: clamp(1.25rem, 3vw, 2rem);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-xl);
   text-align: center;
@@ -701,10 +876,10 @@
 .copilot-welcome__icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
-  margin-bottom: var(--mb-space-3);
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--mb-space-2);
+  border-radius: 14px;
   color: #fff;
   background: linear-gradient(145deg, var(--mb-blue-500), var(--mb-navy-800));
   box-shadow: 0 10px 22px rgba(47, 111, 237, 0.22);
@@ -738,17 +913,17 @@
   max-width: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--mb-space-3);
-  margin-top: var(--mb-space-6);
+  gap: var(--mb-space-2);
+  margin-top: var(--mb-space-4);
 }
 
 .copilot-welcome .copilot-suggestion-chip {
-  min-height: 54px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--mb-space-3);
-  padding: 0.75rem var(--mb-space-4);
+  padding: 0.6rem var(--mb-space-4);
   border-radius: 12px;
   color: var(--mb-text-primary);
   background: var(--mb-surface);
@@ -836,18 +1011,17 @@
   padding-left: 18%;
 }
 
+/* Fără "card" alb cu bordură pentru fiecare răspuns — textul stă direct pe
+   fundalul zonei de mesaje (stil Claude/ChatGPT: avatar + nume deasupra,
+   text simplu dedesubt). Elementele structurate din răspuns (carduri de
+   analiză, bugete, acțiunea propusă) își păstrează propriul chenar/fundal
+   mai jos — doar învelișul mesajului în sine a dispărut. */
 .copilot-message-row:not(.copilot-message-row--user) {
   align-items: flex-start;
 }
 
 .copilot-message-row:not(.copilot-message-row--user) .copilot-message-col {
-  width: 100%;
-  max-width: none;
-  padding: var(--mb-space-5);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-lg);
-  background: var(--mb-surface);
-  box-shadow: 0 3px 12px rgba(16, 24, 48, 0.04);
+  max-width: min(94%, 760px);
 }
 
 .copilot-message-avatar {
@@ -878,7 +1052,6 @@
 
 .copilot-answer {
   margin-bottom: var(--mb-space-5);
-  color: var(--mb-text-secondary);
 }
 
 .copilot-cards {
@@ -886,22 +1059,26 @@
   margin-bottom: var(--mb-space-5);
 }
 
+/* Fundal solid + umbră discretă (nu gradient diagonal) — cardurile stau
+   acum direct pe fundalul mutat al zonei de mesaje (fără "cardul alb" de
+   mesaj din jur, vezi .copilot-message-row de mai sus), deci trebuie să
+   iasă în evidență clar, curat, fără zgomot vizual inutil. */
 .copilot-card {
   min-width: 0;
   padding: var(--mb-space-4);
   border-color: var(--mb-border);
-  background: linear-gradient(145deg, var(--mb-surface), var(--mb-surface-muted));
+  background: var(--mb-surface);
   box-shadow: var(--mb-shadow-xs);
 }
 
 .copilot-card--positive {
-  border-color: color-mix(in srgb, var(--mb-positive) 35%, transparent);
-  background: linear-gradient(145deg, var(--mb-surface), var(--mb-positive-bg));
+  border-color: transparent;
+  border-left: 3px solid var(--mb-positive);
 }
 
 .copilot-card--negative {
-  border-color: color-mix(in srgb, var(--mb-negative) 35%, transparent);
-  background: linear-gradient(145deg, var(--mb-surface), var(--mb-negative-bg));
+  border-color: transparent;
+  border-left: 3px solid var(--mb-negative);
 }
 
 .copilot-card__header {
@@ -933,13 +1110,12 @@
 .copilot-card__row--total {
   margin-top: var(--mb-space-1);
   padding-top: var(--mb-space-3);
-  background: linear-gradient(90deg, var(--mb-blue-50), transparent);
 }
 
 .copilot-recommendation {
   padding: var(--mb-space-4);
-  border: 1px solid color-mix(in srgb, var(--mb-positive) 35%, transparent);
-  background: linear-gradient(100deg, var(--mb-positive-bg), var(--mb-surface));
+  border: none;
+  border-radius: var(--mb-radius-lg);
   font-weight: var(--mb-font-weight-medium);
 }
 
@@ -1115,10 +1291,6 @@
   font-size: var(--mb-font-size-base);
 }
 
-.copilot-agent {
-  padding: var(--mb-space-2) 0;
-}
-
 @media (max-width: 1100px) {
   .copilot-layout {
     grid-template-columns: 1fr;
@@ -1134,10 +1306,6 @@
     padding-left: 0;
   }
 
-  .copilot-message-row:not(.copilot-message-row--user) .copilot-message-col {
-    padding: var(--mb-space-4);
-  }
-
   .copilot-context-grid {
     grid-template-columns: 1fr;
   }
@@ -1149,8 +1317,9 @@
   padding: var(--mb-space-4);
   margin-bottom: var(--mb-space-4);
   border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-md);
+  border-radius: var(--mb-radius-lg);
   background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
 }
 
 .copilot-budgets .copilot-card__header {
@@ -1217,7 +1386,7 @@
   padding: var(--mb-space-4);
   margin-bottom: var(--mb-space-4);
   border: 1px solid var(--mb-blue-100);
-  border-radius: var(--mb-radius-md);
+  border-radius: var(--mb-radius-lg);
   background: var(--mb-blue-50);
 }
 

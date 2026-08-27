@@ -59,6 +59,11 @@ class NotificationCreate(BaseModel):
     user_id: str
     kind: NotificationKind
     text: str = Field(min_length=1, max_length=280)
+    # Id-ul resursei la care se referă notificarea (ex. id-ul tranzacției
+    # pentru un transfer) — opțional, doar serviciile care au un id relevant
+    # îl trimit. Folosit de frontend ca să deschidă direct acea resursă la
+    # click, nu doar pagina ei generică (vezi Topbar::openNotification).
+    reference_id: str | None = None
 
 
 class NotificationOut(BaseModel):
@@ -67,6 +72,7 @@ class NotificationOut(BaseModel):
     text: str
     read: bool
     created_at: datetime
+    reference_id: str | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 

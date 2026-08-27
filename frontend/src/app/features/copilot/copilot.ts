@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -16,6 +16,18 @@ const SUGGESTED_QUESTIONS = [
   'Cât am cheltuit luna asta?',
   'Cu cât estimezi că rămân la finalul lunii?',
   'Pe ce categorie cheltuiesc cel mai mult?',
+];
+
+/** Cuvinte care se rotesc cât timp agentul lucrează — stil Claude
+ * ("Pondering...", "Noodling..."): jocuri de cuvinte, nu descrieri reale a
+ * ce face agentul în spate. */
+const THINKING_WORDS = [
+  'Maestroing',
+  'Bănuind',
+  'Cifrometrând',
+  'Leuind',
+  'Buzunărind',
+  'Chibzuind',
 ];
 
 type PendingActionState = 'pending' | 'confirming' | 'done' | 'cancelled' | 'error';
@@ -58,6 +70,7 @@ export class Copilot implements OnInit, OnDestroy {
   protected readonly speech = inject(SpeechService);
   private readonly toast = inject(ToastService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
+  private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
   protected readonly suggestedQuestions = SUGGESTED_QUESTIONS;
   protected readonly chatInput = signal('');
@@ -69,7 +82,18 @@ export class Copilot implements OnInit, OnDestroy {
   protected readonly chatMessages = signal<ChatMessage[]>([]);
   protected readonly conversations = signal<ConversationSummary[]>([]);
   protected readonly activeConversationId = signal<string | null>(null);
+  protected readonly conversationsMenuOpen = signal(false);
+  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
+  private thinkingWordTimer?: ReturnType<typeof setInterval>;
+
+  /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
+   * copilot.html header-ul chat-ului. */
+  protected readonly activeConversationTitle = computed(() => {
+    const id = this.activeConversationId();
+    if (!id) return 'Conversație nouă';
+    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+  });
 
   /** Ultimul răspuns reușit — alimentează "Context financiar" din sidebar,
    * ca să rămână vizibil chiar și după ce userul pune o altă întrebare. */
@@ -100,6 +124,7 @@ export class Copilot implements OnInit, OnDestroy {
     // plecat de pe pagină (ex. a navigat spre Transferuri în timp ce
     // MaestroAssistent încă citea un răspuns).
     this.speech.stopSpeaking();
+    clearInterval(this.thinkingWordTimer);
   }
 
   private loadConversations(): void {
@@ -108,12 +133,27 @@ export class Copilot implements OnInit, OnDestroy {
     });
   }
 
+  protected toggleConversationsMenu(): void {
+    this.conversationsMenuOpen.update((open) => !open);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.conversationsMenuOpen()) return;
+    const menu = this.conversationsMenuEl()?.nativeElement;
+    if (menu && !menu.contains(event.target as Node)) {
+      this.conversationsMenuOpen.set(false);
+    }
+  }
+
   protected startNewConversation(): void {
+    this.conversationsMenuOpen.set(false);
     this.activeConversationId.set(null);
     this.chatMessages.set([]);
   }
 
   protected openConversation(id: string): void {
+    this.conversationsMenuOpen.set(false);
     if (id === this.activeConversationId()) return;
     this.copilotApi.getConversation(id).subscribe({
       next: (detail: ConversationDetail) => {
@@ -125,7 +165,13 @@ export class Copilot implements OnInit, OnDestroy {
             text: m.content,
             time: formatChatTime(new Date(m.created_at)),
             response: m.response ?? undefined,
-            actionState: m.response?.pending_action ? 'pending' : undefined,
+            // Niciodată 'pending' la reîncărcarea unei conversații vechi —
+            // altfel un buton "Confirmă" pentru o acțiune propusă demult
+            // reapare ca activ/clickabil, deși contextul ei (ex. un buget
+            // care între timp s-a schimbat) nu mai e cel din momentul
+            // propunerii. Doar mesajele DIN sesiunea curentă, live, pot
+            // ajunge 'pending' (vezi sendMessage mai jos).
+            actionState: undefined,
           })),
         );
       },
@@ -189,6 +235,7 @@ export class Copilot implements OnInit, OnDestroy {
     // Majoritatea răspunsurilor vin în 10-20s — dacă trece mai mult,
     // arătăm un indiciu, ca să nu pară că s-a blocat.
     this.slowTimer = setTimeout(() => this.sendingSlow.set(true), 15_000);
+    this.startThinkingWords();
 
     this.copilotApi.sendMessage(message, this.activeConversationId()).subscribe({
       next: (response) => {
@@ -218,6 +265,20 @@ export class Copilot implements OnInit, OnDestroy {
     this.sending.set(false);
     this.sendingSlow.set(false);
     clearTimeout(this.slowTimer);
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  /** Pornește rotația de cuvinte "gândește" (vezi THINKING_WORDS) — un
+   * cuvânt nou, mereu diferit de cel curent, la fiecare ~1.8s cât timp
+   * așteptăm răspunsul. */
+  private startThinkingWords(): void {
+    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    this.thinkingWordTimer = setInterval(() => {
+      this.thinkingWord.update((current) => {
+        const options = THINKING_WORDS.filter((w) => w !== current);
+        return options[Math.floor(Math.random() * options.length)];
+      });
+    }, 1800);
   }
 
   private pushMessage(message: ChatMessage): void {
