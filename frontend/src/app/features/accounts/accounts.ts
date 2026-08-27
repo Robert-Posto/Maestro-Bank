@@ -23,6 +23,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Modal } from '../../shared/components/modal/modal';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { AccountCreateEvent, AccountTypeCarousel } from '../../shared/components/account-type-carousel/account-type-carousel';
+import { Select } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
@@ -57,6 +58,7 @@ type Tab = 'accounts' | 'pockets' | 'deposits';
     Modal,
     ConfirmDialog,
     AccountTypeCarousel,
+    Select,
   ],
   templateUrl: './accounts.html',
   styleUrl: './accounts.css',
