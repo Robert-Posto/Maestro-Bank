@@ -248,7 +248,11 @@ async def list_accounts_for_user(user_id: str) -> list[dict]:
     return await cursor.to_list(length=10)
 
 
-_MAX_ACCOUNTS_PER_USER = 7  # current + savings + deposit + student + eur + usd + gbp
+# 7 rămâne corect ca prag chiar și acum că "deposit" nu mai e creabil — un
+# user vechi cu deposit deja deschis + toate cele 5 tipuri creabile + current
+# tot ajunge la 7; niciun user nou nu poate depăși 6 (current + savings +
+# student + eur + usd + gbp), deci pragul nu blochează nimic nou.
+_MAX_ACCOUNTS_PER_USER = 7
 
 _ACCOUNT_TYPE_LABELS: dict[str, str] = {
     "savings": "economii",

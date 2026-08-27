@@ -19,7 +19,12 @@ CardType = Literal["virtual", "physical"]
 # vizual) — necesare ca schimbul valutar (exchange-service) să aibă unde să
 # crediteze/debiteze efectiv, vezi apply_internal_exchange mai jos.
 AccountType = Literal["current", "savings", "deposit", "student", "eur", "usd", "gbp"]
-CreatableAccountType = Literal["savings", "deposit", "student", "eur", "usd", "gbp"]
+# "deposit" a fost înlocuit de feature-ul real de depozite la termen
+# (deposits-service, vezi docs/superpowers/specs/2026-08-27-deposits-design.md)
+# — rămâne în AccountType (conturi vechi, deja deschise, tot funcționează
+# normal — transfer în/din ele prin IBAN merge ca înainte), dar dispare din
+# CreatableAccountType: nu se mai poate deschide unul nou de acest tip.
+CreatableAccountType = Literal["savings", "student", "eur", "usd", "gbp"]
 
 # --- Core banking --------------------------------------------------------
 
