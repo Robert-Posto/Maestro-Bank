@@ -15,11 +15,11 @@ import logging
 import httpx
 from fastapi import HTTPException, status
 
-from app.catalog import SYMBOLS, is_valid_symbol, name_for
+from app.catalog import INDEX_SYMBOLS, SYMBOLS, is_known_symbol, is_valid_symbol, name_for
 from app.config import settings
 from app.database import get_database
-from app.models import BuyRequest, HoldingOut, InstrumentOut, SellRequest
-from app.prices import get_cached_price, list_cached_prices
+from app.models import BuyRequest, HistoryPoint, HoldingOut, InstrumentDetailOut, InstrumentOut, SellRequest
+from app.prices import fetch_detail, get_cached_price, list_cached_prices
 
 logger = logging.getLogger("investments-service")
 
@@ -94,17 +94,66 @@ async def _get_price_minor_or_error(symbol: str) -> int:
     return cached["price_minor"]
 
 
+def _change_percent(price_minor: int | None, previous_close_minor: int | None) -> float | None:
+    if not price_minor or not previous_close_minor:
+        return None
+    return round((price_minor - previous_close_minor) / previous_close_minor * 100, 2)
+
+
+def _to_instrument_out(symbol: str, cached: dict) -> InstrumentOut:
+    price_minor = cached.get("price_minor")
+    previous_close_minor = cached.get("previous_close_minor")
+    return InstrumentOut(
+        symbol=symbol,
+        name=name_for(symbol),
+        price_minor=price_minor,
+        previous_close_minor=previous_close_minor,
+        change_percent=_change_percent(price_minor, previous_close_minor),
+        updated_at=cached.get("updated_at"),
+    )
+
+
 async def list_instruments() -> list[InstrumentOut]:
     cached_by_symbol = {doc["_id"]: doc for doc in await list_cached_prices()}
-    return [
-        InstrumentOut(
-            symbol=symbol,
-            name=name_for(symbol),
-            price_minor=cached_by_symbol.get(symbol, {}).get("price_minor"),
-            updated_at=cached_by_symbol.get(symbol, {}).get("updated_at"),
-        )
-        for symbol in SYMBOLS
-    ]
+    return [_to_instrument_out(symbol, cached_by_symbol.get(symbol, {})) for symbol in SYMBOLS]
+
+
+async def list_indices() -> list[InstrumentOut]:
+    """Indici bursieri reali — DOAR informativ, nu se tranzacționează
+    direct (vezi app/catalog.py::INDICES pentru raționament)."""
+    cached_by_symbol = {doc["_id"]: doc for doc in await list_cached_prices()}
+    return [_to_instrument_out(symbol, cached_by_symbol.get(symbol, {})) for symbol in INDEX_SYMBOLS]
+
+
+async def get_instrument_detail(symbol: str) -> InstrumentDetailOut:
+    """Vizualizarea de detalii + istoric, la click — funcționează ATÂT pt
+    acțiuni/ETF-uri din catalog CÂT ȘI pt indici (is_tradable spune
+    frontend-ului dacă să arate butonul de cumpărare)."""
+    if not is_known_symbol(symbol):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Simbolul '{symbol}' nu este cunoscut.")
+
+    try:
+        raw = await fetch_detail(symbol)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Nu am putut încărca detaliile pentru {symbol} — încearcă din nou în câteva minute.",
+        ) from exc
+
+    return InstrumentDetailOut(
+        symbol=symbol,
+        name=name_for(symbol),
+        is_tradable=is_valid_symbol(symbol),
+        price_minor=raw["price_minor"],
+        previous_close_minor=raw["previous_close_minor"],
+        change_percent=_change_percent(raw["price_minor"], raw["previous_close_minor"]),
+        day_high_minor=raw["day_high_minor"],
+        day_low_minor=raw["day_low_minor"],
+        week52_high_minor=raw["week52_high_minor"],
+        week52_low_minor=raw["week52_low_minor"],
+        volume=raw["volume"],
+        history=[HistoryPoint(**point) for point in raw["history"]],
+    )
 
 
 def _to_holding_out(doc: dict, current_price_minor: int) -> HoldingOut:

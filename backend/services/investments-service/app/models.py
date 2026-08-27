@@ -8,14 +8,39 @@ from pydantic import BaseModel, Field
 
 
 class InstrumentOut(BaseModel):
-    """Un rând din catalog + prețul lui curent (cache) — folosit de
-    GET /investments/instruments, pentru ca frontend-ul să afișeze
-    catalogul înainte ca userul să aleagă ce cumpără."""
+    """Un rând din catalog SAU din indici + prețul lui curent (cache) —
+    folosit de GET /investments/instruments și GET /investments/indices."""
 
     symbol: str
     name: str
     price_minor: int | None  # None dacă prețul n-a fost încă populat (primul boot)
+    previous_close_minor: int | None
+    change_percent: float | None  # (price - previous_close) / previous_close * 100
     updated_at: datetime | None
+
+
+class HistoryPoint(BaseModel):
+    date: str
+    price_minor: int
+
+
+class InstrumentDetailOut(BaseModel):
+    """Vizualizarea de detalii, la click — vezi GET
+    /investments/instruments/{symbol}/detail. NU e cache-uit (fetch live,
+    la cerere) — vezi app/prices.py::fetch_detail."""
+
+    symbol: str
+    name: str
+    is_tradable: bool  # False pt indici (^GSPC etc.) — informativi, nu se cumpără direct
+    price_minor: int
+    previous_close_minor: int
+    change_percent: float | None
+    day_high_minor: int
+    day_low_minor: int
+    week52_high_minor: int
+    week52_low_minor: int
+    volume: int | None
+    history: list[HistoryPoint]
 
 
 class BuyRequest(BaseModel):

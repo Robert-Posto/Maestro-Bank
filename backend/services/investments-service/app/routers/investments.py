@@ -5,15 +5,21 @@ trăiește acolo.
 
 Extern (prin Gateway) acestea devin:
   GET  /api/investments/instruments
+  GET  /api/investments/instruments/{symbol}/detail
+  GET  /api/investments/indices
   GET  /api/investments/portfolio
   POST /api/investments/buy
   POST /api/investments/sell
+
+ORDINE IMPORTANTĂ: /instruments/{symbol}/detail (3 segmente) e înregistrat
+înainte să conteze — nu e de fapt ambiguu cu /instruments (1 segment) sau
+/indices, dar păstrat aproape de /instruments pentru claritate.
 """
 
 from fastapi import APIRouter
 
 from app import service
-from app.models import BuyRequest, HoldingOut, InstrumentOut, SellRequest
+from app.models import BuyRequest, HoldingOut, InstrumentDetailOut, InstrumentOut, SellRequest
 from app.security import CurrentUserId
 
 router = APIRouter(prefix="/investments", tags=["investments"])
@@ -22,6 +28,16 @@ router = APIRouter(prefix="/investments", tags=["investments"])
 @router.get("/instruments", response_model=list[InstrumentOut])
 async def get_instruments(user_id: str = CurrentUserId):
     return await service.list_instruments()
+
+
+@router.get("/instruments/{symbol}/detail", response_model=InstrumentDetailOut)
+async def get_instrument_detail(symbol: str, user_id: str = CurrentUserId):
+    return await service.get_instrument_detail(symbol)
+
+
+@router.get("/indices", response_model=list[InstrumentOut])
+async def get_indices(user_id: str = CurrentUserId):
+    return await service.list_indices()
 
 
 @router.get("/portfolio", response_model=list[HoldingOut])

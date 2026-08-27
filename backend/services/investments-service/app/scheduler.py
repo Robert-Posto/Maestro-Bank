@@ -8,7 +8,7 @@ singur worker.
 import asyncio
 import logging
 
-from app.catalog import SYMBOLS
+from app.catalog import ALL_SYMBOLS
 from app.config import settings
 from app.prices import refresh_all_prices
 
@@ -19,7 +19,7 @@ async def price_refresh_loop() -> None:
     while True:
         try:
             updated = await refresh_all_prices()
-            logger.info("investments-service: prețuri reîmprospătate (%s/%s simboluri)", updated, len(SYMBOLS))
+            logger.info("investments-service: prețuri reîmprospătate (%s/%s simboluri)", updated, len(ALL_SYMBOLS))
         except Exception:
             logger.exception("investments-service: eroare în loop-ul de reîmprospătare prețuri")
         await asyncio.sleep(settings.price_refresh_interval_seconds)

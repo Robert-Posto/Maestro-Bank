@@ -58,10 +58,18 @@ def mock_accounts(monkeypatch):
     return state
 
 
-async def _seed_price(symbol: str, price_minor: int) -> None:
+async def _seed_price(symbol: str, price_minor: int, previous_close_minor: int | None = None) -> None:
     await get_database().price_cache.update_one(
         {"_id": symbol},
-        {"$set": {"name": symbol, "price_minor": price_minor, "updated_at": datetime.now(timezone.utc), "source": "yahoo"}},
+        {
+            "$set": {
+                "name": symbol,
+                "price_minor": price_minor,
+                "previous_close_minor": previous_close_minor if previous_close_minor is not None else price_minor,
+                "updated_at": datetime.now(timezone.utc),
+                "source": "yahoo",
+            }
+        },
         upsert=True,
     )
 
@@ -204,6 +212,85 @@ async def test_list_instruments_returns_catalog_with_prices(mock_accounts):
     assert aapl.price_minor == 20_000
     unpriced = next(i for i in instruments if i.symbol == "MSFT")
     assert unpriced.price_minor is None
+
+
+async def test_list_instruments_computes_change_percent(mock_accounts):
+    from app.service import list_instruments
+
+    await _seed_price("AAPL", 22_000, previous_close_minor=20_000)  # +10%
+    instruments = await list_instruments()
+
+    aapl = next(i for i in instruments if i.symbol == "AAPL")
+    assert aapl.change_percent == pytest.approx(10.0)
+
+
+async def test_list_indices_returns_indices_not_catalog(mock_accounts):
+    from app.service import list_indices
+
+    await _seed_price("^GSPC", 500_000, previous_close_minor=495_000)
+    indices = await list_indices()
+
+    assert len(indices) == 6
+    symbols = {i.symbol for i in indices}
+    assert "^GSPC" in symbols
+    assert "AAPL" not in symbols  # indicii sunt separați de catalogul tranzacționabil
+    gspc = next(i for i in indices if i.symbol == "^GSPC")
+    assert gspc.change_percent == pytest.approx(round((500_000 - 495_000) / 495_000 * 100, 2))
+
+
+# --- Detalii instrument (click) -------------------------------------------------
+
+
+async def test_get_instrument_detail_marks_catalog_symbol_tradable(monkeypatch, mock_accounts):
+    from app.service import get_instrument_detail
+
+    async def fake_fetch_detail(symbol: str) -> dict:
+        return {
+            "price_minor": 20_000,
+            "previous_close_minor": 19_000,
+            "day_high_minor": 20_500,
+            "day_low_minor": 19_800,
+            "week52_high_minor": 25_000,
+            "week52_low_minor": 15_000,
+            "volume": 12_345_678,
+            "history": [{"date": "2026-08-01", "price_minor": 19_000}, {"date": "2026-08-27", "price_minor": 20_000}],
+        }
+
+    monkeypatch.setattr("app.service.fetch_detail", fake_fetch_detail)
+
+    detail = await get_instrument_detail("AAPL")
+    assert detail.is_tradable is True
+    assert detail.change_percent == pytest.approx(round((20_000 - 19_000) / 19_000 * 100, 2))
+    assert len(detail.history) == 2
+
+
+async def test_get_instrument_detail_marks_index_not_tradable(monkeypatch, mock_accounts):
+    from app.service import get_instrument_detail
+
+    async def fake_fetch_detail(symbol: str) -> dict:
+        return {
+            "price_minor": 500_000,
+            "previous_close_minor": 500_000,
+            "day_high_minor": 505_000,
+            "day_low_minor": 495_000,
+            "week52_high_minor": 520_000,
+            "week52_low_minor": 400_000,
+            "volume": None,
+            "history": [],
+        }
+
+    monkeypatch.setattr("app.service.fetch_detail", fake_fetch_detail)
+
+    detail = await get_instrument_detail("^GSPC")
+    assert detail.is_tradable is False
+
+
+async def test_get_instrument_detail_rejects_unknown_symbol(mock_accounts):
+    from app.service import get_instrument_detail
+
+    with pytest.raises(Exception) as exc_info:
+        await get_instrument_detail("NOTREAL")
+    assert exc_info.value.status_code == 404
 
 
 # --- Endpoint HTTP ---------------------------------------------------------------
