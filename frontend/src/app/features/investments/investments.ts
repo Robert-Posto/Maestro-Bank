@@ -4,7 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { AccountView, BankingService } from '../../services/banking.service';
-import { HoldingView, InstrumentView, InvestmentsService } from '../../services/investments.service';
+import {
+  HistoryPointView,
+  HoldingView,
+  InstrumentDetailView,
+  InstrumentView,
+  InvestmentsService,
+} from '../../services/investments.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
@@ -17,10 +23,12 @@ import { extractErrorMessage } from '../../shared/error-utils';
 /**
  * Investiții — cumpărare/vânzare de acțiuni/ETF-uri, catalog curatoriat
  * (16 simboluri), preț REAL (dar dintr-un endpoint NEOFICIAL, vezi
- * InvestmentsService). Pagină separată (nu tab pe Conturi) — suprafață
- * prea mare (catalog + portofoliu + tranzacționare) pentru un tab.
- * Toate instrumentele se tranzacționează în USD — necesită contul USD
- * deschis (vezi accounts-service, aceeași cerință ca Schimb valutar).
+ * InvestmentsService), plus indici bursieri reali (DOAR informativi — nu
+ * se cumpără direct). Pagină separată (nu tab pe Conturi) — suprafață
+ * prea mare (catalog + indici + portofoliu + tranzacționare + detalii)
+ * pentru un tab. Toate instrumentele se tranzacționează în USD — necesită
+ * contul USD deschis (vezi accounts-service, aceeași cerință ca Schimb
+ * valutar).
  */
 @Component({
   selector: 'app-investments',
@@ -41,6 +49,9 @@ export class Investments implements OnInit {
   protected readonly instruments = signal<InstrumentView[]>([]);
   protected readonly instrumentsLoading = signal(true);
 
+  protected readonly indices = signal<InstrumentView[]>([]);
+  protected readonly indicesLoading = signal(true);
+
   protected readonly portfolio = signal<HoldingView[]>([]);
   protected readonly portfolioLoading = signal(true);
   protected readonly portfolioValueMinor = computed(() =>
@@ -49,6 +60,12 @@ export class Investments implements OnInit {
   protected readonly portfolioGainMinor = computed(() =>
     this.portfolio().reduce((sum, h) => sum + h.unrealized_gain_minor, 0),
   );
+
+  // --- Detalii, la click (instrument SAU indice) ---------------------------
+  protected readonly detailSymbol = signal<string | null>(null);
+  protected readonly detailData = signal<InstrumentDetailView | null>(null);
+  protected readonly detailLoading = signal(false);
+  protected readonly detailError = signal<string | null>(null);
 
   protected readonly buyModalInstrument = signal<InstrumentView | null>(null);
   protected readonly buyAmountUsd = signal(500);
@@ -61,6 +78,7 @@ export class Investments implements OnInit {
   ngOnInit(): void {
     this.banking.getAllAccounts().subscribe({ next: (accounts) => this.accounts.set(accounts) });
     this.loadInstruments();
+    this.loadIndices();
     this.loadPortfolio();
   }
 
@@ -75,6 +93,17 @@ export class Investments implements OnInit {
     });
   }
 
+  private loadIndices(): void {
+    this.indicesLoading.set(true);
+    this.investmentsApi.listIndices().subscribe({
+      next: (indices) => {
+        this.indices.set(indices);
+        this.indicesLoading.set(false);
+      },
+      error: () => this.indicesLoading.set(false),
+    });
+  }
+
   private loadPortfolio(): void {
     this.portfolioLoading.set(true);
     this.investmentsApi.getPortfolio().subscribe({
@@ -86,9 +115,81 @@ export class Investments implements OnInit {
     });
   }
 
+  private refreshAccountsAndPortfolio(): void {
+    this.loadPortfolio();
+    this.banking.getAllAccounts().subscribe({ next: (accounts) => this.accounts.set(accounts) });
+  }
+
   protected goToOpenAccount(): void {
     this.router.navigate(['/app/accounts']);
   }
+
+  // --- Detalii (click pe orice card — instrument SAU indice) ---------------
+
+  protected openDetail(symbol: string): void {
+    this.detailSymbol.set(symbol);
+    this.detailData.set(null);
+    this.detailError.set(null);
+    this.detailLoading.set(true);
+    this.investmentsApi.getDetail(symbol).subscribe({
+      next: (detail) => {
+        this.detailData.set(detail);
+        this.detailLoading.set(false);
+      },
+      error: (err) => {
+        this.detailLoading.set(false);
+        this.detailError.set(extractErrorMessage(err, 'Nu am putut încărca detaliile.'));
+      },
+    });
+  }
+
+  protected closeDetail(): void {
+    this.detailSymbol.set(null);
+    this.detailData.set(null);
+  }
+
+  /** Cumpărare direct din panoul de detalii — închide detaliile, deschide
+   * modalul de cumpărare, presetat pe același simbol. */
+  protected buyFromDetail(): void {
+    const detail = this.detailData();
+    if (!detail) return;
+    const instrument = this.instruments().find((i) => i.symbol === detail.symbol);
+    if (!instrument) return;
+    this.closeDetail();
+    this.openBuyModal(instrument);
+  }
+
+  /** Punctele unui sparkline SVG (viewBox 0 0 100 32) — normalizat pe
+   * min/max din istoric, ca linia să umple tot spațiul disponibil
+   * indiferent de amplitudinea reală a prețului. */
+  protected sparklinePoints(history: HistoryPointView[]): string {
+    if (history.length < 2) return '';
+    const prices = history.map((h) => h.price_minor);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min || 1;
+    return history
+      .map((h, i) => {
+        const x = (i / (history.length - 1)) * 100;
+        const y = 32 - ((h.price_minor - min) / range) * 32;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  }
+
+  protected sparklineTrendPositive(history: HistoryPointView[]): boolean {
+    if (history.length < 2) return true;
+    return history[history.length - 1].price_minor >= history[0].price_minor;
+  }
+
+  /** Poziția (%) pe un "range-bar" (zi sau 52 săptămâni) pentru prețul
+   * curent, între low și high. */
+  protected rangePositionPercent(low: number, high: number, current: number): number {
+    if (high <= low) return 50;
+    return Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100));
+  }
+
+  // --- Cumpărare -------------------------------------------------------------
 
   protected openBuyModal(instrument: InstrumentView): void {
     this.buyAmountUsd.set(500);
@@ -111,8 +212,7 @@ export class Investments implements OnInit {
         this.buying.set(false);
         this.buyModalInstrument.set(null);
         this.toast.success(`Ai cumpărat ${instrument.symbol} de ${this.buyAmountUsd()} USD.`);
-        this.loadPortfolio();
-        this.banking.getAllAccounts().subscribe({ next: (accounts) => this.accounts.set(accounts) });
+        this.refreshAccountsAndPortfolio();
       },
       error: (err) => {
         this.buying.set(false);
@@ -120,6 +220,8 @@ export class Investments implements OnInit {
       },
     });
   }
+
+  // --- Vânzare -----------------------------------------------------------------
 
   protected openSellModal(holding: HoldingView): void {
     this.sellQuantity.set(holding.quantity);
@@ -137,8 +239,7 @@ export class Investments implements OnInit {
         this.selling.set(false);
         this.sellModalHolding.set(null);
         this.toast.success(`Ai vândut ${quantity} ${holding.symbol}.`);
-        this.loadPortfolio();
-        this.banking.getAllAccounts().subscribe({ next: (accounts) => this.accounts.set(accounts) });
+        this.refreshAccountsAndPortfolio();
       },
       error: (err) => {
         this.selling.set(false);

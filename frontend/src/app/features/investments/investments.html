@@ -16,7 +16,7 @@
     </div>
     <div class="investments-summary__card">
       <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
-      <strong [class.investments-summary__gain--positive]="portfolioGainMinor() >= 0" [class.investments-summary__gain--negative]="portfolioGainMinor() < 0">
+      <strong class="change-text" [class.change-text--positive]="portfolioGainMinor() >= 0" [class.change-text--negative]="portfolioGainMinor() < 0">
         {{ portfolioGainMinor() | money: 'USD' }}
       </strong>
     </div>
@@ -25,6 +25,30 @@
       <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
     </div>
   </div>
+
+  <section class="investments-section">
+    <h2>Indici bursieri</h2>
+    <p class="investments-section__subtitle">Informativ — un indice nu se cumpără direct; SPY/QQQ din catalogul de mai jos sunt ETF-urile care-l urmăresc.</p>
+    @if (indicesLoading()) {
+      <app-loading-skeleton [rows]="1" [height]="90" />
+    } @else {
+      <div class="indices-row">
+        @for (index of indices(); track index.symbol) {
+          <button type="button" class="index-chip" (click)="openDetail(index.symbol)">
+            <span class="index-chip__name">{{ index.name }}</span>
+            @if (index.price_minor !== null) {
+              <span class="index-chip__price">{{ index.price_minor | money: 'USD' }}</span>
+              @if (index.change_percent !== null) {
+                <span class="change-badge" [class.change-badge--positive]="index.change_percent >= 0" [class.change-badge--negative]="index.change_percent < 0">
+                  {{ index.change_percent >= 0 ? '▲' : '▼' }} {{ (index.change_percent >= 0 ? '+' : '') + index.change_percent }}%
+                </span>
+              }
+            }
+          </button>
+        }
+      </div>
+    }
+  </section>
 
   <section class="investments-section">
     <h2>Portofoliul tău</h2>
@@ -48,7 +72,7 @@
           </thead>
           <tbody>
             @for (holding of portfolio(); track holding.symbol) {
-              <tr>
+              <tr class="holdings-table__row" (click)="openDetail(holding.symbol)">
                 <td>
                   <strong>{{ holding.symbol }}</strong>
                   <span class="holdings-table__name">{{ holding.name }}</span>
@@ -57,10 +81,12 @@
                 <td>{{ holding.avg_cost_minor_per_share | money: 'USD' }}</td>
                 <td>{{ holding.current_price_minor | money: 'USD' }}</td>
                 <td>{{ holding.current_value_minor | money: 'USD' }}</td>
-                <td [class.holdings-table__gain--positive]="holding.unrealized_gain_minor >= 0" [class.holdings-table__gain--negative]="holding.unrealized_gain_minor < 0">
-                  {{ holding.unrealized_gain_minor | money: 'USD' }} ({{ holding.unrealized_gain_percent }}%)
-                </td>
                 <td>
+                  <span class="change-badge" [class.change-badge--positive]="holding.unrealized_gain_minor >= 0" [class.change-badge--negative]="holding.unrealized_gain_minor < 0">
+                    {{ holding.unrealized_gain_minor | money: 'USD' }} ({{ holding.unrealized_gain_percent >= 0 ? '+' : '' }}{{ holding.unrealized_gain_percent }}%)
+                  </span>
+                </td>
+                <td (click)="$event.stopPropagation()">
                   <app-action-button variant="ghost" (pressed)="openSellModal(holding)">Vinde</app-action-button>
                 </td>
               </tr>
@@ -74,22 +100,33 @@
   <section class="investments-section">
     <h2>Catalog</h2>
     @if (instrumentsLoading()) {
-      <app-loading-skeleton [rows]="3" [height]="70" />
+      <app-loading-skeleton [rows]="3" [height]="90" />
     } @else {
       <div class="instruments-grid">
         @for (instrument of instruments(); track instrument.symbol) {
-          <div class="instrument-card">
+          <div
+            class="instrument-card"
+            [class.instrument-card--positive]="(instrument.change_percent ?? 0) >= 0"
+            [class.instrument-card--negative]="(instrument.change_percent ?? 0) < 0"
+            (click)="openDetail(instrument.symbol)"
+          >
             <div class="instrument-card__top">
               <strong>{{ instrument.symbol }}</strong>
-              @if (instrument.price_minor !== null) {
-                <span class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</span>
+              @if (instrument.change_percent !== null) {
+                <span class="change-badge" [class.change-badge--positive]="instrument.change_percent >= 0" [class.change-badge--negative]="instrument.change_percent < 0">
+                  {{ instrument.change_percent >= 0 ? '▲' : '▼' }} {{ (instrument.change_percent >= 0 ? '+' : '') + instrument.change_percent }}%
+                </span>
               }
             </div>
             <p class="instrument-card__name">{{ instrument.name }}</p>
+            @if (instrument.price_minor !== null) {
+              <p class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</p>
+            }
             <app-action-button
               variant="secondary"
               [fullWidth]="true"
               [disabled]="instrument.price_minor === null"
+              (click)="$event.stopPropagation()"
               (pressed)="openBuyModal(instrument)"
             >
               Cumpără
@@ -99,6 +136,73 @@
       </div>
     }
   </section>
+}
+
+<!-- Panou de detalii (click pe orice instrument SAU indice) -->
+@if (detailSymbol(); as symbol) {
+  <app-modal [title]="detailData()?.name ?? symbol" [maxWidth]="560" (closed)="closeDetail()">
+    @if (detailLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="50" />
+    } @else if (detailError()) {
+      <app-empty-state icon="info" title="Nu am putut încărca detaliile" [description]="detailError()!" />
+    } @else if (detailData(); as detail) {
+      <div class="instrument-detail">
+        <div class="instrument-detail__header">
+          <div>
+            <p class="instrument-detail__symbol">{{ detail.symbol }}</p>
+            <p class="instrument-detail__price">{{ detail.price_minor | money: 'USD' }}</p>
+          </div>
+          @if (detail.change_percent !== null) {
+            <span class="change-badge change-badge--large" [class.change-badge--positive]="detail.change_percent >= 0" [class.change-badge--negative]="detail.change_percent < 0">
+              {{ detail.change_percent >= 0 ? '▲' : '▼' }} {{ (detail.change_percent >= 0 ? '+' : '') + detail.change_percent }}%
+            </span>
+          }
+        </div>
+
+        @if (detail.history.length > 1) {
+          <svg class="instrument-detail__chart" viewBox="0 0 100 32" preserveAspectRatio="none">
+            <polyline
+              [attr.points]="sparklinePoints(detail.history)"
+              fill="none"
+              [attr.stroke]="sparklineTrendPositive(detail.history) ? 'var(--mb-positive)' : 'var(--mb-negative)'"
+              stroke-width="1.5"
+              vector-effect="non-scaling-stroke"
+            />
+          </svg>
+        }
+
+        <div class="instrument-detail__range">
+          <div class="instrument-detail__range-label">
+            <span>Interval zi</span>
+            <span>{{ detail.day_low_minor | money: 'USD' }} – {{ detail.day_high_minor | money: 'USD' }}</span>
+          </div>
+          <div class="range-bar">
+            <div class="range-bar__dot" [style.left.%]="rangePositionPercent(detail.day_low_minor, detail.day_high_minor, detail.price_minor)"></div>
+          </div>
+        </div>
+
+        <div class="instrument-detail__range">
+          <div class="instrument-detail__range-label">
+            <span>52 săptămâni</span>
+            <span>{{ detail.week52_low_minor | money: 'USD' }} – {{ detail.week52_high_minor | money: 'USD' }}</span>
+          </div>
+          <div class="range-bar">
+            <div class="range-bar__dot" [style.left.%]="rangePositionPercent(detail.week52_low_minor, detail.week52_high_minor, detail.price_minor)"></div>
+          </div>
+        </div>
+
+        @if (detail.volume) {
+          <p class="instrument-detail__volume">Volum: {{ detail.volume | number: '1.0-0' }} acțiuni</p>
+        }
+
+        @if (detail.is_tradable) {
+          <app-action-button [fullWidth]="true" (pressed)="buyFromDetail()">Cumpără {{ detail.symbol }}</app-action-button>
+        } @else {
+          <p class="instrument-detail__info-note">Indice informativ — nu se tranzacționează direct.</p>
+        }
+      </div>
+    }
+  </app-modal>
 }
 
 @if (buyModalInstrument(); as instrument) {

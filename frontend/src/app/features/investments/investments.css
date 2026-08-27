@@ -1,18 +1,18 @@
 .investments-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--mb-space-4);
-  margin-bottom: var(--mb-space-6);
+  gap: var(--mb-space-5);
+  margin-bottom: var(--mb-space-8);
 }
 
 .investments-summary__card {
   background: var(--mb-surface);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-5);
+  padding: var(--mb-space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-2);
+  gap: var(--mb-space-3);
 }
 
 .investments-summary__label {
@@ -25,24 +25,98 @@
   font-weight: var(--mb-font-weight-semibold);
 }
 
-.investments-summary__gain--positive {
-  color: var(--mb-positive);
-}
-
-.investments-summary__gain--negative {
-  color: var(--mb-negative);
-}
-
 .investments-section {
-  margin-bottom: var(--mb-space-8);
+  margin-bottom: var(--mb-space-10);
 }
 
 .investments-section h2 {
   font-size: var(--mb-font-size-base);
-  margin-bottom: var(--mb-space-4);
+  margin-bottom: var(--mb-space-2);
 }
 
-/* --- Portofoliu ------------------------------------------------------------ */
+.investments-section__subtitle {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+  max-width: 560px;
+}
+
+/* --- Verde / roșu, reutilizat peste tot (indici, portofoliu, catalog) ------ */
+
+.change-text--positive {
+  color: var(--mb-positive);
+}
+
+.change-text--negative {
+  color: var(--mb-negative);
+}
+
+.change-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--mb-radius-pill);
+  white-space: nowrap;
+}
+
+.change-badge--positive {
+  color: var(--mb-positive);
+  background: var(--mb-positive-bg);
+}
+
+.change-badge--negative {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+.change-badge--large {
+  font-size: var(--mb-font-size-sm);
+  padding: 0.35rem 0.8rem;
+}
+
+/* --- Indici bursieri (rând orizontal, aerisit) ----------------------------- */
+
+.indices-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-4);
+}
+
+.index-chip {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  align-items: flex-start;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-5);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--mb-transition-fast), transform var(--mb-transition-fast);
+}
+
+.index-chip:hover {
+  border-color: var(--mb-blue-500);
+  transform: translateY(-2px);
+}
+
+.index-chip__name {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.index-chip__price {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+/* --- Portofoliu -------------------------------------------------------------- */
 
 .holdings-table-wrap {
   overflow-x: auto;
@@ -61,13 +135,13 @@
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
   font-weight: var(--mb-font-weight-medium);
-  padding: var(--mb-space-3) var(--mb-space-4);
+  padding: var(--mb-space-4);
   border-bottom: 1px solid var(--mb-border);
   white-space: nowrap;
 }
 
 .holdings-table td {
-  padding: var(--mb-space-3) var(--mb-space-4);
+  padding: var(--mb-space-4);
   border-bottom: 1px solid var(--mb-border);
   font-size: var(--mb-font-size-sm);
   white-space: nowrap;
@@ -77,63 +151,149 @@
   border-bottom: none;
 }
 
+.holdings-table__row {
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.holdings-table__row:hover {
+  background: var(--mb-surface-muted);
+}
+
 .holdings-table__name {
   display: block;
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
 }
 
-.holdings-table__gain--positive {
-  color: var(--mb-positive);
-}
-
-.holdings-table__gain--negative {
-  color: var(--mb-negative);
-}
-
-/* --- Catalog ----------------------------------------------------------------- */
+/* --- Catalog ------------------------------------------------------------------ */
 
 .instruments-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--mb-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--mb-space-5);
 }
 
 .instrument-card {
+  position: relative;
   background: var(--mb-surface);
   border: 1px solid var(--mb-border);
+  border-top: 3px solid var(--mb-border);
   border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-4);
+  padding: var(--mb-space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-2);
+  gap: var(--mb-space-3);
+  cursor: pointer;
+  transition: transform var(--mb-transition-fast), box-shadow var(--mb-transition-fast);
+}
+
+.instrument-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mb-shadow-sm);
+}
+
+.instrument-card--positive {
+  border-top-color: var(--mb-positive);
+}
+
+.instrument-card--negative {
+  border-top-color: var(--mb-negative);
 }
 
 .instrument-card__top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
 }
 
 .instrument-card__top strong {
-  font-size: var(--mb-font-size-base);
+  font-size: var(--mb-font-size-lg);
   font-weight: var(--mb-font-weight-semibold);
-}
-
-.instrument-card__price {
-  font-size: var(--mb-font-size-sm);
-  color: var(--mb-text-secondary);
-  font-weight: var(--mb-font-weight-medium);
 }
 
 .instrument-card__name {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
-  margin-bottom: var(--mb-space-2);
   min-height: 2.4em;
 }
 
-/* --- Formulare cumpărare/vânzare (modale) ------------------------------------ */
+.instrument-card__price {
+  font-size: var(--mb-font-size-base);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-secondary);
+}
+
+/* --- Panou de detalii (click) -------------------------------------------------- */
+
+.instrument-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-6);
+}
+
+.instrument-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+}
+
+.instrument-detail__symbol {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: 2px;
+}
+
+.instrument-detail__price {
+  font-size: var(--mb-font-size-2xl, var(--mb-font-size-xl));
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.instrument-detail__chart {
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+}
+
+.instrument-detail__range-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+}
+
+.range-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-border);
+}
+
+.range-bar__dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mb-blue-500);
+  border: 2px solid var(--mb-surface);
+  transform: translate(-50%, -50%);
+}
+
+.instrument-detail__volume {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.instrument-detail__info-note {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  text-align: center;
+}
+
+/* --- Formulare cumpărare/vânzare (modale) --------------------------------------- */
 
 .trade-form {
   display: flex;
@@ -180,5 +340,8 @@
 @media (max-width: 900px) {
   .investments-summary {
     grid-template-columns: 1fr;
+  }
+  .index-chip {
+    flex-basis: 100%;
   }
 }
