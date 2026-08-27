@@ -133,6 +133,46 @@
   </section>
 
   <section class="profile-panel profile-panel--wide">
+    <h2>Documente de semnat</h2>
+    <p class="profile-panel__desc">Documente trimise de personalul băncii, de semnat direct de aici.</p>
+
+    @if (documentsLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="50" />
+    } @else if (documents().length === 0) {
+      <app-empty-state
+        icon="receipt"
+        title="Niciun document de semnat"
+        description="Când personalul îți trimite un document, va apărea aici."
+      />
+    } @else {
+      <ul class="profile-document-list">
+        @for (doc of documents(); track doc.id) {
+          <li class="profile-document-row">
+            <app-icon name="receipt" [size]="18" />
+            <div class="profile-document-row__info">
+              <p class="profile-document-row__title">{{ doc.title }}</p>
+              <p class="profile-document-row__meta">
+                Primit {{ doc.created_at | date: 'dd MMM yyyy' }}
+                @if (doc.signed_at) {
+                  · semnat {{ doc.signed_at | date: 'dd MMM yyyy' }}
+                }
+              </p>
+            </div>
+            <app-status-badge
+              [status]="doc.status"
+              [toneOverride]="documentStatusTone(doc.status)"
+              [labelOverride]="documentStatusLabel(doc.status)"
+            />
+            <app-action-button variant="ghost" (pressed)="openDocument(doc)">
+              {{ doc.status === 'pending' ? 'Vezi și semnează' : 'Vezi' }}
+            </app-action-button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="profile-panel profile-panel--wide">
     <h2>Schimbă parola</h2>
     <form class="profile-password-form" (ngSubmit)="changePassword()">
       <label>
@@ -221,4 +261,49 @@
     (confirmed)="confirmRevokePasskey()"
     (cancelled)="pendingRevoke.set(null)"
   />
+}
+
+@if (viewModalBusy() && !viewTarget()) {
+  <app-modal title="Se încarcă..." [maxWidth]="600" (closed)="closeDocumentModal()">
+    <app-loading-skeleton [rows]="1" [height]="400" />
+  </app-modal>
+} @else if (viewTarget(); as doc) {
+  <app-modal [title]="doc.title" [maxWidth]="700" (closed)="closeDocumentModal()">
+    <div class="document-viewer">
+      <embed [src]="documentViewerUrl()" type="application/pdf" class="document-viewer__pdf" />
+
+      @if (doc.status === 'pending') {
+        <div class="reveal-form">
+          <p class="reveal-form__desc">Confirmă identitatea ca să semnezi acest document.</p>
+
+          @if (signPasskeyAvailable()) {
+            <app-action-button [fullWidth]="true" [loading]="signBiometricBusy()" (pressed)="submitSignWithBiometrics()">
+              <app-icon name="fingerprint" [size]="16" /> Semnează cu passkey
+            </app-action-button>
+            <div class="reveal-divider"><span>sau introdu parola</span></div>
+          }
+
+          <form (ngSubmit)="submitSignWithPassword()">
+            <label>
+              <span>Parola contului</span>
+              <input
+                type="password"
+                autocomplete="current-password"
+                [ngModel]="signPassword()"
+                (ngModelChange)="signPassword.set($event)"
+                name="signPassword"
+              />
+            </label>
+            <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="signBusy()">
+              Semnează cu parola
+            </app-action-button>
+          </form>
+        </div>
+      } @else {
+        <p class="profile-panel__desc">
+          {{ doc.status === 'signed' ? 'Ai semnat deja acest document.' : 'Acest document a fost anulat de personal.' }}
+        </p>
+      }
+    </div>
+  </app-modal>
 }

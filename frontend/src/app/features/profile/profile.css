@@ -279,6 +279,120 @@
   color: var(--mb-negative);
 }
 
+/* --- Documente de semnat (eSign) ------------------------------------------ */
+
+.profile-document-list {
+  list-style: none;
+  margin: 0 0 var(--mb-space-4);
+  padding: 0;
+}
+
+.profile-document-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-4);
+  padding: var(--mb-space-3) 0;
+  border-bottom: 1px solid var(--mb-border);
+  color: var(--mb-text-secondary);
+}
+
+.profile-document-row:last-child {
+  border-bottom: none;
+}
+
+.profile-document-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-document-row__title {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-document-row__meta {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: 1px;
+}
+
+.document-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.document-viewer__pdf {
+  width: 100%;
+  height: 60vh;
+  min-height: 360px;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-sm);
+}
+
+/* Formular de confirmare identitate (passkey/parolă) — aceeași formă ca
+   .reveal-form din features/cards/cards.css (reveal PAN/CVV card), doar
+   scop diferit (semnare document, nu dezvăluire card). */
+.reveal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.reveal-form form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.reveal-form__desc {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.reveal-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+}
+
+.reveal-divider::before,
+.reveal-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--mb-border);
+}
+
+.reveal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.reveal-form input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  padding: 0.6rem var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.reveal-form input:focus {
+  border-color: var(--mb-blue-500);
+}
+
 .profile-password-form {
   display: flex;
   flex-direction: column;

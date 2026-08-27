@@ -18,6 +18,7 @@ from app.models import (
     InternalSecurityFactsView,
     InternalUserContactView,
     InternalUserNameView,
+    InternalUserSearchResult,
 )
 from app.models_webauthn import (
     InternalLatestCredentialView,
@@ -26,6 +27,13 @@ from app.models_webauthn import (
 )
 
 router = APIRouter(prefix="/internal", tags=["internal"])
+
+
+@router.get("/users/search", response_model=list[InternalUserSearchResult])
+async def search_users(q: str = ""):
+    # ÎNREGISTRATĂ înainte de /users/{user_id} — altfel "search" ar fi
+    # interpretat ca un user_id, la fel ca la rutele /staff din alte servicii.
+    return await service.search_users(q)
 
 
 @router.get("/users/{user_id}", response_model=InternalUserNameView)
