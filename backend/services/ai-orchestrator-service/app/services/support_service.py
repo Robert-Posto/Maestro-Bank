@@ -34,6 +34,7 @@ _ACTION_ROUTES: dict[str, str] = {
     "navigate_transactions": "/app/transactions",
     "navigate_transfers": "/app/transfers",
     "navigate_exchange": "/app/exchange",
+    "navigate_investments": "/app/investments",
     "navigate_budgets": "/app/budgets",
     "navigate_spending_forecast": "/app/spending-forecast",
     "navigate_profile": "/app/profile",
