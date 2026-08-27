@@ -547,7 +547,11 @@
      pe toată lățimea mesajului, ca o bară. `align-self` îl lasă la lățimea
      conținutului, adică un buton normal. */
   align-self: flex-start;
-  margin-top: var(--mb-space-2);
+  /* Spațiu egal deasupra și dedesubt — vezi copilot.css::.copilot-listen-btn
+     pentru raționament. Aici valoarea de sus vine din `.support-chat__answer`
+     (--mb-space-4), deci o oglindim pe aceea, nu pe cea din copilot. */
+  margin-top: 0;
+  margin-bottom: var(--mb-space-4);
   padding: 4px 10px;
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-pill);

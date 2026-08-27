@@ -305,6 +305,41 @@
   transition: border-color var(--mb-transition-fast), box-shadow var(--mb-transition-fast);
 }
 
+/* Câmp de parolă cu buton de dezvăluire (ochiul) — același comportament ca
+   pe ecranele de login/înregistrare (vezi shared/styles/auth-screen.css);
+   stilurile sunt separate pentru că pagina asta nu importă acel fișier. */
+.profile-password-control {
+  position: relative;
+  display: flex;
+}
+
+.profile-password-control input {
+  flex: 1;
+  min-width: 0;
+  /* Loc pentru buton, ca textul să nu treacă pe sub el. */
+  padding-right: 2.6rem;
+}
+
+.profile-password-reveal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2.6rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0 var(--mb-radius-sm) var(--mb-radius-sm) 0;
+  background: transparent;
+  color: var(--mb-text-tertiary);
+  cursor: pointer;
+  transition: color var(--mb-transition-fast);
+}
+
+.profile-password-reveal:hover {
+  color: var(--mb-text-secondary);
+}
+
 .profile-password-form input:focus {
   border-color: var(--mb-blue-500);
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.12);

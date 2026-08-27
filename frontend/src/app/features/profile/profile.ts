@@ -216,6 +216,10 @@ export class Profile implements OnInit, OnDestroy {
   protected readonly currentPassword = signal('');
   protected readonly newPassword = signal('');
   protected readonly confirmPassword = signal('');
+  /** Ce câmpuri de parolă sunt afișate în clar (butonul cu ochi). Fiecare
+   * se comută independent — vrei să verifici parola nouă fără s-o expui și
+   * pe cea curentă. Pornesc toate ascunse la fiecare intrare pe pagină. */
+  protected readonly passwordVisible = signal({ current: false, new: false, confirm: false });
   protected readonly changingPassword = signal(false);
   protected readonly passwordError = signal<string | null>(null);
   protected readonly passwordSuccess = signal(false);
@@ -288,6 +292,10 @@ export class Profile implements OnInit, OnDestroy {
         this.toast.error(extractErrorMessage(err, 'Nu am putut revoca passkey-ul.'));
       },
     });
+  }
+
+  protected togglePasswordVisibility(field: 'current' | 'new' | 'confirm'): void {
+    this.passwordVisible.update((state) => ({ ...state, [field]: !state[field] }));
   }
 
   protected changePassword(): void {
