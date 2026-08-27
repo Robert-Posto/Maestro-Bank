@@ -1,75 +1,84 @@
+<app-auth-language-toggle />
 <div class="auth-screen">
   <main class="auth-layout">
     <aside class="auth-visual" aria-hidden="true">
       <div class="auth-brand">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
       <div class="auth-visual__content">
-        <p class="auth-visual__eyebrow">Începe simplu</p>
-        <h2 class="auth-visual__title">Un cont construit în jurul tău.</h2>
-        <p class="auth-visual__text">Ai acces rapid la sold, card virtual și instrumentele de care ai nevoie zi de zi.</p>
+        <p class="auth-visual__eyebrow">{{ 'auth.register.eyebrow' | translate }}</p>
+        <h2 class="auth-visual__title">{{ 'auth.register.title' | translate }}</h2>
+        <p class="auth-visual__text">{{ 'auth.register.text' | translate }}</p>
       </div>
 
-      <p class="auth-visual__security">Înregistrare rapidă și protejată</p>
+      <p class="auth-visual__security">{{ 'auth.register.security' | translate }}</p>
     </aside>
 
     <section class="auth-card">
       <div class="auth-brand auth-brand--mobile">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
-    <a class="auth-back auth-back--icon" routerLink="/login" aria-label="Înapoi la autentificare">
+    <a class="auth-back auth-back--icon" routerLink="/login" [attr.aria-label]="'auth.register.back' | translate">
       <app-icon name="chevron-left" [size]="18" />
     </a>
 
-    <h1 class="auth-title">Creează cont</h1>
-    <p class="auth-subtitle">Contul RON, IBAN-ul demo și cardul virtual se creează automat. Urmează 2 pași rapizi de verificare — email și identitate.</p>
+    <h1 class="auth-title">{{ 'auth.register.title2' | translate }}</h1>
+    <p class="auth-subtitle">{{ 'auth.register.subtitle' | translate }}</p>
 
     <form class="auth-form" (ngSubmit)="submit()">
       <div class="auth-form-row">
         <label class="auth-field">
-          <span>Prenume</span>
+          <span>{{ 'auth.register.firstName' | translate }}</span>
           <input type="text" [ngModel]="firstName()" (ngModelChange)="firstName.set($event)" name="firstName" autocomplete="given-name" />
         </label>
         <label class="auth-field">
-          <span>Nume</span>
+          <span>{{ 'auth.register.lastName' | translate }}</span>
           <input type="text" [ngModel]="lastName()" (ngModelChange)="lastName.set($event)" name="lastName" autocomplete="family-name" />
         </label>
       </div>
 
       <label class="auth-field">
-        <span>Email</span>
-        <input type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" autocomplete="email" placeholder="nume@exemplu.com" />
+        <span>{{ 'common.email' | translate }}</span>
+        <input type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" autocomplete="email" [placeholder]="'auth.login.emailPlaceholder' | translate" />
       </label>
 
       <label class="auth-field">
-        <span>Telefon</span>
-        <input type="tel" [ngModel]="phoneNumber()" (ngModelChange)="phoneNumber.set($event)" name="phoneNumber" autocomplete="tel" placeholder="+40 7xx xxx xxx" />
-        <span class="auth-hint">Folosit doar pentru contact — necesar acum, verificarea prin SMS vine într-o etapă viitoare.</span>
+        <span>{{ 'auth.register.phone' | translate }}</span>
+        <input type="tel" [ngModel]="phoneNumber()" (ngModelChange)="phoneNumber.set($event)" name="phoneNumber" autocomplete="tel" [placeholder]="'auth.register.phonePlaceholder' | translate" />
+        <span class="auth-hint">{{ 'auth.register.phoneHint' | translate }}</span>
       </label>
 
       <label class="auth-field">
-        <span>Parolă</span>
-        <input type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" autocomplete="new-password" placeholder="••••••••" />
-        <span class="auth-hint">Minimum 8 caractere, cel puțin o literă și o cifră.</span>
+        <span>{{ 'common.password' | translate }}</span>
+        <app-password-input
+          [value]="password()"
+          (valueChange)="password.set($event)"
+          name="password"
+          autocomplete="new-password"
+          placeholder="••••••••"
+        />
+        <span class="auth-hint">{{ 'auth.register.passwordHint' | translate }}</span>
       </label>
 
       @if (error()) {
         <p class="auth-error">{{ error() }}</p>
       }
       @if (success()) {
-        <p class="auth-success">Cont creat. Te autentificăm automat...</p>
+        <p class="auth-success">{{ 'auth.register.success' | translate }}</p>
       }
 
       <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
-        {{ isSubmitting() ? 'Se creează...' : 'Creează cont' }}
+        {{ (isSubmitting() ? 'auth.register.submitting' : 'auth.register.submit') | translate }}
       </button>
     </form>
 
-    <p class="auth-switch">Ai deja cont? <a routerLink="/login">Autentifică-te</a></p>
+    <p class="auth-switch">
+      {{ 'auth.register.haveAccount' | translate }} <a routerLink="/login">{{ 'auth.register.signIn' | translate }}</a>
+    </p>
     </section>
   </main>
 </div>

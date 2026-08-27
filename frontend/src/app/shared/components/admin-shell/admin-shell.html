@@ -3,29 +3,38 @@
     <div class="admin-topbar__brand">
       <span class="admin-topbar__icon"><app-icon name="shield" [size]="18" /></span>
       <div>
-        <p class="admin-topbar__title">MaestroBank <span>Personal</span></p>
-        <p class="admin-topbar__subtitle">Zonă restricționată — vizibilă doar personalului</p>
+        <p class="admin-topbar__title">MaestroBank <span>{{ 'admin.brand.name' | translate }}</span></p>
+        <p class="admin-topbar__subtitle">{{ 'admin.brand.subtitle' | translate }}</p>
       </div>
     </div>
 
     <div class="admin-topbar__right">
+      <button
+        type="button"
+        class="admin-topbar__action"
+        [attr.title]="languageService.language() === 'ro' ? 'English' : 'Română'"
+        (click)="languageService.toggle()"
+      >
+        <app-icon name="globe" [size]="16" />
+        {{ languageService.language() === 'ro' ? 'RO' : 'EN' }}
+      </button>
       <span class="admin-topbar__user">{{ staffName }}</span>
       <button type="button" class="admin-topbar__action" (click)="logout()">
         <app-icon name="logout" [size]="16" />
-        Ieși din cont
+        {{ 'topbar.logout' | translate }}
       </button>
     </div>
   </header>
 
   <nav class="admin-nav">
     <a class="admin-nav__link" routerLink="/admin/holds" routerLinkActive="admin-nav__link--active">
-      <app-icon name="shield" [size]="15" /> Rețineri
+      <app-icon name="shield" [size]="15" /> {{ 'admin.nav.holds' | translate }}
     </a>
     <a class="admin-nav__link" routerLink="/admin/blocklist" routerLinkActive="admin-nav__link--active">
-      <app-icon name="lock" [size]="15" /> Blocklist
+      <app-icon name="lock" [size]="15" /> {{ 'admin.nav.blocklist' | translate }}
     </a>
     <a class="admin-nav__link" routerLink="/admin/documents" routerLinkActive="admin-nav__link--active">
-      <app-icon name="receipt" [size]="15" /> Documente
+      <app-icon name="receipt" [size]="15" /> {{ 'admin.nav.documents' | translate }}
     </a>
   </nav>
 

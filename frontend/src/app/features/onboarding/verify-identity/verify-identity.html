@@ -1,67 +1,68 @@
+<app-auth-language-toggle />
 <div class="auth-screen">
   <main class="auth-layout auth-layout--wide">
     <aside class="auth-visual" aria-hidden="true">
       <div class="auth-brand">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
       <div class="auth-visual__content">
-        <p class="auth-visual__eyebrow">Pasul 2 din 3</p>
-        <h2 class="auth-visual__title">Confirmă că ești chiar tu.</h2>
-        <p class="auth-visual__text">Comparăm poza buletinului cu un selfie live — verificare reală, nu doar bifată la formular.</p>
+        <p class="auth-visual__eyebrow">{{ 'auth.verifyIdentity.eyebrow' | translate }}</p>
+        <h2 class="auth-visual__title">{{ 'auth.verifyIdentity.title' | translate }}</h2>
+        <p class="auth-visual__text">{{ 'auth.verifyIdentity.text' | translate }}</p>
       </div>
 
-      <p class="auth-visual__security">Imaginile NU sunt salvate — doar rezultatul comparării</p>
+      <p class="auth-visual__security">{{ 'auth.verifyIdentity.security' | translate }}</p>
     </aside>
 
     <section class="auth-card">
       <div class="auth-brand auth-brand--mobile">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
-      <button type="button" class="auth-back auth-back--icon" aria-label="Înapoi" (click)="back()">
+      <button type="button" class="auth-back auth-back--icon" [attr.aria-label]="'auth.verifyIdentity.back' | translate" (click)="back()">
         <app-icon name="chevron-left" [size]="18" />
       </button>
 
-      <h1 class="auth-title">Verifică-ți identitatea</h1>
-      <p class="auth-subtitle">Încarcă buletinul, apoi fă un selfie — le comparăm automat.</p>
+      <h1 class="auth-title">{{ 'auth.verifyIdentity.title2' | translate }}</h1>
+      <p class="auth-subtitle">{{ 'auth.verifyIdentity.subtitle' | translate }}</p>
 
       <div class="identity-grid">
         <div class="identity-slot">
-          <p class="identity-slot__label"><app-icon name="cards" [size]="15" /> Buletin</p>
+          <p class="identity-slot__label"><app-icon name="cards" [size]="15" /> {{ 'auth.verifyIdentity.idLabel' | translate }}</p>
 
           @if (idDocumentPreviewUrl()) {
             <img class="identity-slot__preview" [src]="idDocumentPreviewUrl()" alt="Previzualizare buletin" />
             <label class="identity-slot__action">
-              Schimbă poza
+              {{ 'auth.verifyIdentity.changePhoto' | translate }}
               <input type="file" accept="image/*" (change)="onIdDocumentSelected($event)" hidden />
             </label>
           } @else {
             <label class="identity-slot__dropzone">
               <app-icon name="upload" [size]="24" />
-              <span>Încarcă poza buletinului</span>
+              <span>{{ 'auth.verifyIdentity.uploadId' | translate }}</span>
               <input type="file" accept="image/*" (change)="onIdDocumentSelected($event)" hidden />
             </label>
           }
         </div>
 
         <div class="identity-slot">
-          <p class="identity-slot__label"><app-icon name="camera" [size]="15" /> Selfie</p>
+          <p class="identity-slot__label"><app-icon name="camera" [size]="15" /> {{ 'auth.verifyIdentity.selfieLabel' | translate }}</p>
 
           @if (selfiePreviewUrl()) {
             <img class="identity-slot__preview" [src]="selfiePreviewUrl()" alt="Previzualizare selfie" />
-            <button type="button" class="identity-slot__action" (click)="retakePhoto()">Refă poza</button>
+            <button type="button" class="identity-slot__action" (click)="retakePhoto()">{{ 'auth.verifyIdentity.retake' | translate }}</button>
           } @else if (cameraActive()) {
             <div class="identity-camera">
               <video #video [srcObject]="cameraStream()" autoplay playsinline muted></video>
-              <button type="button" class="identity-camera__shutter" aria-label="Fă poza" (click)="capturePhoto()"></button>
+              <button type="button" class="identity-camera__shutter" [attr.aria-label]="'auth.verifyIdentity.takePhoto' | translate" (click)="capturePhoto()"></button>
             </div>
           } @else {
             <button type="button" class="identity-slot__dropzone" (click)="startCamera()">
               <app-icon name="camera" [size]="24" />
-              <span>Pornește camera</span>
+              <span>{{ 'auth.verifyIdentity.startCamera' | translate }}</span>
             </button>
           }
 
@@ -78,7 +79,7 @@
       }
 
       <button type="button" class="auth-submit identity-submit" [disabled]="submitting()" (click)="submit()">
-        {{ submitting() ? 'Se verifică...' : 'Confirmă identitatea' }}
+        {{ (submitting() ? 'auth.verifyIdentity.verifying' : 'auth.verifyIdentity.confirm') | translate }}
       </button>
     </section>
   </main>

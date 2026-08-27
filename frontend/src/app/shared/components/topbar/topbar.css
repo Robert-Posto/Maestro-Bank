@@ -159,6 +159,19 @@
   background: var(--mb-surface);
 }
 
+.topbar__lang-btn {
+  align-items: center;
+  gap: 4px;
+  padding-left: var(--mb-space-3);
+  padding-right: var(--mb-space-3);
+}
+
+.topbar__lang-code {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
 .topbar__badge {
   position: absolute;
   top: 2px;

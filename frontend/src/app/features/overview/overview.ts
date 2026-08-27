@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { BankingService } from '../../services/banking.service';
+import { LanguageService } from '../../services/language.service';
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
 import { BudgetsService, Budget, Subscription } from '../../services/budgets.service';
 import { AccountCard, AccountRowData } from '../../shared/components/account-card/account-card';
@@ -11,6 +12,7 @@ import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loadin
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Icon } from '../../shared/components/icon/icon';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
 
 interface QuickAction {
@@ -21,13 +23,13 @@ interface QuickAction {
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { label: 'Transfer', icon: 'transfer', route: '/app/transfers' },
-  { label: 'Schimb valutar', icon: 'exchange', route: '/app/exchange' },
+  { label: 'overview.action.transfer', icon: 'transfer', route: '/app/transfers' },
+  { label: 'overview.action.exchange', icon: 'exchange', route: '/app/exchange' },
   // Aceeași pagină ca "Transfer", dar cu categoria presetată pe "bills" —
   // altfel cele 2 tile-uri ar duce spre exact aceeași destinație, fără
   // nicio diferență vizibilă pentru user (duplicare confuză).
-  { label: 'Plată factură', icon: 'receipt', route: '/app/transfers', queryParams: { category: 'bills' } },
-  { label: 'Control card', icon: 'cards', route: '/app/cards' },
+  { label: 'overview.action.payBill', icon: 'receipt', route: '/app/transfers', queryParams: { category: 'bills' } },
+  { label: 'overview.action.cardControls', icon: 'cards', route: '/app/cards' },
 ];
 
 function startOfMonthIso(): string {
@@ -44,7 +46,7 @@ function startOfMonthIso(): string {
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [RouterLink, AccountCard, TransactionRow, LoadingSkeleton, EmptyState, MoneyPipe, Icon],
+  imports: [RouterLink, AccountCard, TransactionRow, LoadingSkeleton, EmptyState, MoneyPipe, Icon, TranslatePipe],
   templateUrl: './overview.html',
   styleUrl: './overview.css',
 })
@@ -54,6 +56,7 @@ export class Overview implements OnInit {
   private readonly transactionsApi = inject(TransactionsService);
   private readonly budgetsApi = inject(BudgetsService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
 
   protected readonly quickActions = QUICK_ACTIONS;
   protected readonly loading = signal(true);
@@ -74,7 +77,9 @@ export class Overview implements OnInit {
   protected readonly incomeDisplayMinor = signal(0);
   protected readonly progressDisplayPercent = signal(0);
 
-  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
+  protected daysUntilBillingLabel(billingDay: number): string {
+    return daysUntilBillingLabel(billingDay, this.language.language());
+  }
 
   protected readonly budgetProgress = computed(() => {
     const budgetList = this.budgets().filter((b) => b.active);
@@ -106,7 +111,10 @@ export class Overview implements OnInit {
       next: ({ account, transactions, incomeThisMonth, spending, budgets, subscriptions }) => {
         this.account.set({
           id: account.id,
-          name: 'Cont curent',
+          // Cheie de traducere, NU string deja tradus — AccountCard aplică
+          // `| translate` la afișare, deci rămâne reactiv la comutarea de
+          // limbă chiar și după ce datele au fost încărcate o singură dată.
+          name: 'overview.currentAccount',
           iban: account.iban,
           currency: account.currency,
           balance_minor: account.balance_minor,
@@ -132,7 +140,7 @@ export class Overview implements OnInit {
         this.animateTo(this.progressDisplayPercent, this.budgetProgress()?.percent ?? 0);
       },
       error: () => {
-        this.error.set('Nu am putut încărca datele contului. Încearcă din nou.');
+        this.error.set(this.language.t('overview.loadError'));
         this.loading.set(false);
       },
     });

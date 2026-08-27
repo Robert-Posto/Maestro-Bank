@@ -3,20 +3,24 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
+import { LanguageService } from '../../../services/language.service';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { AuthLanguageToggle } from '../../../shared/components/auth-language-toggle/auth-language-toggle';
 import { Icon } from '../../../shared/components/icon/icon';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 /** Pasul 1/3 din onboarding — cod de 6 cifre trimis pe email la register. */
 @Component({
   selector: 'app-verify-email',
   standalone: true,
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, TranslatePipe, AuthLanguageToggle],
   templateUrl: './verify-email.html',
   styleUrl: './verify-email.css',
 })
 export class VerifyEmail {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
 
   protected readonly email = this.auth.currentUser()?.email ?? '';
   protected readonly code = signal('');
@@ -31,7 +35,7 @@ export class VerifyEmail {
 
     const code = this.code().trim();
     if (code.length !== 6) {
-      this.error.set('Codul are 6 cifre.');
+      this.error.set(this.language.t('auth.verifyEmail.codeLength'));
       return;
     }
 
@@ -54,7 +58,7 @@ export class VerifyEmail {
       },
       error: (err) => {
         this.isSubmitting.set(false);
-        this.error.set(extractErrorMessage(err, 'Cod incorect. Încearcă din nou.'));
+        this.error.set(extractErrorMessage(err, this.language.t('auth.verifyEmail.incorrectCode')));
       },
     });
   }
@@ -78,7 +82,7 @@ export class VerifyEmail {
       },
       error: (err) => {
         this.resending.set(false);
-        this.error.set(extractErrorMessage(err, 'Nu am putut retrimite codul.'));
+        this.error.set(extractErrorMessage(err, this.language.t('auth.verifyEmail.resendFailed')));
       },
     });
   }

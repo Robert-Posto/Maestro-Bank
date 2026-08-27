@@ -1,103 +1,122 @@
-<app-page-header title="Profil & Securitate" subtitle="Datele contului tău și opțiunile de securitate." />
+<app-page-header title="Profil & Securitate" subtitle="Datele contului tău și opțiunile de securitate.">
+  <app-action-button variant="secondary" (pressed)="logout()">
+    <app-icon name="logout" [size]="15" /> Ieși din cont
+  </app-action-button>
+</app-page-header>
 
+<section class="profile-hero">
+  <div class="profile-hero__avatar-wrap">
+    <span class="profile-hero__avatar">
+      @if (currentUser()?.profile_picture; as picture) {
+        <img [src]="picture" alt="Poză de profil" />
+      } @else {
+        <span class="profile-hero__initials">{{ initials() }}</span>
+      }
+    </span>
+    <label class="profile-hero__avatar-edit" [class.profile-hero__avatar-edit--busy]="profilePictureBusy()" title="Schimbă poza">
+      <input type="file" accept="image/*" (change)="onProfilePictureSelected($event)" [disabled]="profilePictureBusy()" hidden />
+      <app-icon name="camera" [size]="14" />
+    </label>
+  </div>
+
+  <div class="profile-hero__info">
+    <h2>{{ currentUser()?.first_name ?? '—' }} {{ currentUser()?.last_name ?? '' }}</h2>
+    <p class="profile-hero__email">{{ currentUser()?.email ?? '—' }}</p>
+    <div class="profile-hero__actions">
+      <button type="button" class="profile-hero__link" [disabled]="profilePictureBusy() || cameraActive()" (click)="startCamera()">
+        <app-icon name="camera" [size]="13" /> Fă poza cu camera
+      </button>
+      @if (currentUser()?.profile_picture) {
+        <button type="button" class="profile-hero__link profile-hero__link--danger" [disabled]="profilePictureBusy()" (click)="removeProfilePicture()">
+          <app-icon name="trash" [size]="13" /> Șterge poza
+        </button>
+      }
+    </div>
+  </div>
+</section>
+
+@if (cameraActive() || capturedPreviewUrl()) {
+  <div class="profile-camera-panel">
+    @if (capturedPreviewUrl(); as preview) {
+      <img class="profile-camera-panel__preview" [src]="preview" alt="Previzualizare poză capturată" />
+      <div class="profile-camera-panel__actions">
+        <app-action-button variant="secondary" [disabled]="profilePictureBusy()" (pressed)="retakePhoto()">
+          Refă poza
+        </app-action-button>
+        <app-action-button [loading]="profilePictureBusy()" (pressed)="saveCapturedPhoto()">Salvează</app-action-button>
+      </div>
+    } @else {
+      <div class="profile-camera-panel__video-wrap">
+        <video #profileCameraVideo [srcObject]="cameraStream()" autoplay playsinline muted></video>
+        <button type="button" class="profile-camera-panel__shutter" aria-label="Fă poza" (click)="capturePhoto()"></button>
+      </div>
+      <app-action-button variant="ghost" (pressed)="cancelCameraCapture()">Renunță</app-action-button>
+    }
+    @if (cameraError()) {
+      <p class="profile-password-error">{{ cameraError() }}</p>
+    }
+  </div>
+}
+<canvas #profileCameraCanvas hidden></canvas>
+
+<div class="profile-stats">
+  <article class="profile-stat-card">
+    <div class="profile-stat-card__top"><span>Identitate</span></div>
+    <strong>{{ currentUser()?.identity_verified ? 'Verificată' : 'În așteptare' }}</strong>
+    <p>{{ currentUser()?.identity_verified ? 'Contul tău e verificat complet.' : 'Verificarea nu e încă finalizată.' }}</p>
+    <span
+      class="profile-stat-card__icon"
+      [class.profile-stat-card__icon--green]="currentUser()?.identity_verified"
+      [class.profile-stat-card__icon--amber]="!currentUser()?.identity_verified"
+    >
+      <app-icon name="shield" [size]="20" />
+    </span>
+  </article>
+
+  <article class="profile-stat-card">
+    <div class="profile-stat-card__top"><span>Passkeys</span></div>
+    <strong>{{ passkeys().length }}</strong>
+    <p>{{ passkeys().length > 0 ? 'Autentificare fără parolă, activă.' : 'Niciunul înregistrat încă.' }}</p>
+    <span class="profile-stat-card__icon profile-stat-card__icon--blue"><app-icon name="fingerprint" [size]="20" /></span>
+  </article>
+
+  <article class="profile-stat-card">
+    <div class="profile-stat-card__top"><span>Documente</span></div>
+    <strong>{{ pendingDocumentsCount() }}</strong>
+    <p>{{ pendingDocumentsCount() > 0 ? 'În așteptarea semnăturii tale.' : 'Nimic de semnat momentan.' }}</p>
+    <span
+      class="profile-stat-card__icon"
+      [class.profile-stat-card__icon--amber]="pendingDocumentsCount() > 0"
+      [class.profile-stat-card__icon--green]="pendingDocumentsCount() === 0"
+    >
+      <app-icon name="receipt" [size]="20" />
+    </span>
+  </article>
+
+  <article class="profile-stat-card">
+    <div class="profile-stat-card__top"><span>Sesiune</span></div>
+    <strong>{{ sessionExpiry() ? (sessionExpiry() | date: 'HH:mm') : '—' }}</strong>
+    <p>{{ sessionExpiry() ? ('Expiră ' + (sessionExpiry() | date: 'dd MMM')) : 'Autentificat.' }}</p>
+    <span class="profile-stat-card__icon profile-stat-card__icon--blue"><app-icon name="lock" [size]="20" /></span>
+  </article>
+</div>
+
+<h2 class="profile-section-title"><app-icon name="shield" [size]="16" /> Securitate</h2>
 <div class="profile-grid">
   <section class="profile-panel">
-    <h2>Profil</h2>
-
-    <div class="profile-avatar-row">
-      <span class="profile-avatar">
-        @if (currentUser()?.profile_picture; as picture) {
-          <img [src]="picture" alt="Poză de profil" />
-        } @else {
-          <app-icon name="profile" [size]="22" />
-        }
-      </span>
-      <div class="profile-avatar-actions">
-        <label class="profile-avatar-upload" [class.profile-avatar-upload--busy]="profilePictureBusy()">
-          <input type="file" accept="image/*" (change)="onProfilePictureSelected($event)" [disabled]="profilePictureBusy()" hidden />
-          {{ currentUser()?.profile_picture ? 'Schimbă poza' : 'Adaugă poză (opțional)' }}
-        </label>
-        <button
-          type="button"
-          class="profile-avatar-camera"
-          [disabled]="profilePictureBusy() || cameraActive()"
-          (click)="startCamera()"
-        >
-          <app-icon name="camera" [size]="14" /> Fă poza acum
-        </button>
-        @if (currentUser()?.profile_picture) {
-          <button type="button" class="profile-avatar-remove" [disabled]="profilePictureBusy()" (click)="removeProfilePicture()">
-            Șterge
-          </button>
-        }
-      </div>
+    <div class="profile-panel__header">
+      <h3>Passkeys</h3>
+      <p class="profile-panel__desc">
+        Autentifică-te și confirmă acțiuni sensibile (ex. vezi datele unui card) cu Face ID, Touch ID sau Windows Hello,
+        în loc de parolă.
+      </p>
     </div>
-
-    @if (cameraActive() || capturedPreviewUrl()) {
-      <div class="profile-camera-panel">
-        @if (capturedPreviewUrl(); as preview) {
-          <img class="profile-camera-panel__preview" [src]="preview" alt="Previzualizare poză capturată" />
-          <div class="profile-camera-panel__actions">
-            <app-action-button variant="secondary" [disabled]="profilePictureBusy()" (pressed)="retakePhoto()">
-              Refă poza
-            </app-action-button>
-            <app-action-button [loading]="profilePictureBusy()" (pressed)="saveCapturedPhoto()">Salvează</app-action-button>
-          </div>
-        } @else {
-          <div class="profile-camera-panel__video-wrap">
-            <video #profileCameraVideo [srcObject]="cameraStream()" autoplay playsinline muted></video>
-            <button type="button" class="profile-camera-panel__shutter" aria-label="Fă poza" (click)="capturePhoto()"></button>
-          </div>
-          <app-action-button variant="ghost" (pressed)="cancelCameraCapture()">Renunță</app-action-button>
-        }
-        @if (cameraError()) {
-          <p class="profile-password-error">{{ cameraError() }}</p>
-        }
-      </div>
-    }
-    <canvas #profileCameraCanvas hidden></canvas>
-
-    <div class="profile-field">
-      <span>Prenume</span>
-      <p>{{ currentUser()?.first_name ?? '—' }}</p>
-    </div>
-    <div class="profile-field">
-      <span>Nume</span>
-      <p>{{ currentUser()?.last_name ?? '—' }}</p>
-    </div>
-    <div class="profile-field">
-      <span>Email</span>
-      <p>{{ currentUser()?.email ?? '—' }}</p>
-    </div>
-  </section>
-
-  <section class="profile-panel">
-    <h2>Sesiune</h2>
-    <div class="profile-field">
-      <span>Status</span>
-      <p>Autentificat</p>
-    </div>
-    @if (sessionExpiry()) {
-      <div class="profile-field">
-        <span>Sesiunea expiră la</span>
-        <p>{{ sessionExpiry() | date: 'dd MMM yyyy, HH:mm' }}</p>
-      </div>
-    }
-    <app-action-button variant="danger" (pressed)="logout()">Ieși din cont</app-action-button>
-  </section>
-
-  <section class="profile-panel profile-panel--wide">
-    <h2>Passkeys</h2>
-    <p class="profile-panel__desc">
-      Autentifică-te și confirmă acțiuni sensibile (ex. vezi datele unui card) cu Face ID, Touch ID sau Windows Hello, în
-      loc de parolă.
-    </p>
 
     @if (!passkeySupported) {
       <p class="profile-passkey-unsupported">Browserul tău nu suportă passkey-uri — poți folosi în continuare parola.</p>
     } @else {
       @if (passkeysLoading()) {
-        <app-loading-skeleton [rows]="2" [height]="50" />
+        <app-loading-skeleton [rows]="2" [height]="56" />
       } @else if (passkeys().length === 0) {
         <app-empty-state
           icon="fingerprint"
@@ -108,7 +127,7 @@
         <ul class="profile-passkey-list">
           @for (p of passkeys(); track p.id) {
             <li class="profile-passkey-row">
-              <app-icon name="fingerprint" [size]="18" />
+              <span class="profile-passkey-row__icon"><app-icon name="fingerprint" [size]="18" /></span>
               <div class="profile-passkey-row__info">
                 <p class="profile-passkey-row__title">Passkey</p>
                 <p class="profile-passkey-row__meta">
@@ -118,7 +137,7 @@
                   }
                 </p>
               </div>
-              <button type="button" class="profile-passkey-row__revoke" (click)="pendingRevoke.set(p)">
+              <button type="button" class="profile-passkey-row__revoke" (click)="pendingRevoke.set(p)" aria-label="Revocă passkey-ul">
                 <app-icon name="trash" [size]="15" />
               </button>
             </li>
@@ -132,60 +151,22 @@
     }
   </section>
 
-  <section class="profile-panel profile-panel--wide">
-    <h2>Documente de semnat</h2>
-    <p class="profile-panel__desc">Documente trimise de personalul băncii, de semnat direct de aici.</p>
-
-    @if (documentsLoading()) {
-      <app-loading-skeleton [rows]="2" [height]="50" />
-    } @else if (documents().length === 0) {
-      <app-empty-state
-        icon="receipt"
-        title="Niciun document de semnat"
-        description="Când personalul îți trimite un document, va apărea aici."
-      />
-    } @else {
-      <ul class="profile-document-list">
-        @for (doc of documents(); track doc.id) {
-          <li class="profile-document-row">
-            <app-icon name="receipt" [size]="18" />
-            <div class="profile-document-row__info">
-              <p class="profile-document-row__title">{{ doc.title }}</p>
-              <p class="profile-document-row__meta">
-                Primit {{ doc.created_at | date: 'dd MMM yyyy' }}
-                @if (doc.signed_at) {
-                  · semnat {{ doc.signed_at | date: 'dd MMM yyyy' }}
-                }
-              </p>
-            </div>
-            <app-status-badge
-              [status]="doc.status"
-              [toneOverride]="documentStatusTone(doc.status)"
-              [labelOverride]="documentStatusLabel(doc.status)"
-            />
-            <app-action-button variant="ghost" (pressed)="openDocument(doc)">
-              {{ doc.status === 'pending' ? 'Vezi și semnează' : 'Vezi' }}
-            </app-action-button>
-          </li>
-        }
-      </ul>
-    }
-  </section>
-
-  <section class="profile-panel profile-panel--wide">
-    <h2>Schimbă parola</h2>
+  <section class="profile-panel">
+    <div class="profile-panel__header">
+      <h3>Schimbă parola</h3>
+    </div>
     <form class="profile-password-form" (ngSubmit)="changePassword()">
       <label>
         <span>Parola curentă</span>
-        <input type="password" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" name="currentPassword" />
+        <app-password-input [value]="currentPassword()" (valueChange)="currentPassword.set($event)" name="currentPassword" autocomplete="current-password" />
       </label>
       <label>
         <span>Parolă nouă</span>
-        <input type="password" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" name="newPassword" />
+        <app-password-input [value]="newPassword()" (valueChange)="newPassword.set($event)" name="newPassword" autocomplete="new-password" />
       </label>
       <label>
         <span>Confirmă parola nouă</span>
-        <input type="password" autocomplete="new-password" [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" name="confirmPassword" />
+        <app-password-input [value]="confirmPassword()" (valueChange)="confirmPassword.set($event)" name="confirmPassword" autocomplete="new-password" />
       </label>
 
       @if (passwordError()) {
@@ -199,6 +180,46 @@
     </form>
   </section>
 </div>
+
+<h2 class="profile-section-title"><app-icon name="receipt" [size]="16" /> Documente</h2>
+<section class="profile-panel">
+  @if (documentsLoading()) {
+    <app-loading-skeleton [rows]="2" [height]="56" />
+  } @else if (documents().length === 0) {
+    <app-empty-state
+      icon="receipt"
+      title="Niciun document de semnat"
+      description="Când personalul îți trimite un document, va apărea aici."
+    />
+  } @else {
+    <ul class="profile-document-list">
+      @for (doc of documents(); track doc.id) {
+        <li class="profile-document-row">
+          <span class="profile-document-row__icon" [class.profile-document-row__icon--signed]="doc.status === 'signed'">
+            <app-icon name="receipt" [size]="18" />
+          </span>
+          <div class="profile-document-row__info">
+            <p class="profile-document-row__title">{{ doc.title }}</p>
+            <p class="profile-document-row__meta">
+              Primit {{ doc.created_at | date: 'dd MMM yyyy' }}
+              @if (doc.signed_at) {
+                · semnat {{ doc.signed_at | date: 'dd MMM yyyy' }}
+              }
+            </p>
+          </div>
+          <app-status-badge
+            [status]="doc.status"
+            [toneOverride]="documentStatusTone(doc.status)"
+            [labelOverride]="documentStatusLabel(doc.status)"
+          />
+          <app-action-button variant="ghost" (pressed)="openDocument(doc)">
+            {{ doc.status === 'pending' ? 'Vezi și semnează' : 'Vezi' }}
+          </app-action-button>
+        </li>
+      }
+    </ul>
+  }
+</section>
 
 @if (pendingRevoke(); as p) {
   <app-confirm-dialog
@@ -235,12 +256,11 @@
           <form (ngSubmit)="submitSignWithPassword()">
             <label>
               <span>Parola contului</span>
-              <input
-                type="password"
-                autocomplete="current-password"
-                [ngModel]="signPassword()"
-                (ngModelChange)="signPassword.set($event)"
+              <app-password-input
+                [value]="signPassword()"
+                (valueChange)="signPassword.set($event)"
                 name="signPassword"
+                autocomplete="current-password"
               />
             </label>
             <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="signBusy()">

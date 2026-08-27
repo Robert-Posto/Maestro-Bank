@@ -1,36 +1,37 @@
+<app-auth-language-toggle />
 <div class="auth-screen">
   <main class="auth-layout">
     <aside class="auth-visual" aria-hidden="true">
       <div class="auth-brand">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
       <div class="auth-visual__content">
-        <p class="auth-visual__eyebrow">Pasul 1 din 3</p>
-        <h2 class="auth-visual__title">Confirmă-ți adresa de email.</h2>
-        <p class="auth-visual__text">Un cont verificat înseamnă un cont mai sigur — un singur cod, primit pe mail, e tot ce ne trebuie.</p>
+        <p class="auth-visual__eyebrow">{{ 'auth.verifyEmail.eyebrow' | translate }}</p>
+        <h2 class="auth-visual__title">{{ 'auth.verifyEmail.title' | translate }}</h2>
+        <p class="auth-visual__text">{{ 'auth.verifyEmail.text' | translate }}</p>
       </div>
 
-      <p class="auth-visual__security">Conexiune securizată și date protejate</p>
+      <p class="auth-visual__security">{{ 'auth.verifyEmail.security' | translate }}</p>
     </aside>
 
     <section class="auth-card">
       <div class="auth-brand auth-brand--mobile">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
-      <button type="button" class="auth-back auth-back--icon" aria-label="Renunță și ieși" (click)="back()">
+      <button type="button" class="auth-back auth-back--icon" [attr.aria-label]="'auth.verifyEmail.exit' | translate" (click)="back()">
         <app-icon name="chevron-left" [size]="18" />
       </button>
 
-      <h1 class="auth-title">Verifică-ți emailul</h1>
-      <p class="auth-subtitle">Am trimis un cod de 6 cifre către <strong>{{ email }}</strong>.</p>
+      <h1 class="auth-title">{{ 'auth.verifyEmail.title2' | translate }}</h1>
+      <p class="auth-subtitle">{{ 'auth.verifyEmail.subtitle' | translate }} <strong>{{ email }}</strong>.</p>
 
       <form class="auth-form" (ngSubmit)="submit()">
         <label class="auth-field">
-          <span>Cod de verificare</span>
+          <span>{{ 'auth.verifyEmail.codeLabel' | translate }}</span>
           <input
             type="text"
             inputmode="numeric"
@@ -48,18 +49,18 @@
           <p class="auth-error">{{ error() }}</p>
         }
         @if (resent()) {
-          <p class="auth-success">Cod nou trimis.</p>
+          <p class="auth-success">{{ 'auth.verifyEmail.resent' | translate }}</p>
         }
 
         <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Se verifică...' : 'Confirmă' }}
+          {{ (isSubmitting() ? 'auth.verifyEmail.verifying' : 'auth.verifyEmail.confirm') | translate }}
         </button>
       </form>
 
       <p class="auth-switch">
-        N-ai primit codul?
+        {{ 'auth.verifyEmail.noCode' | translate }}
         <button type="button" class="verify-email-resend" [disabled]="resending()" (click)="resendCode()">
-          {{ resending() ? 'Se retrimite...' : 'Retrimite codul' }}
+          {{ (resending() ? 'auth.verifyEmail.resending' : 'auth.verifyEmail.resend') | translate }}
         </button>
       </p>
     </section>

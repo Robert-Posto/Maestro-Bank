@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { Icon } from '../icon/icon';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 interface NavItem {
   label: string;
@@ -25,24 +26,24 @@ interface NavGroup {
 // fost adăugate funcționalitățile.
 const NAV_GROUPS: NavGroup[] = [
   {
-    items: [{ label: 'Overview', route: '/app/overview', icon: 'overview' }],
+    items: [{ label: 'nav.overview', route: '/app/overview', icon: 'overview' }],
   },
   {
-    label: 'Bancar',
+    label: 'nav.group.banking',
     items: [
-      { label: 'Conturi', route: '/app/accounts', icon: 'accounts' },
-      { label: 'Carduri', route: '/app/cards', icon: 'cards' },
-      { label: 'Tranzacții', route: '/app/transactions', icon: 'transactions' },
-      { label: 'Plăți & Transferuri', route: '/app/transfers', icon: 'transfer' },
-      { label: 'Schimb valutar', route: '/app/exchange', icon: 'exchange' },
-      { label: 'Investiții', route: '/app/investments', icon: 'trending-up' },
+      { label: 'nav.accounts', route: '/app/accounts', icon: 'accounts' },
+      { label: 'nav.cards', route: '/app/cards', icon: 'cards' },
+      { label: 'nav.transactions', route: '/app/transactions', icon: 'transactions' },
+      { label: 'nav.transfers', route: '/app/transfers', icon: 'transfer' },
+      { label: 'nav.exchange', route: '/app/exchange', icon: 'exchange' },
+      { label: 'nav.investments', route: '/app/investments', icon: 'trending-up' },
     ],
   },
   {
-    label: 'Planificare',
+    label: 'nav.group.planning',
     items: [
-      { label: 'Bugete', route: '/app/budgets', icon: 'budgets' },
-      { label: 'Spending & Forecast', route: '/app/spending-forecast', icon: 'spending' },
+      { label: 'nav.budgets', route: '/app/budgets', icon: 'budgets' },
+      { label: 'nav.forecast', route: '/app/spending-forecast', icon: 'spending' },
     ],
   },
   {
@@ -50,7 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
     // ăsta ieșea în evidență ca "orfan" față de restul, inconsecvent
     // vizual, deși cele două intrări sunt deja rudă (ambele agenți AI
     // găzduiți de ai-orchestrator-service).
-    label: 'Asistenți AI',
+    label: 'nav.group.assistants',
     highlight: true,
     items: [
       // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
@@ -62,8 +63,8 @@ const NAV_GROUPS: NavGroup[] = [
       // agent AI și nu are una, deci ar fi inconsecvent să aibă doar
       // MaestroAgent; grupul ("Asistenți AI") spune deja asta o dată,
       // pentru amândouă, nu are nevoie s-o repete per-element.
-      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot' },
-      { label: 'Support', route: '/app/support', icon: 'support' },
+      { label: 'nav.copilot', route: '/app/copilot', icon: 'copilot' },
+      { label: 'nav.support', route: '/app/support', icon: 'support' },
     ],
   },
   // Profil & Securitate și Ieși din cont NU sunt aici — trăiesc doar în
@@ -79,7 +80,7 @@ const NAV_GROUPS: NavGroup[] = [
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, Icon],
+  imports: [RouterLink, RouterLinkActive, Icon, TranslatePipe],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.css',
 })

@@ -14,6 +14,7 @@ import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Icon } from '../../shared/components/icon/icon';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { Modal } from '../../shared/components/modal/modal';
+import { PasswordInput } from '../../shared/components/password-input/password-input';
 import { StatusBadge, BadgeTone } from '../../shared/components/status-badge/status-badge';
 import { decodeJwtPayload } from '../../shared/jwt-utils';
 import { ToastService } from '../../shared/components/toast/toast.service';
@@ -33,6 +34,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
     Icon,
     LoadingSkeleton,
     Modal,
+    PasswordInput,
     StatusBadge,
   ],
   templateUrl: './profile.html',
@@ -47,6 +49,14 @@ export class Profile implements OnInit, OnDestroy {
   private readonly router = inject(Router);
 
   protected readonly currentUser = this.auth.currentUser;
+
+  /** Aceeași formulă ca shared/components/topbar/topbar.ts::initials —
+   * fallback pentru avatar când userul n-a încărcat o poză de profil. */
+  protected readonly initials = computed(() => {
+    const user = this.currentUser();
+    if (!user) return '';
+    return `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase();
+  });
 
   // --- Poză de profil (opțională, la cererea userului) ---------------------
   protected readonly profilePictureBusy = signal(false);
@@ -312,6 +322,7 @@ export class Profile implements OnInit, OnDestroy {
 
   protected readonly documentsLoading = signal(true);
   protected readonly documents = signal<DocumentSummary[]>([]);
+  protected readonly pendingDocumentsCount = computed(() => this.documents().filter((d) => d.status === 'pending').length);
   protected readonly viewTarget = signal<DocumentView | null>(null);
   protected readonly viewModalBusy = signal(false);
   protected readonly signPassword = signal('');

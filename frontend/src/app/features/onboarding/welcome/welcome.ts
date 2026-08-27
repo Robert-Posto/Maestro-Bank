@@ -3,8 +3,10 @@ import { Router } from '@angular/router';
 
 import { AccountView, BankingService } from '../../../services/banking.service';
 import { AuthService } from '../../../services/auth.service';
+import { AuthLanguageToggle } from '../../../shared/components/auth-language-toggle/auth-language-toggle';
 import { Icon } from '../../../shared/components/icon/icon';
 import { MoneyPipe } from '../../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 const WELCOME_BONUS_MINOR = 50_000; // 500 lei — vezi accounts-service POST /accounts/dev/fund
 
@@ -14,7 +16,7 @@ const WELCOME_BONUS_MINOR = 50_000; // 500 lei — vezi accounts-service POST /a
 @Component({
   selector: 'app-welcome',
   standalone: true,
-  imports: [Icon, MoneyPipe],
+  imports: [Icon, MoneyPipe, TranslatePipe, AuthLanguageToggle],
   templateUrl: './welcome.html',
   styleUrl: './welcome.css',
 })

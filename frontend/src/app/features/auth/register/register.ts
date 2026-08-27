@@ -3,19 +3,24 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
+import { LanguageService } from '../../../services/language.service';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { AuthLanguageToggle } from '../../../shared/components/auth-language-toggle/auth-language-toggle';
 import { Icon } from '../../../shared/components/icon/icon';
+import { PasswordInput } from '../../../shared/components/password-input/password-input';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [FormsModule, RouterLink, Icon, PasswordInput, TranslatePipe, AuthLanguageToggle],
   templateUrl: './register.html',
   styleUrl: './register.css',
 })
 export class Register {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
 
   protected readonly firstName = signal('');
   protected readonly lastName = signal('');
@@ -30,7 +35,7 @@ export class Register {
     this.error.set(null);
 
     if (!this.firstName().trim() || !this.lastName().trim() || !this.email().trim() || !this.phoneNumber().trim() || !this.password()) {
-      this.error.set('Completează toate câmpurile.');
+      this.error.set(this.language.t('auth.register.fillAllFields'));
       return;
     }
 
@@ -54,7 +59,7 @@ export class Register {
         },
         error: (err) => {
           this.isSubmitting.set(false);
-          this.error.set(extractErrorMessage(err, 'Înregistrarea a eșuat.'));
+          this.error.set(extractErrorMessage(err, this.language.t('auth.register.failed')));
         },
       });
   }

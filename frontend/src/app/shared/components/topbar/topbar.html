@@ -3,7 +3,7 @@
     <app-icon name="search" [size]="18" />
     <input
       type="search"
-      placeholder="Caută tranzacții, comercianți, categorii..."
+      [placeholder]="'topbar.search' | translate"
       [ngModel]="searchTerm()"
       (ngModelChange)="searchTerm.set($event)"
       name="topbarSearch"
@@ -14,13 +14,24 @@
   <div class="topbar__right">
     <button type="button" class="topbar__new-tx" (click)="newTransaction()">
       <span class="topbar__new-tx-icon"><app-icon name="plus" [size]="16" /></span>
-      <span class="topbar__new-tx-label">Tranzacție nouă</span>
+      <span class="topbar__new-tx-label">{{ 'topbar.newTransaction' | translate }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="topbar__icon-btn topbar__lang-btn"
+      [attr.aria-label]="'topbar.language' | translate"
+      [attr.title]="languageService.language() === 'ro' ? 'English' : 'Română'"
+      (click)="languageService.toggle()"
+    >
+      <app-icon name="globe" [size]="18" />
+      <span class="topbar__lang-code">{{ languageService.language() === 'ro' ? 'RO' : 'EN' }}</span>
     </button>
 
     <button
       type="button"
       class="topbar__icon-btn"
-      [attr.aria-label]="themeService.theme() === 'dark' ? 'Comută la tema deschisă' : 'Comută la tema închisă'"
+      [attr.aria-label]="(themeService.theme() === 'dark' ? 'topbar.switchToLight' : 'topbar.switchToDark') | translate"
       (click)="themeService.toggle()"
     >
       <app-icon [name]="themeService.theme() === 'dark' ? 'sun' : 'moon'" [size]="20" />
@@ -30,7 +41,7 @@
       <button
         type="button"
         class="topbar__icon-btn"
-        aria-label="Notificări"
+        [attr.aria-label]="'topbar.notifications' | translate"
         (click)="toggleNotifications()"
       >
         <app-icon name="bell" [size]="20" />
@@ -41,9 +52,9 @@
 
       @if (notificationsOpen()) {
         <div class="topbar__dropdown topbar__dropdown--wide">
-          <p class="topbar__dropdown-title">Notificări</p>
+          <p class="topbar__dropdown-title">{{ 'topbar.notifications' | translate }}</p>
           @if (notifications().length === 0) {
-            <p class="topbar__dropdown-empty">Nicio notificare încă.</p>
+            <p class="topbar__dropdown-empty">{{ 'topbar.noNotificationsYet' | translate }}</p>
           } @else {
             <div class="topbar__notification-list">
               @for (n of notifications(); track n.id) {
@@ -55,7 +66,7 @@
                   <button
                     type="button"
                     class="topbar__notification-delete"
-                    aria-label="Șterge notificarea"
+                    [attr.aria-label]="'topbar.deleteNotification' | translate"
                     (click)="removeNotification(n, $event)"
                   >
                     <app-icon name="close" [size]="14" />
@@ -85,10 +96,10 @@
     @if (profileMenuOpen()) {
       <div class="topbar__dropdown topbar__dropdown--profile">
         <a routerLink="/app/profile" class="topbar__dropdown-link" (click)="profileMenuOpen.set(false)">
-          Profil &amp; Securitate
+          {{ 'topbar.profile' | translate }}
         </a>
         <button type="button" class="topbar__dropdown-link topbar__dropdown-link--danger" (click)="logout()">
-          Ieși din cont
+          {{ 'topbar.logout' | translate }}
         </button>
       </div>
     }
