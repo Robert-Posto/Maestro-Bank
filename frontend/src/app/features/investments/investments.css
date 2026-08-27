@@ -279,6 +279,71 @@
   background: var(--mb-positive);
 }
 
+/* --- Filtru de categorii, deasupra panoului de catalog ------------------------- */
+
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-2);
+  margin-bottom: var(--mb-space-4);
+}
+
+.category-filter__chip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--mb-radius-pill);
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
+  transition: all var(--mb-transition-fast);
+}
+
+.category-filter__chip:hover {
+  border-color: var(--mb-blue-500);
+}
+
+.category-filter__chip--blue {
+  color: var(--mb-blue-600);
+}
+
+.category-filter__chip--navy {
+  color: var(--mb-text-primary);
+}
+
+.category-filter__chip--green {
+  color: var(--mb-positive);
+}
+
+.category-filter__chip--active.category-filter__chip--all {
+  background: var(--mb-text-primary);
+  color: var(--mb-surface);
+  border-color: var(--mb-text-primary);
+}
+
+.category-filter__chip--active.category-filter__chip--blue {
+  background: var(--mb-blue-600);
+  color: #fff;
+  border-color: var(--mb-blue-600);
+}
+
+.category-filter__chip--active.category-filter__chip--navy {
+  background: var(--mb-text-primary);
+  color: var(--mb-surface);
+  border-color: var(--mb-text-primary);
+}
+
+.category-filter__chip--active.category-filter__chip--green {
+  background: var(--mb-positive);
+  color: #fff;
+  border-color: var(--mb-positive);
+}
+
 .instruments-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));

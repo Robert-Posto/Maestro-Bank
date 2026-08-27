@@ -80,6 +80,20 @@ export class Investments implements OnInit {
     return groups;
   });
 
+  /** null = "Toate" (fără filtru). Altfel, eticheta categoriei active. */
+  protected readonly selectedCategory = signal<string | null>(null);
+
+  /** Ce se randează efectiv în panoul de catalog — toate grupurile, sau
+   * doar cea aleasă din filtrul de categorii. */
+  protected readonly visibleCatalogGroups = computed(() => {
+    const selected = this.selectedCategory();
+    return selected === null ? this.catalogGroups() : this.catalogGroups().filter((g) => g.label === selected);
+  });
+
+  protected selectCategory(label: string | null): void {
+    this.selectedCategory.set(label);
+  }
+
   /** Iconiță + culoare distinctă pe categorie — doar cosmetic, ca eticheta
    * fiecărui grup din catalog să se recunoască dintr-o privire. */
   protected categoryIcon(label: string): 'flash' | 'building' | 'globe' | 'trending-up' {
@@ -105,6 +119,22 @@ export class Investments implements OnInit {
         return 'category-pill--green';
       default:
         return 'category-pill--navy';
+    }
+  }
+
+  /** Aceeași paletă ca la category-pill, dar pt. filtrul de categorii —
+   * clase separate ca să nu se calce peste stilul (mereu plin colorat) al
+   * pill-ului static din antetul fiecărui grup. */
+  protected categoryFilterClass(label: string): string {
+    switch (label) {
+      case 'Tehnologie':
+        return 'category-filter__chip--blue';
+      case 'Consum & Finanțe':
+        return 'category-filter__chip--navy';
+      case 'ETF-uri':
+        return 'category-filter__chip--green';
+      default:
+        return 'category-filter__chip--navy';
     }
   }
 

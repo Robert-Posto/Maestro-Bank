@@ -125,8 +125,31 @@
     @if (instrumentsLoading()) {
       <app-loading-skeleton [rows]="3" [height]="90" />
     } @else {
-      <div class="investments-panel">
+      <div class="category-filter">
+        <button
+          type="button"
+          class="category-filter__chip category-filter__chip--all"
+          [class.category-filter__chip--active]="selectedCategory() === null"
+          (click)="selectCategory(null)"
+        >
+          Toate
+        </button>
         @for (group of catalogGroups(); track group.label) {
+          <button
+            type="button"
+            class="category-filter__chip"
+            [class]="categoryFilterClass(group.label)"
+            [class.category-filter__chip--active]="selectedCategory() === group.label"
+            (click)="selectCategory(group.label)"
+          >
+            <app-icon [name]="categoryIcon(group.label)" [size]="13" />
+            {{ group.label }}
+          </button>
+        }
+      </div>
+
+      <div class="investments-panel">
+        @for (group of visibleCatalogGroups(); track group.label) {
           <div class="catalog-group">
             <div class="catalog-group__header">
               <span class="category-pill" [class]="categoryPillClass(group.label)">
