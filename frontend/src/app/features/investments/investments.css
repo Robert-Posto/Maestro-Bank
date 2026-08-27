@@ -1,0 +1,525 @@
+.investments-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--mb-border);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(16, 24, 48, 0.04);
+  margin-bottom: var(--mb-space-8);
+}
+
+.investments-summary__card {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  background: var(--mb-surface);
+  padding: var(--mb-space-5);
+}
+
+.investments-summary__card > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.investments-summary__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.investments-summary__icon--blue {
+  color: var(--mb-blue-600);
+  background: var(--mb-blue-50);
+}
+
+.investments-summary__icon--navy {
+  color: var(--mb-text-primary);
+  background: var(--mb-blue-50);
+}
+
+.investments-summary__icon--green {
+  color: var(--mb-positive);
+  background: var(--mb-positive-bg);
+}
+
+.investments-summary__icon--red {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+.investments-summary__label {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  white-space: nowrap;
+}
+
+.investments-summary__card strong {
+  font-size: var(--mb-font-size-xl);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.investments-section {
+  margin-bottom: var(--mb-space-8);
+}
+
+/* Panou care "prinde" continutul unei sectiuni (indici / catalog) intr-un
+   singur bloc — fara el, elementele plutesc direct pe fundalul gri al
+   paginii si sectiunea pare goala, cu mult alb intre ele. */
+.investments-panel {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  box-shadow: 0 1px 3px rgba(16, 24, 48, 0.06);
+}
+
+.investments-section h2 {
+  font-size: var(--mb-font-size-base);
+  margin-bottom: var(--mb-space-2);
+}
+
+.investments-section__subtitle {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+  max-width: 560px;
+}
+
+/* --- Verde / roșu, reutilizat peste tot (indici, portofoliu, catalog) ------ */
+
+.change-text--positive {
+  color: var(--mb-positive);
+}
+
+.change-text--negative {
+  color: var(--mb-negative);
+}
+
+.change-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--mb-radius-pill);
+  white-space: nowrap;
+}
+
+.change-badge--positive {
+  color: var(--mb-positive);
+  background: var(--mb-positive-bg);
+}
+
+.change-badge--negative {
+  color: var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+.change-badge--large {
+  font-size: var(--mb-font-size-sm);
+  padding: 0.35rem 0.8rem;
+}
+
+/* --- Indici bursieri (rând orizontal, aerisit) ----------------------------- */
+
+.indices-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-4);
+}
+
+.index-chip {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  align-items: flex-start;
+  background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  border-left: 3px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-4) var(--mb-space-5);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--mb-transition-fast), transform var(--mb-transition-fast), box-shadow var(--mb-transition-fast);
+}
+
+.index-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(16, 24, 48, 0.08);
+}
+
+.index-chip--positive {
+  border-left-color: var(--mb-positive);
+  background: linear-gradient(160deg, var(--mb-positive-bg) 0%, var(--mb-surface-muted) 65%);
+}
+
+.index-chip--negative {
+  border-left-color: var(--mb-negative);
+  background: linear-gradient(160deg, var(--mb-negative-bg) 0%, var(--mb-surface-muted) 65%);
+}
+
+.index-chip__name {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.index-chip__price {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+/* --- Portofoliu -------------------------------------------------------------- */
+
+.holdings-table-wrap {
+  overflow-x: auto;
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.holdings-table th {
+  text-align: left;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  font-weight: var(--mb-font-weight-medium);
+  padding: var(--mb-space-4);
+  background: var(--mb-surface-muted);
+  border-bottom: 1px solid var(--mb-border);
+  white-space: nowrap;
+}
+
+.holdings-table td {
+  padding: var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+  font-size: var(--mb-font-size-sm);
+  white-space: nowrap;
+}
+
+.holdings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.holdings-table__row {
+  cursor: pointer;
+  transition: background var(--mb-transition-fast);
+}
+
+.holdings-table__row:hover {
+  background: var(--mb-surface-muted);
+}
+
+.holdings-table__name {
+  display: block;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+/* --- Catalog, grupat pe categorii ---------------------------------------------- */
+
+.catalog-group {
+  margin-bottom: var(--mb-space-8);
+}
+
+.catalog-group:last-child {
+  margin-bottom: 0;
+}
+
+.catalog-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-4);
+  padding-bottom: var(--mb-space-3);
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.catalog-group__count {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--mb-radius-pill);
+}
+
+.category-pill--blue {
+  color: #fff;
+  background: var(--mb-blue-600);
+}
+
+.category-pill--navy {
+  color: var(--mb-surface);
+  background: var(--mb-text-primary);
+}
+
+.category-pill--green {
+  color: #fff;
+  background: var(--mb-positive);
+}
+
+/* --- Filtru de categorii, deasupra panoului de catalog ------------------------- */
+
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-2);
+  margin-bottom: var(--mb-space-4);
+}
+
+.category-filter__chip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--mb-radius-pill);
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
+  transition: all var(--mb-transition-fast);
+}
+
+.category-filter__chip:hover {
+  border-color: var(--mb-blue-500);
+}
+
+.category-filter__chip--blue {
+  color: var(--mb-blue-600);
+}
+
+.category-filter__chip--navy {
+  color: var(--mb-text-primary);
+}
+
+.category-filter__chip--green {
+  color: var(--mb-positive);
+}
+
+.category-filter__chip--active.category-filter__chip--all {
+  background: var(--mb-text-primary);
+  color: var(--mb-surface);
+  border-color: var(--mb-text-primary);
+}
+
+.category-filter__chip--active.category-filter__chip--blue {
+  background: var(--mb-blue-600);
+  color: #fff;
+  border-color: var(--mb-blue-600);
+}
+
+.category-filter__chip--active.category-filter__chip--navy {
+  background: var(--mb-text-primary);
+  color: var(--mb-surface);
+  border-color: var(--mb-text-primary);
+}
+
+.category-filter__chip--active.category-filter__chip--green {
+  background: var(--mb-positive);
+  color: #fff;
+  border-color: var(--mb-positive);
+}
+
+.instruments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--mb-space-4);
+}
+
+.instrument-card {
+  position: relative;
+  background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  border-left: 4px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-4) var(--mb-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+  cursor: pointer;
+  transition: transform var(--mb-transition-fast), box-shadow var(--mb-transition-fast);
+}
+
+.instrument-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(16, 24, 48, 0.1);
+}
+
+.instrument-card--positive {
+  border-left-color: var(--mb-positive);
+  background: linear-gradient(165deg, var(--mb-positive-bg) 0%, var(--mb-surface-muted) 55%);
+}
+
+.instrument-card--negative {
+  border-left-color: var(--mb-negative);
+  background: linear-gradient(165deg, var(--mb-negative-bg) 0%, var(--mb-surface-muted) 55%);
+}
+
+.instrument-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.instrument-card__top strong {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.instrument-card__name {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  min-height: 2.4em;
+}
+
+.instrument-card__price {
+  font-size: var(--mb-font-size-base);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-secondary);
+}
+
+/* --- Panou de detalii (click) -------------------------------------------------- */
+
+.instrument-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-6);
+}
+
+.instrument-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+}
+
+.instrument-detail__symbol {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: 2px;
+}
+
+.instrument-detail__price {
+  font-size: var(--mb-font-size-2xl, var(--mb-font-size-xl));
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.instrument-detail__chart {
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+}
+
+.instrument-detail__range-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+}
+
+.range-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-border);
+}
+
+.range-bar__dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mb-blue-500);
+  border: 2px solid var(--mb-surface);
+  transform: translate(-50%, -50%);
+}
+
+.instrument-detail__volume {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.instrument-detail__info-note {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  text-align: center;
+}
+
+/* --- Formulare cumpărare/vânzare (modale) --------------------------------------- */
+
+.trade-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.trade-form__price {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.trade-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.trade-form input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  min-height: 44px;
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+}
+
+.trade-form input:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.trade-form__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: -8px;
+}
+
+@media (max-width: 900px) {
+  .investments-summary {
+    grid-template-columns: 1fr;
+  }
+  .index-chip {
+    flex-basis: 100%;
+  }
+}

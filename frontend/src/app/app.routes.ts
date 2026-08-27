@@ -76,6 +76,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/exchange/exchange').then((m) => m.Exchange),
       },
       {
+        path: 'investments',
+        loadComponent: () => import('./features/investments/investments').then((m) => m.Investments),
+      },
+      {
         path: 'budgets',
         loadComponent: () => import('./features/budgets/budgets').then((m) => m.Budgets),
       },
@@ -114,6 +118,10 @@ export const routes: Routes = [
       {
         path: 'blocklist',
         loadComponent: () => import('./features/staff-blocklist/staff-blocklist').then((m) => m.StaffBlocklist),
+      },
+      {
+        path: 'documents',
+        loadComponent: () => import('./features/staff-documents/staff-documents').then((m) => m.StaffDocuments),
       },
       {
         path: 'customers/:userId',

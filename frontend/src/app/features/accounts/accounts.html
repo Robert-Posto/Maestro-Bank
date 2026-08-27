@@ -53,6 +53,12 @@
         <span class="accounts-tabs__count">{{ pockets().length }}</span>
       }
     </button>
+    <button type="button" [class.accounts-tab--active]="tab() === 'deposits'" (click)="tab.set('deposits')">
+      <app-icon name="shield" [size]="15" /> Depozite
+      @if (activeTermDeposits().length > 0) {
+        <span class="accounts-tabs__count">{{ activeTermDeposits().length }}</span>
+      }
+    </button>
   </div>
 
   @if (tab() === 'accounts') {
@@ -194,6 +200,73 @@
     }
   </section>
   }
+
+  @if (tab() === 'deposits') {
+  <section class="deposits-section">
+    <div class="pockets-section__header">
+      <div>
+        <h2>Depozite la termen</h2>
+        <p class="pockets-section__subtitle">
+          Dobândă mai bună pentru bani pe care nu-i atingi o vreme — RON, EUR, USD sau GBP.
+        </p>
+      </div>
+      <app-action-button variant="secondary" (pressed)="openDepositCreateModal()">
+        <app-icon name="plus" [size]="16" />
+        Depozit nou
+      </app-action-button>
+    </div>
+
+    @if (termDepositsLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="120" />
+    } @else if (termDeposits().length === 0) {
+      <app-empty-state
+        icon="shield"
+        title="Niciun depozit încă"
+        description="Deschide un depozit la termen pentru o dobândă mai bună decât la un cont de economii."
+      />
+    } @else {
+      <div class="pockets-grid">
+        @for (deposit of termDeposits(); track deposit.id) {
+          <div class="deposit-card">
+            <div class="deposit-card__top">
+              <span class="deposit-card__currency">{{ deposit.currency }}</span>
+              <app-status-badge [status]="deposit.status" />
+            </div>
+
+            <div class="deposit-card__amount">
+              <strong>{{ deposit.principal_minor | money: deposit.currency }}</strong>
+              <span>{{ deposit.term_months }} luni · {{ deposit.rate_percent_annual }}%/an</span>
+            </div>
+
+            @if (deposit.status === 'active') {
+              <div class="pocket-card__bar">
+                <div class="pocket-card__bar-fill" [style.width.%]="depositProgressPercent(deposit)"></div>
+              </div>
+              <p class="deposit-card__meta">
+                {{ depositDaysRemaining(deposit) }} zile până la scadență ·
+                dobândă estimată {{ deposit.interest_minor | money: deposit.currency }}
+                @if (deposit.renew_at_maturity) {
+                  · se reînnoiește automat
+                }
+              </p>
+              <div class="deposit-card__actions">
+                <app-action-button variant="ghost" (pressed)="requestLiquidateDeposit(deposit)">
+                  Lichidează anticipat
+                </app-action-button>
+              </div>
+            } @else if (deposit.status === 'matured_renewed') {
+              <p class="deposit-card__meta">Reînnoit automat la scadență.</p>
+            } @else if (deposit.status === 'liquidated_early') {
+              <p class="deposit-card__meta">Lichidat anticipat — dobânda a fost pierdută.</p>
+            } @else {
+              <p class="deposit-card__meta">Plătit la scadență, în cont.</p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </section>
+  }
 }
 
 @if (createModalOpen()) {
@@ -264,6 +337,56 @@
       </app-action-button>
     </div>
   </app-modal>
+}
+
+@if (depositCreateModalOpen()) {
+  <app-modal title="Depozit nou" (closed)="closeDepositCreateModal()">
+    <div class="pocket-form">
+      <label>
+        <span>Monedă</span>
+        <app-select
+          [options]="depositCurrencyOptions.map(c => ({ value: c, label: c }))"
+          [value]="newDepositCurrency()"
+          (changed)="newDepositCurrency.set($any($event))"
+        />
+      </label>
+
+      <label>
+        <span>Termen</span>
+        <app-select
+          [options]="depositTermOptions.map(t => ({ value: t.toString(), label: t + ' luni (' + (rateFor(newDepositCurrency(), t) ?? '—') + '%/an)' }))"
+          [value]="newDepositTerm().toString()"
+          (changed)="newDepositTerm.set($any(+$event))"
+        />
+      </label>
+
+      <label>
+        <span>Sumă ({{ newDepositCurrency() }})</span>
+        <input type="number" min="1" step="1" [ngModel]="newDepositAmount()" (ngModelChange)="newDepositAmount.set($event)" />
+      </label>
+
+      <label class="deposit-form__renew">
+        <input type="checkbox" [ngModel]="newDepositRenew()" (ngModelChange)="newDepositRenew.set($event)" />
+        <span>Reînnoiește automat la scadență</span>
+      </label>
+
+      <app-action-button [fullWidth]="true" [loading]="creatingTermDeposit()" (pressed)="createTermDeposit()">
+        Deschide depozitul
+      </app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (pendingLiquidateDeposit(); as pd) {
+  <app-confirm-dialog
+    title="Lichidezi depozitul anticipat?"
+    [message]="'Primești înapoi DOAR suma depusă (' + (pd.principal_minor | money: pd.currency) + ') — dobânda acumulată (' + (pd.interest_minor | money: pd.currency) + ') se pierde integral. Această acțiune nu poate fi anulată.'"
+    confirmLabel="Lichidează"
+    [danger]="true"
+    [loading]="liquidatingDeposit()"
+    (confirmed)="confirmLiquidateDeposit()"
+    (cancelled)="pendingLiquidateDeposit.set(null)"
+  />
 }
 
 @if (depositModalPocket(); as pocket) {

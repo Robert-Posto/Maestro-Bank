@@ -9,7 +9,10 @@ import { WebauthnStepUpProof } from './webauthn.service';
  * eur/usd/gbp sunt conturi REALE pe valuta respectivă (nu RON afișat altfel) — necesare ca
  * schimbul valutar (Exchange) să aibă unde să crediteze/debiteze efectiv. */
 export type AccountType = 'current' | 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
-export type CreatableAccountType = 'savings' | 'deposit' | 'student' | 'eur' | 'usd' | 'gbp';
+// "deposit" a fost înlocuit de feature-ul real de depozite la termen (vezi
+// DepositsService) — rămâne în AccountType (conturi vechi tot funcționează),
+// dar dispare din CreatableAccountType.
+export type CreatableAccountType = 'savings' | 'student' | 'eur' | 'usd' | 'gbp';
 
 export interface AccountView {
   id: string;

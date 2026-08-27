@@ -35,6 +35,8 @@ SERVICES: dict[str, dict[str, str | float]] = {
     "budgets": {"base_url": settings.budgets_service_url, "internal_prefix": ""},
     "support": {"base_url": settings.support_service_url, "internal_prefix": ""},
     "exchange": {"base_url": settings.exchange_service_url, "internal_prefix": ""},
+    "deposits": {"base_url": settings.deposits_service_url, "internal_prefix": "/deposits"},
+    "investments": {"base_url": settings.investments_service_url, "internal_prefix": "/investments"},
     # timeout mai mare decât restul — DeepFace (VGG-Face + detector
     # retinaface, alese pentru acuratețe pe poze reale de buletin, nu
     # pentru viteză — vezi verification-service/app/config.py) rulează pe
@@ -76,6 +78,8 @@ def _is_protected(service: str, path: str) -> bool:
       - budgets: TOT e protejat (budgets, subscriptions);
       - support: TOT e protejat (tickets);
       - exchange: TOT e protejat (rate/quote personalizate per user);
+      - deposits: TOT e protejat (depozitele unui user sunt personale);
+      - investments: TOT e protejat (portofoliul unui user e personal);
       - verification: TOT e protejat (identitatea userului curent);
       - ai: TOT e protejat (identitatea userului vine STRICT din JWT — nici
         Spending + Forecast, nici Support Agent nu acceptă user_id
@@ -95,7 +99,17 @@ def _is_protected(service: str, path: str) -> bool:
         ):
             return True
         return path.startswith("webauthn/credentials/")
-    if service in ("accounts", "transactions", "budgets", "support", "exchange", "verification", "ai"):
+    if service in (
+        "accounts",
+        "transactions",
+        "budgets",
+        "support",
+        "exchange",
+        "deposits",
+        "investments",
+        "verification",
+        "ai",
+    ):
         return True
     return False
 

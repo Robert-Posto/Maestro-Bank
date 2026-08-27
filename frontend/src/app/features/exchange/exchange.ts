@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
+import { debounceTime, Subject } from 'rxjs';
 
 import { AccountView, BankingService } from '../../services/banking.service';
 import { ExchangeQuote, ExchangeRate, ExchangeService } from '../../services/exchange.service';
@@ -105,7 +105,11 @@ export class Exchange implements OnInit {
       error: () => this.loadingRates.set(false),
     });
 
-    this.quoteTrigger.pipe(debounceTime(350), distinctUntilChanged()).subscribe(() => this.fetchQuote());
+    // NU distinctUntilChanged() aici — quoteTrigger e un Subject<void>, deci
+    // fiecare emisie e `undefined`; distinctUntilChanged ar compara
+    // undefined === undefined (mereu egal) și ar bloca orice recalculare
+    // după PRIMA schimbare de sumă/monedă (bug real, deja întâlnit).
+    this.quoteTrigger.pipe(debounceTime(350)).subscribe(() => this.fetchQuote());
   }
 
   private loadAccounts(): void {

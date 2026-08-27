@@ -112,6 +112,52 @@ async def test_internal_get_user_contact_404_for_unknown_user(client: AsyncClien
     assert response.status_code == 404
 
 
+async def test_internal_search_users_matches_partial_email(client: AsyncClient):
+    """Consumat de support-service (trimitere documente de semnat, eSign) —
+    personalul caută un client de la zero, fără user_id cunoscut."""
+    await client.post("/auth/register", json=VALID_PAYLOAD)
+
+    response = await client.get("/internal/users/search", params={"q": "autotest"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["email"] == VALID_PAYLOAD["email"]
+    assert body[0]["first_name"] == VALID_PAYLOAD["first_name"]
+    assert "id" in body[0]
+
+
+async def test_internal_search_users_matches_partial_name_case_insensitive(client: AsyncClient):
+    await client.post("/auth/register", json=VALID_PAYLOAD)
+
+    response = await client.get("/internal/users/search", params={"q": "OCTAVIA"})
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+async def test_internal_search_users_no_match_returns_empty_list(client: AsyncClient):
+    response = await client.get("/internal/users/search", params={"q": "nu-exista-nimeni-cu-numele-asta"})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_internal_search_users_empty_query_returns_empty_list(client: AsyncClient):
+    await client.post("/auth/register", json=VALID_PAYLOAD)
+
+    response = await client.get("/internal/users/search", params={"q": ""})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_internal_search_users_respects_limit(client: AsyncClient):
+    for i in range(25):
+        payload = {**VALID_PAYLOAD, "email": f"searchlimit{i}@maestrobank.local"}
+        await client.post("/auth/register", json=payload)
+
+    response = await client.get("/internal/users/search", params={"q": "searchlimit"})
+    assert response.status_code == 200
+    assert len(response.json()) == 20
+
+
 async def test_register_rejects_malformed_phone_number(client: AsyncClient):
     response = await client.post("/auth/register", json={**VALID_PAYLOAD, "phone_number": "not-a-phone!"})
     assert response.status_code == 422

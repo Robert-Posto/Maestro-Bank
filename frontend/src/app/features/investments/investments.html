@@ -1,0 +1,306 @@
+<app-page-header title="Investiții" subtitle="Cumpără și vinde acțiuni și ETF-uri, cu preț real de piață." />
+
+@if (!usdAccount()) {
+  <app-empty-state
+    icon="globe"
+    title="Ai nevoie de un cont USD"
+    description="Toate instrumentele se tranzacționează în USD — deschide un cont USD din pagina Conturi înainte de a investi."
+  >
+    <app-action-button (pressed)="goToOpenAccount()">Deschide cont USD</app-action-button>
+  </app-empty-state>
+} @else {
+  <div class="investments-summary">
+    <div class="investments-summary__card">
+      <span class="investments-summary__icon investments-summary__icon--blue"><app-icon name="wallet" [size]="18" /></span>
+      <div>
+        <span class="investments-summary__label">Valoare portofoliu</span>
+        <strong>{{ portfolioValueMinor() | money: 'USD' }}</strong>
+      </div>
+    </div>
+    <div class="investments-summary__card">
+      <span
+        class="investments-summary__icon"
+        [class.investments-summary__icon--green]="portfolioGainMinor() >= 0"
+        [class.investments-summary__icon--red]="portfolioGainMinor() < 0"
+      >
+        <app-icon [name]="portfolioGainMinor() >= 0 ? 'arrow-up-right' : 'arrow-down-right'" [size]="18" />
+      </span>
+      <div>
+        <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
+        <strong class="change-text" [class.change-text--positive]="portfolioGainMinor() >= 0" [class.change-text--negative]="portfolioGainMinor() < 0">
+          {{ portfolioGainMinor() | money: 'USD' }}
+        </strong>
+      </div>
+    </div>
+    <div class="investments-summary__card">
+      <span class="investments-summary__icon investments-summary__icon--navy"><app-icon name="building" [size]="18" /></span>
+      <div>
+        <span class="investments-summary__label">Sold disponibil (USD)</span>
+        <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <section class="investments-section">
+    <h2>Portofoliul tău</h2>
+    @if (portfolioLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="60" />
+    } @else if (portfolio().length === 0) {
+      <app-empty-state icon="trending-up" title="Niciun instrument încă" description="Alege ceva din catalogul de mai jos ca să începi." />
+    } @else {
+      <div class="holdings-table-wrap">
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th>Simbol</th>
+              <th>Cantitate</th>
+              <th>Preț mediu</th>
+              <th>Preț curent</th>
+              <th>Valoare</th>
+              <th>Câștig/pierdere</th>
+              <th aria-label="Acțiuni"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (holding of portfolio(); track holding.symbol) {
+              <tr class="holdings-table__row" (click)="openDetail(holding.symbol)">
+                <td>
+                  <strong>{{ holding.symbol }}</strong>
+                  <span class="holdings-table__name">{{ holding.name }}</span>
+                </td>
+                <td>{{ holding.quantity | number: '1.0-4' }}</td>
+                <td>{{ holding.avg_cost_minor_per_share | money: 'USD' }}</td>
+                <td>{{ holding.current_price_minor | money: 'USD' }}</td>
+                <td>{{ holding.current_value_minor | money: 'USD' }}</td>
+                <td>
+                  <span class="change-badge" [class.change-badge--positive]="holding.unrealized_gain_minor >= 0" [class.change-badge--negative]="holding.unrealized_gain_minor < 0">
+                    {{ holding.unrealized_gain_minor | money: 'USD' }} ({{ holding.unrealized_gain_percent >= 0 ? '+' : '' }}{{ holding.unrealized_gain_percent }}%)
+                  </span>
+                </td>
+                <td (click)="$event.stopPropagation()">
+                  <app-action-button variant="ghost" (pressed)="openSellModal(holding)">Vinde</app-action-button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section class="investments-section">
+    <h2>Indici bursieri</h2>
+    <p class="investments-section__subtitle">Informativ — un indice nu se cumpără direct; SPY/QQQ din catalogul de mai jos sunt ETF-urile care-l urmăresc.</p>
+    @if (indicesLoading()) {
+      <app-loading-skeleton [rows]="1" [height]="90" />
+    } @else {
+      <div class="investments-panel">
+        <div class="indices-row">
+          @for (index of indices(); track index.symbol) {
+            <button
+              type="button"
+              class="index-chip"
+              [class.index-chip--positive]="(index.change_percent ?? 0) >= 0"
+              [class.index-chip--negative]="(index.change_percent ?? 0) < 0"
+              (click)="openDetail(index.symbol)"
+            >
+              <span class="index-chip__name">{{ index.name }}</span>
+              @if (index.price_minor !== null) {
+                <span class="index-chip__price">{{ index.price_minor | money: 'USD' }}</span>
+                @if (index.change_percent !== null) {
+                  <span class="change-badge" [class.change-badge--positive]="index.change_percent >= 0" [class.change-badge--negative]="index.change_percent < 0">
+                    {{ index.change_percent >= 0 ? '▲' : '▼' }} {{ (index.change_percent >= 0 ? '+' : '') + index.change_percent }}%
+                  </span>
+                }
+              }
+            </button>
+          }
+        </div>
+      </div>
+    }
+  </section>
+
+  <section class="investments-section">
+    <h2>Catalog</h2>
+    @if (instrumentsLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="90" />
+    } @else {
+      <div class="category-filter">
+        <button
+          type="button"
+          class="category-filter__chip category-filter__chip--all"
+          [class.category-filter__chip--active]="selectedCategory() === null"
+          (click)="selectCategory(null)"
+        >
+          Toate
+        </button>
+        @for (group of catalogGroups(); track group.label) {
+          <button
+            type="button"
+            class="category-filter__chip"
+            [class]="categoryFilterClass(group.label)"
+            [class.category-filter__chip--active]="selectedCategory() === group.label"
+            (click)="selectCategory(group.label)"
+          >
+            <app-icon [name]="categoryIcon(group.label)" [size]="13" />
+            {{ group.label }}
+          </button>
+        }
+      </div>
+
+      <div class="investments-panel">
+        @for (group of visibleCatalogGroups(); track group.label) {
+          <div class="catalog-group">
+            <div class="catalog-group__header">
+              <span class="category-pill" [class]="categoryPillClass(group.label)">
+                <app-icon [name]="categoryIcon(group.label)" [size]="13" />
+                {{ group.label }}
+              </span>
+              <span class="catalog-group__count">{{ group.items.length }} instrumente</span>
+            </div>
+            <div class="instruments-grid">
+              @for (instrument of group.items; track instrument.symbol) {
+                <div
+                  class="instrument-card"
+                  [class.instrument-card--positive]="(instrument.change_percent ?? 0) >= 0"
+                  [class.instrument-card--negative]="(instrument.change_percent ?? 0) < 0"
+                  (click)="openDetail(instrument.symbol)"
+                >
+                  <div class="instrument-card__top">
+                    <strong>{{ instrument.symbol }}</strong>
+                    @if (instrument.change_percent !== null) {
+                      <span class="change-badge" [class.change-badge--positive]="instrument.change_percent >= 0" [class.change-badge--negative]="instrument.change_percent < 0">
+                        {{ instrument.change_percent >= 0 ? '▲' : '▼' }} {{ (instrument.change_percent >= 0 ? '+' : '') + instrument.change_percent }}%
+                      </span>
+                    }
+                  </div>
+                  <p class="instrument-card__name">{{ instrument.name }}</p>
+                  @if (instrument.price_minor !== null) {
+                    <p class="instrument-card__price">{{ instrument.price_minor | money: 'USD' }}</p>
+                  }
+                  <app-action-button
+                    variant="secondary"
+                    [fullWidth]="true"
+                    [disabled]="instrument.price_minor === null"
+                    (click)="$event.stopPropagation()"
+                    (pressed)="openBuyModal(instrument)"
+                  >
+                    Cumpără
+                  </app-action-button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </section>
+}
+
+<!-- Panou de detalii (click pe orice instrument SAU indice) -->
+@if (detailSymbol(); as symbol) {
+  <app-modal [title]="detailData()?.name ?? symbol" [maxWidth]="560" (closed)="closeDetail()">
+    @if (detailLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="50" />
+    } @else if (detailError()) {
+      <app-empty-state icon="info" title="Nu am putut încărca detaliile" [description]="detailError()!" />
+    } @else if (detailData(); as detail) {
+      <div class="instrument-detail">
+        <div class="instrument-detail__header">
+          <div>
+            <p class="instrument-detail__symbol">{{ detail.symbol }}</p>
+            <p class="instrument-detail__price">{{ detail.price_minor | money: 'USD' }}</p>
+          </div>
+          @if (detail.change_percent !== null) {
+            <span class="change-badge change-badge--large" [class.change-badge--positive]="detail.change_percent >= 0" [class.change-badge--negative]="detail.change_percent < 0">
+              {{ detail.change_percent >= 0 ? '▲' : '▼' }} {{ (detail.change_percent >= 0 ? '+' : '') + detail.change_percent }}%
+            </span>
+          }
+        </div>
+
+        @if (detail.history.length > 1) {
+          <svg class="instrument-detail__chart" viewBox="0 0 100 32" preserveAspectRatio="none">
+            <polyline
+              [attr.points]="sparklinePoints(detail.history)"
+              fill="none"
+              [attr.stroke]="sparklineTrendPositive(detail.history) ? 'var(--mb-positive)' : 'var(--mb-negative)'"
+              stroke-width="1.5"
+              vector-effect="non-scaling-stroke"
+            />
+          </svg>
+        }
+
+        <div class="instrument-detail__range">
+          <div class="instrument-detail__range-label">
+            <span>Interval zi</span>
+            <span>{{ detail.day_low_minor | money: 'USD' }} – {{ detail.day_high_minor | money: 'USD' }}</span>
+          </div>
+          <div class="range-bar">
+            <div class="range-bar__dot" [style.left.%]="rangePositionPercent(detail.day_low_minor, detail.day_high_minor, detail.price_minor)"></div>
+          </div>
+        </div>
+
+        <div class="instrument-detail__range">
+          <div class="instrument-detail__range-label">
+            <span>52 săptămâni</span>
+            <span>{{ detail.week52_low_minor | money: 'USD' }} – {{ detail.week52_high_minor | money: 'USD' }}</span>
+          </div>
+          <div class="range-bar">
+            <div class="range-bar__dot" [style.left.%]="rangePositionPercent(detail.week52_low_minor, detail.week52_high_minor, detail.price_minor)"></div>
+          </div>
+        </div>
+
+        @if (detail.volume) {
+          <p class="instrument-detail__volume">Volum: {{ detail.volume | number: '1.0-0' }} acțiuni</p>
+        }
+
+        @if (detail.is_tradable) {
+          <app-action-button [fullWidth]="true" (pressed)="buyFromDetail()">Cumpără {{ detail.symbol }}</app-action-button>
+        } @else {
+          <p class="instrument-detail__info-note">Indice informativ — nu se tranzacționează direct.</p>
+        }
+      </div>
+    }
+  </app-modal>
+}
+
+@if (buyModalInstrument(); as instrument) {
+  <app-modal [title]="'Cumpără ' + instrument.symbol" (closed)="closeBuyModal()">
+    <div class="trade-form">
+      <p class="trade-form__price">Preț curent: {{ instrument.price_minor | money: 'USD' }} / acțiune</p>
+      <label>
+        <span>Sumă (USD)</span>
+        <input type="number" min="1" step="1" [ngModel]="buyAmountUsd()" (ngModelChange)="buyAmountUsd.set($event)" />
+      </label>
+      @if (instrument.price_minor) {
+        <p class="trade-form__hint">
+          ≈ {{ (buyAmountUsd() * 100 / instrument.price_minor) | number: '1.0-4' }} acțiuni
+        </p>
+      }
+      <app-action-button [fullWidth]="true" [loading]="buying()" (pressed)="confirmBuy()">Confirmă cumpărarea</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (sellModalHolding(); as holding) {
+  <app-modal [title]="'Vinde ' + holding.symbol" (closed)="sellModalHolding.set(null)">
+    <div class="trade-form">
+      <p class="trade-form__price">Deții {{ holding.quantity | number: '1.0-4' }} · preț curent {{ holding.current_price_minor | money: 'USD' }} / acțiune</p>
+      <label>
+        <span>Cantitate</span>
+        <input
+          type="number"
+          min="0"
+          [max]="holding.quantity"
+          step="0.0001"
+          [ngModel]="sellQuantity()"
+          (ngModelChange)="sellQuantity.set($event)"
+        />
+      </label>
+      <p class="trade-form__hint">
+        ≈ {{ (sellQuantity() * holding.current_price_minor) | money: 'USD' }} încasați
+      </p>
+      <app-action-button [fullWidth]="true" [loading]="selling()" (pressed)="confirmSell()">Confirmă vânzarea</app-action-button>
+    </div>
+  </app-modal>
+}
