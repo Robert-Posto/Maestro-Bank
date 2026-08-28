@@ -132,7 +132,6 @@ export class Loans implements OnInit, OnDestroy {
    * fiecare schimbare, ca rezultatul să "prindă viață" în loc să sară brusc. */
   protected readonly displayedInstallmentMinor = signal(0);
 
-  protected readonly howItWorksOpen = signal(false);
   protected readonly howItWorksCards = HOW_IT_WORKS_CARDS;
   protected readonly activeCardIndex = signal(0);
   protected readonly dragOffsetPx = signal(0);
@@ -272,9 +271,8 @@ export class Loans implements OnInit, OnDestroy {
     this.dragPointerId = null;
   }
 
-  protected openHowItWorks(): void {
-    this.activeCardIndex.set(0);
-    this.howItWorksOpen.set(true);
+  protected scrollToHowItWorks(): void {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   protected loanProgressPercent(loan: LoanView): number {

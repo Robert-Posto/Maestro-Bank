@@ -207,36 +207,41 @@
   }
 }
 
-/* --- Banner spre carte -------------------------------------------------------- */
+/* --- Secțiunea "Cum funcționează", jos de tot pe pagină --------------------------- */
 
-.how-it-works-teaser {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--mb-space-4);
-  flex-wrap: wrap;
-  background: var(--mb-info-bg);
-  border-radius: var(--mb-radius-lg);
-  padding: var(--mb-space-5) var(--mb-space-6);
+.explain-section {
+  margin-top: var(--mb-space-10);
   margin-bottom: var(--mb-space-8);
+  scroll-margin-top: var(--mb-space-8);
 }
 
-.how-it-works-teaser__title {
+.explain-section h2 {
   font-size: var(--mb-font-size-base);
-  font-weight: var(--mb-font-weight-semibold);
+  margin-bottom: var(--mb-space-2);
 }
 
-.how-it-works-teaser__subtitle {
+.explain-section__subtitle {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-5);
 }
 
-/* --- Cartea "Cum funcționează" — glisabilă, stânga/dreapta ------------------------ */
+.card-deck-panel {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-8) var(--mb-space-6);
+  box-shadow: var(--mb-shadow-sm);
+}
+
+/* --- Cartea glisabilă — stânga/dreapta -------------------------------------------- */
 
 .card-deck {
   display: flex;
   align-items: center;
-  gap: var(--mb-space-2);
+  gap: var(--mb-space-4);
+  max-width: 640px;
+  margin: 0 auto;
   outline: none;
 }
 
@@ -288,7 +293,7 @@
 
 .deck-card {
   flex: 0 0 100%;
-  min-height: 220px;
+  min-height: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -338,7 +343,16 @@
 .deck-card__text {
   font-size: var(--mb-font-size-sm);
   color: var(--mb-text-secondary);
-  max-width: 320px;
+  max-width: 400px;
+}
+
+@media (max-width: 560px) {
+  .card-deck-panel {
+    padding: var(--mb-space-6) var(--mb-space-3);
+  }
+  .card-deck {
+    gap: var(--mb-space-2);
+  }
 }
 
 .card-deck__dots {

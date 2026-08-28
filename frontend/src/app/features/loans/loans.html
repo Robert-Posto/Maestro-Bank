@@ -1,5 +1,5 @@
 <app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici.">
-  <app-action-button variant="ghost" (pressed)="openHowItWorks()">
+  <app-action-button variant="ghost" (pressed)="scrollToHowItWorks()">
     <app-icon name="info" [size]="16" /> Cum funcționează
   </app-action-button>
 </app-page-header>
@@ -70,16 +70,6 @@
   </div>
 </section>
 
-<section class="how-it-works-teaser">
-  <div class="how-it-works-teaser__text">
-    <p class="how-it-works-teaser__title">Cum funcționează, pas cu pas</p>
-    <p class="how-it-works-teaser__subtitle">De la sumă la rată automată — glisează prin cărțile de mai jos.</p>
-  </div>
-  <app-action-button variant="secondary" (pressed)="openHowItWorks()">
-    <app-icon name="info" [size]="16" /> Deschide explicațiile
-  </app-action-button>
-</section>
-
 <section class="loans-section">
   <h2>Creditele tale</h2>
   @if (loansLoading()) {
@@ -132,8 +122,11 @@
   }
 </section>
 
-@if (howItWorksOpen()) {
-  <app-modal title="Cum funcționează" [maxWidth]="460" (closed)="howItWorksOpen.set(false)">
+<section class="explain-section" id="how-it-works">
+  <h2>Cum funcționează, pas cu pas</h2>
+  <p class="explain-section__subtitle">Glisează stânga-dreapta prin cărți — de la sumă la rată automată.</p>
+
+  <div class="card-deck-panel">
     <div class="card-deck" tabindex="0" (keydown.arrowleft)="prevCard()" (keydown.arrowright)="nextCard()">
       <button type="button" class="card-deck__nav" aria-label="Cardul anterior" (click)="prevCard()">
         <app-icon name="chevron-left" [size]="18" />
@@ -182,8 +175,8 @@
       Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu
       lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.
     </p>
-  </app-modal>
-}
+  </div>
+</section>
 
 @if (applyConfirmOpen()) {
   <app-modal title="Confirmă cererea de credit" (closed)="closeApplyConfirm()">
