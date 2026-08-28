@@ -1,14 +1,14 @@
 <div class="support-page">
-<app-page-header title="Suport" subtitle="Suntem aici să te ajutăm." />
+<app-page-header title="Asistent" subtitle="Întreabă orice — te trimitem automat la răspunsul potrivit." />
 
 <div class="support-layout">
-  <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" aria-label="Chat cu Support Agent">
+  <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" aria-label="Chat cu Asistentul MaestroBank">
     <header class="support-chat__bar">
       <div class="support-chat__identity">
-        <span class="support-chat__identity-avatar"><app-icon name="support" [size]="17" /></span>
+        <span class="support-chat__identity-avatar"><app-icon name="sparkles" [size]="17" /></span>
         <div class="support-chat__identity-text">
-          <strong>Support Agent</strong>
-          <span>Cont, card, tranzacții și tichete</span>
+          <strong>Asistent MaestroBank</strong>
+          <span>Întreabă orice — te ajutăm sau te trimitem la agentul potrivit</span>
         </div>
       </div>
 
@@ -218,7 +218,7 @@
         type="text"
         name="chatMessage"
         autocomplete="off"
-        aria-label="Mesaj pentru Support Agent"
+        aria-label="Mesaj pentru Asistentul MaestroBank"
         [placeholder]="speech.listening() ? 'Te ascult...' : 'Scrie mesajul tău...'"
         [ngModel]="chatInput()"
         (ngModelChange)="chatInput.set($event)"
