@@ -11,6 +11,7 @@ import {
   ConversationDetail,
   ConversationSummary,
 } from '../../services/ai-support.service';
+import { AiCopilotService, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { AssistantService } from '../../services/assistant.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
@@ -84,13 +85,24 @@ const FAQ_KEYS: { qKey: string; aKey: string }[] = [
 
 /** Cuvinte care se rotesc cât timp agentul lucrează — vezi
  * copilot.ts, același concept (jocuri de cuvinte, stil Claude), set pe
- * limbă (vezi `thinkingWords()`). */
-const THINKING_WORDS_RO = ['Maestroing', 'Detectivind', 'Răscolind', 'Percolând', 'Investigând', 'Chibzuind'];
-const THINKING_WORDS_EN = ['Maestroing', 'Sleuthing', 'Digging', 'Percolating', 'Investigating', 'Mulling'];
+ * limbă (vezi `thinkingWords()`). Două seturi diferite — unul per agent —
+ * fiindcă acum AMBII agenți răspund pe ACEEAȘI pagină (vezi askAgent), nu
+ * doar Support ca înainte. */
+const SUPPORT_THINKING_WORDS_RO = ['Maestroing', 'Detectivind', 'Răscolind', 'Percolând', 'Investigând', 'Chibzuind'];
+const SUPPORT_THINKING_WORDS_EN = ['Maestroing', 'Sleuthing', 'Digging', 'Percolating', 'Investigating', 'Mulling'];
+const MAESTRO_THINKING_WORDS_RO = ['Maestroing', 'Bănuind', 'Cifrometrând', 'Leuind', 'Buzunărind', 'Chibzuind'];
+const MAESTRO_THINKING_WORDS_EN = ['Maestroing', 'Pondering', 'Number-crunching', 'Tallying', 'Rummaging', 'Mulling'];
+
+/** Vezi Copilot::confirmPendingAction — starea butonului de confirmare
+ * pentru o acțiune de buget PROPUSĂ de MaestroAgent (create/update/delete
+ * budget), distinctă de `AiPendingAction` (confirmarea Support Agent,
+ * text-based, pentru crearea unui tichet). Cei doi agenți au fluxuri de
+ * confirmare COMPLET separate — nu se amestecă niciodată. */
+type MaestroActionState = 'pending' | 'confirming' | 'done' | 'cancelled' | 'error';
 
 interface ChatMessage {
   id: number;
-  role: 'support' | 'user';
+  role: 'support' | 'maestro' | 'user';
   text: string;
   time: string;
   context?: ChatContext;
@@ -98,6 +110,12 @@ interface ChatMessage {
    * din app/agents/support.py) — populate de GPT, NU doar text irosit: un
    * click retrimite eticheta ca mesaj nou, exact ca o întrebare rapidă. */
   recommendedActions?: AiRecommendedAction[];
+  /** Doar pentru role: 'maestro' — răspunsul bogat al agentului Spending +
+   * Forecast (carduri de analiză/prognoză, buget, acțiune propusă). */
+  maestroResponse?: SpendingForecastResponse;
+  maestroActionState?: MaestroActionState;
+  maestroActionResultText?: string;
+  errorText?: string;
 }
 
 function formatChatTime(date: Date): string {
@@ -125,6 +143,7 @@ function formatChatTime(date: Date): string {
 export class Support implements OnInit, OnDestroy {
   private readonly supportApi = inject(SupportService);
   private readonly aiSupport = inject(AiSupportService);
+  private readonly aiCopilot = inject(AiCopilotService);
   private readonly assistant = inject(AssistantService);
   protected readonly speech = inject(SpeechService);
   private readonly toast = inject(ToastService);
@@ -163,13 +182,22 @@ export class Support implements OnInit, OnDestroy {
    * (vezi timeout-ul de pe backend, app/llm/azure_openai.py) — ca userul
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly supportTypingSlow = signal(false);
-  protected readonly thinkingWord = signal(THINKING_WORDS_RO[0]);
+  protected readonly thinkingWord = signal(SUPPORT_THINKING_WORDS_RO[0]);
+  /** Care agent e "pe fir" cât timp `supportTyping()` e true — determină ce
+   * cuvinte de "gândește" și ce nume arătăm în indicatorul de typing (vezi
+   * support.html). Nu mai navigăm către o pagină separată pentru
+   * MaestroAgent (cerut explicit de user: "lasam tot pe pagina mare, nu ne
+   * mai invartim"), deci indicatorul de typing trebuie să reflecte agentul
+   * REAL care lucrează, nu presupune mereu Support. */
+  protected readonly awaitingAgent = signal<'support' | 'maestro'>('support');
   private slowTimer?: ReturnType<typeof setTimeout>;
   private thinkingWordTimer?: ReturnType<typeof setInterval>;
 
-  /** Setul de cuvinte "gândește" pentru limba activă. */
+  /** Setul de cuvinte "gândește" pentru limba activă + agentul curent. */
   private thinkingWords(): string[] {
-    return this.language.language() === 'en' ? THINKING_WORDS_EN : THINKING_WORDS_RO;
+    const en = this.language.language() === 'en';
+    if (this.awaitingAgent() === 'maestro') return en ? MAESTRO_THINKING_WORDS_EN : MAESTRO_THINKING_WORDS_RO;
+    return en ? SUPPORT_THINKING_WORDS_EN : SUPPORT_THINKING_WORDS_RO;
   }
   private readonly pendingAction = signal<AiPendingAction | null>(null);
   /** Gol doar la prima vizită/conversație nouă — caz în care arată ecranul
@@ -178,6 +206,13 @@ export class Support implements OnInit, OnDestroy {
   protected readonly chatMessages = signal<ChatMessage[]>([]);
   protected readonly conversations = signal<ConversationSummary[]>([]);
   protected readonly activeConversationId = signal<string | null>(null);
+  /** Conversația MaestroAgent, SEPARATĂ de cea de Support — cei doi agenți
+   * au propriile colecții de conversații persistate pe backend (fiecare cu
+   * propriul `agent` field), deci nu pot împărți un singur ID. Vizual, pe
+   * pagina asta, turele lor apar totuși în ACEEAȘI listă continuă
+   * (`chatMessages`) — doar id-ul de conversație trimis la backend diferă
+   * în funcție de care agent răspunde la turul curent. */
+  protected readonly maestroConversationId = signal<string | null>(null);
   protected readonly conversationsMenuOpen = signal(false);
 
   /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
@@ -188,30 +223,47 @@ export class Support implements OnInit, OnDestroy {
     return this.conversations().find((c) => c.id === id)?.title ?? this.language.t('support.newConversation');
   });
 
-  /** Adevărat doar după ce a existat DEJA cel puțin un tur — orice
-   * conversație populată aici e prin definiție o conversație de Support
-   * (ramura spending_forecast din askAgent navighează imediat la Copilot,
-   * nu populează niciodată chatMessages aici). Înainte de primul mesaj
-   * identitatea rămâne generică ("Asistent"), fiindcă întrebarea încă
-   * n-a fost clasificată — poate ajunge oricare din cei doi agenți.
-   * Folosit și în template (vezi support.html), de-aia e protected, nu
-   * private ca înainte. */
-  protected readonly isConfirmedSupport = computed(() => this.chatMessages().length > 0);
+  /** Adevărat doar după ce a existat DEJA cel puțin un tur (Support SAU
+   * MaestroAgent — vezi lastAnsweringAgent mai jos). Înainte de primul
+   * mesaj identitatea rămâne generică ("Asistent"), fiindcă întrebarea
+   * încă n-a fost clasificată. Folosit și în template (vezi support.html),
+   * de-aia e protected, nu private. */
+  protected readonly hasStartedConversation = computed(() => this.chatMessages().length > 0);
+
+  /** Care agent a răspuns ULTIMUL — determină identitatea afișată sus
+   * (titlu + bara de identitate a chat-ului). Ambii agenți răspund acum pe
+   * ACEEAȘI pagină, fără navigare (vezi askAgent) — userul cere explicit
+   * doar să i se spună care agent lucrează, nu să fie plimbat între
+   * pagini. `undefined` înainte de primul răspuns. */
+  protected readonly lastAnsweringAgent = computed<'support' | 'maestro' | undefined>(() => {
+    const messages = this.chatMessages();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'support') return 'support';
+      if (messages[i].role === 'maestro') return 'maestro';
+    }
+    return undefined;
+  });
 
   /** Titlul de sus al paginii (PageHeader, doar text — vezi
    * support.html pentru săgeata REALĂ, ca iconiță, din bara de
    * identitate a chat-ului, care nu poate exista aici, PageHeader
    * acceptă doar string). */
-  protected readonly pageTitle = computed(() =>
-    this.isConfirmedSupport() ? this.language.t('support.breadcrumbTitle') : this.language.t('nav.assistant'),
-  );
+  protected readonly pageTitle = computed(() => {
+    const agent = this.lastAnsweringAgent();
+    if (agent === 'maestro') return this.language.t('copilot.breadcrumbTitle');
+    if (agent === 'support') return this.language.t('support.breadcrumbTitle');
+    return this.language.t('nav.assistant');
+  });
 
-  protected readonly identitySubtitle = computed(() =>
-    this.isConfirmedSupport()
-      ? this.language.t('support.identitySubtitle')
-      : this.language.t('support.identitySubtitleGeneric'),
-  );
-  protected readonly identityIcon = computed(() => (this.isConfirmedSupport() ? 'support' : 'sparkles'));
+  protected readonly identitySubtitle = computed(() => {
+    const agent = this.lastAnsweringAgent();
+    if (agent === 'maestro') return this.language.t('copilot.identitySubtitle');
+    if (agent === 'support') return this.language.t('support.identitySubtitle');
+    return this.language.t('support.identitySubtitleGeneric');
+  });
+  /** MaestroAgent și starea generică (pre-clasificare) folosesc amândouă
+   * "sparkles" — doar Support are propria iconiță distinctă. */
+  protected readonly identityIcon = computed(() => (this.lastAnsweringAgent() === 'support' ? 'support' : 'sparkles'));
 
   constructor() {
     effect(() => {
@@ -271,6 +323,7 @@ export class Support implements OnInit, OnDestroy {
   protected startNewConversation(): void {
     this.conversationsMenuOpen.set(false);
     this.activeConversationId.set(null);
+    this.maestroConversationId.set(null);
     this.pendingAction.set(null);
     this.chatMessages.set([]);
   }
@@ -281,6 +334,11 @@ export class Support implements OnInit, OnDestroy {
     this.aiSupport.getConversation(id).subscribe({
       next: (detail: ConversationDetail) => {
         this.activeConversationId.set(detail.id);
+        // O conversație salvată e mereu 100% Support (istoricul persistat
+        // separat pe backend — vezi maestroConversationId mai sus), deci
+        // orice fir de Maestro rămas dintr-o sesiune anterioară nu mai are
+        // sens aici.
+        this.maestroConversationId.set(null);
         this.pendingAction.set(null);
         this.chatMessages.set(
           detail.messages.map((m, index) => {
@@ -367,12 +425,17 @@ export class Support implements OnInit, OnDestroy {
     this.askAgent(action.label);
   }
 
-  /** Trimite un mesaj către Support Agent (backend/ai-orchestrator-service, prin
-   * POST /api/ai/support) și afișează răspunsul real. Istoricul conversației e
-   * retrimis la fiecare tur (serviciul e stateless) — la fel și `pendingAction`,
-   * dacă turul anterior a cerut confirmare pentru o acțiune de scriere (ex.
-   * creare tichet de suport); serverul decide dacă mesajul curent e o
-   * confirmare validă, nu frontend-ul. */
+  /** Trimite un mesaj către agentul potrivit — Support SAU MaestroAgent,
+   * decis de classify() la fiecare mesaj nou, dar AMÂNDOI răspund pe
+   * ACEEAȘI pagină, în ACEEAȘI listă de mesaje (`chatMessages`) — nu mai
+   * navigăm niciodată către o pagină separată pentru MaestroAgent (cerut
+   * explicit de user: "lasam tot pe pagina mare... doar mentionam ce agent
+   * e folosit"). Istoricul fiecărui agent e retrimis la fiecare tur al LUI
+   * (fiecare are propriul `conversation_id`, vezi activeConversationId vs
+   * maestroConversationId) — la fel și `pendingAction`, dacă turul anterior
+   * de Support a cerut confirmare pentru o acțiune de scriere (ex. creare
+   * tichet); serverul decide dacă mesajul curent e o confirmare validă,
+   * nu frontend-ul. */
   private askAgent(text: string): void {
     if (!text || this.supportTyping()) return;
 
@@ -386,16 +449,15 @@ export class Support implements OnInit, OnDestroy {
       { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
     ]);
 
-    // Support e singura intrare vizibilă în sidebar acum ("Asistent") — la
-    // FIECARE mesaj nou (nu doar primul al unei conversații noi), verificăm
-    // dacă întrebarea ține de fapt de MaestroAgent (buget/prognoză/
-    // economii/abonamente — vezi intent_router.py din backend, acum
-    // clasificare hibridă: cuvinte-cheie + fallback LLM, nu doar regex) și,
-    // dacă da, trimitem userul direct acolo, cu întrebarea deja "pusă"
-    // (query param "q", citit în Copilot::ngOnInit) — nu o retastează.
-    // Excepție: un mesaj care confirmă o acțiune în curs (pendingAction, ex.
-    // "da" pentru crearea unui tichet) NU se reclasifică niciodată — nu e o
-    // întrebare nouă, e un răspuns la ceva deja pus.
+    // La FIECARE mesaj nou (nu doar primul al unei conversații noi),
+    // verificăm dacă întrebarea ține de fapt de MaestroAgent (buget/
+    // prognoză/economii/abonamente — vezi intent_router.py din backend,
+    // acum clasificare hibridă: cuvinte-cheie + fallback LLM, nu doar
+    // regex) și, dacă da, îi răspundem AICI, fără nicio navigare.
+    // Excepție: un mesaj care confirmă o acțiune de Support în curs
+    // (pendingAction, ex. "da" pentru crearea unui tichet) NU se
+    // reclasifică niciodată — nu e o întrebare nouă, e un răspuns la ceva
+    // deja pus.
     if (!this.pendingAction()) {
       // Dezactivează inputul (vezi [disabled]="supportTyping()" în
       // support.html) cât timp se decide agentul — previne un al doilea
@@ -405,17 +467,20 @@ export class Support implements OnInit, OnDestroy {
       this.assistant.classify(text).subscribe({
         next: (result) => {
           if (result.agent === 'spending_forecast') {
-            this.supportTyping.set(false);
-            this.toast.info(this.language.t('support.redirectedToMaestroAgent'));
-            this.router.navigate([result.route], { queryParams: { q: text } });
+            // Toast-ul are sens DOAR la PRIMA implicare a AGENTULUI ĂSTUIA
+            // în conversație — verificăm `maestroConversationId` (populat
+            // abia după primul răspuns real de-al lui, vezi askMaestroAgent),
+            // NU `chatMessages().length` (deja nenul aici, bula userului a
+            // fost pusă mai sus) și NICI starea lui Support — dacă
+            // MaestroAgent preia pentru prima oară o conversație pornită
+            // deja cu Support, tot merită anunțat, nu doar la mesajul 1.
+            if (!this.maestroConversationId()) {
+              this.toast.info(this.language.t('support.answeredByMaestroAgent'));
+            }
+            this.askMaestroAgent(text, true);
           } else {
-            // Toast-ul "te-am direcționat către Support" are sens DOAR la
-            // primul mesaj al unei conversații noi — arată identitatea
-            // agentului o singură dată. La turele următoare (deja pe
-            // Support), reclasificarea confirmă doar că rămâi aici — un
-            // toast la fiecare mesaj ar deveni spam, nu informație utilă.
             if (!this.activeConversationId()) {
-              this.toast.info(this.language.t('support.redirectedToSupport'));
+              this.toast.info(this.language.t('support.answeredBySupport'));
             }
             this.sendToSupportAgent(text, true);
           }
@@ -430,6 +495,94 @@ export class Support implements OnInit, OnDestroy {
     this.sendToSupportAgent(text, true);
   }
 
+  /** Trimite un mesaj către MaestroAgent (Spending + Forecast, backend/
+   * ai-orchestrator-service, prin POST /api/ai/spending-forecast/chat) —
+   * vezi Copilot::ask, aceeași logică, dar scriind în `chatMessages`-ul
+   * ACESTEI pagini (role: 'maestro'), nu într-o pagină separată. */
+  private askMaestroAgent(text: string, userBubbleAlreadyShown = false): void {
+    if (!userBubbleAlreadyShown) {
+      this.chatMessages.update((messages) => [
+        ...messages,
+        { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
+      ]);
+    }
+    this.awaitingAgent.set('maestro');
+    this.supportTyping.set(true);
+    this.supportTypingSlow.set(false);
+    this.slowTimer = setTimeout(() => this.supportTypingSlow.set(true), 15_000);
+    this.startThinkingWords();
+
+    this.aiCopilot.sendMessage(text, this.maestroConversationId()).subscribe({
+      next: (response) => {
+        this.stopTyping();
+        if (!this.maestroConversationId()) {
+          this.maestroConversationId.set(response.conversation_id);
+        }
+        this.chatMessages.update((messages) => [
+          ...messages,
+          {
+            id: Date.now() + 1,
+            role: 'maestro',
+            text: response.answer,
+            time: formatChatTime(new Date()),
+            maestroResponse: response,
+            maestroActionState: response.pending_action ? 'pending' : undefined,
+          },
+        ]);
+      },
+      error: (err) => {
+        this.stopTyping();
+        this.chatMessages.update((messages) => [
+          ...messages,
+          {
+            id: Date.now() + 1,
+            role: 'maestro',
+            text: '',
+            time: formatChatTime(new Date()),
+            errorText: extractErrorMessage(err, this.language.t('copilot.errorFallback')),
+          },
+        ]);
+      },
+    });
+  }
+
+  /** Execută REAL acțiunea de buget propusă de MaestroAgent — vezi
+   * Copilot::confirmPendingAction, identic, doar scriind în ChatMessage-ul
+   * de-aici (maestroActionState, nu actionState — flux complet separat de
+   * pendingAction-ul Support Agent, vezi tipul MaestroActionState). */
+  protected confirmMaestroPendingAction(message: ChatMessage): void {
+    const action = message.maestroResponse?.pending_action;
+    if (!action || message.maestroActionState !== 'pending') return;
+
+    this.updateMaestroActionState(message.id, 'confirming');
+    this.aiCopilot.confirmAction(action).subscribe({
+      next: (result) => {
+        this.updateMaestroActionState(message.id, result.success ? 'done' : 'error', result.message);
+      },
+      error: (err) => {
+        const errorText = extractErrorMessage(err, this.language.t('copilot.actionErrorFallback'));
+        this.updateMaestroActionState(message.id, 'error', errorText);
+      },
+    });
+  }
+
+  protected cancelMaestroPendingAction(message: ChatMessage): void {
+    if (message.maestroActionState !== 'pending') return;
+    this.updateMaestroActionState(message.id, 'cancelled');
+  }
+
+  private updateMaestroActionState(messageId: number, state: MaestroActionState, resultText?: string): void {
+    this.chatMessages.update((messages) =>
+      messages.map((m) => (m.id === messageId ? { ...m, maestroActionState: state, maestroActionResultText: resultText } : m)),
+    );
+  }
+
+  /** Vezi Copilot::sourceLabels — etichete scurte, prietenoase pentru
+   * documentele RAG folosite de MaestroAgent. */
+  protected maestroSourceLabels(sources: { source: string }[]): string {
+    return sources.map((s) => s.source.replace(/\.md$/, '').replace(/_/g, ' ')).join(', ');
+  }
+
   /** `userBubbleAlreadyShown` — adevărat când askAgent a afișat deja bula
    * userului (cazul normal, vezi mai sus); fals DOAR când sendToSupportAgent
    * ar fi apelat direct, din afara askAgent (nu mai există azi un astfel de
@@ -438,6 +591,7 @@ export class Support implements OnInit, OnDestroy {
   private sendToSupportAgent(text: string, userBubbleAlreadyShown = false): void {
     const pending = this.pendingAction();
     this.pendingAction.set(null);
+    this.awaitingAgent.set('support');
 
     if (!userBubbleAlreadyShown) {
       this.chatMessages.update((messages) => [

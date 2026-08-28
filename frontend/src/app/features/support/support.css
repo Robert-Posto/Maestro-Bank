@@ -98,9 +98,9 @@
   text-overflow: ellipsis;
 }
 
-/* Săgeata REALĂ (iconiță, nu doar caracterul "→" din text) care arată că
-   ai fost redirecționat de la Asistentul general la Support Agent — vezi
-   isConfirmedSupport în support.ts. Colorată distinct (nu gri, ca restul
+/* Săgeata REALĂ (iconiță, nu doar caracterul "→" din text) care arată care
+   agent (Support SAU MaestroAgent) a răspuns ultimul — vezi
+   lastAnsweringAgent în support.ts. Colorată distinct (nu gri, ca restul
    textului secundar), ca să nu se piardă vizual lângă titlul îngroșat. */
 .support-chat__identity-breadcrumb {
   display: inline-flex;
@@ -125,7 +125,7 @@
   flex: 0 0 auto;
 }
 
-/* Vizibil DOAR după primul mesaj (vezi isConfirmedSupport) — înainte de
+/* Vizibil DOAR după primul mesaj (vezi hasStartedConversation) — înainte de
    asta n-ai ce "schimba", conversația e deja goală. Pornește pur și simplu
    o conversație nouă (ca "Conversație nouă" din dropdown), care face ca
    următoarea întrebare să fie reclasificată de la zero (vezi askAgent). */
@@ -1167,4 +1167,284 @@
   .support-chat__message-col {
     max-width: 100%;
   }
+}
+
+/* --- Răspunsuri MaestroAgent (Spending + Forecast), afișate INLINE aici ---
+   Userul a cerut explicit să nu mai fie plimbat pe altă pagină când
+   întrebarea ține de fapt de MaestroAgent — "lasam tot pe pagina mare,
+   nu ne mai invartim, doar mentionam ce agent e folosit" — deci ambii
+   agenți răspund acum în ACEEAȘI listă de mesaje (vezi support.ts::
+   askMaestroAgent). Stilurile de mai jos sunt echivalentul consolidat al
+   .copilot-card/.copilot-budgets/.copilot-action/etc. din copilot.css
+   (ambele straturi ale acelui fișier — cel de bază + cel de rafinare
+   vizuală — combinate aici într-un singur set), NU un import — fiecare
+   componentă Angular are stilurile ei proprii (vezi și pay-request.css
+   pentru același raționament), deci nu pot fi refolosite direct de-acolo. */
+
+.support-chat__error {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+  font-size: var(--mb-font-size-sm);
+}
+
+.maestro-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-5);
+}
+
+@media (max-width: 640px) {
+  .maestro-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.maestro-card {
+  min-width: 0;
+  padding: var(--mb-space-4);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.maestro-card--positive {
+  border-color: transparent;
+  border-left: 3px solid var(--mb-positive);
+  background: var(--mb-positive-bg);
+}
+
+.maestro-card--negative {
+  border-color: transparent;
+  border-left: 3px solid var(--mb-negative);
+  background: var(--mb-negative-bg);
+}
+
+.maestro-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  margin-bottom: var(--mb-space-3);
+  color: var(--mb-text-primary);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.maestro-card__header app-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--mb-blue-600);
+  background: var(--mb-blue-50);
+}
+
+.maestro-verdict {
+  display: block;
+  margin: var(--mb-space-4) 0;
+  color: var(--mb-positive);
+  font-size: var(--mb-font-size-lg);
+}
+
+.maestro-card--negative .maestro-verdict {
+  color: var(--mb-negative);
+}
+
+.maestro-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mb-space-2);
+  padding: 0.35rem 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.maestro-card__row span:last-child {
+  color: var(--mb-text-primary);
+  font-weight: var(--mb-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.maestro-card__row--total {
+  margin-top: var(--mb-space-1);
+  padding-top: var(--mb-space-3);
+  border-top: 1px solid var(--mb-border);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.maestro-card__row--total span:last-child {
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.maestro-recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  padding: var(--mb-space-4);
+  border-radius: var(--mb-radius-lg);
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  line-height: 1.5;
+}
+
+.maestro-recommendation--negative {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+}
+
+.maestro-sources {
+  margin: var(--mb-space-2) 0 0;
+  color: var(--mb-text-tertiary);
+  font-size: var(--mb-font-size-xs);
+}
+
+.maestro-budgets {
+  padding: var(--mb-space-4);
+  margin-bottom: var(--mb-space-4);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  background: var(--mb-surface);
+  box-shadow: var(--mb-shadow-xs);
+}
+
+.maestro-budgets .maestro-card__header {
+  margin-bottom: var(--mb-space-3);
+}
+
+.maestro-budget-row {
+  padding: var(--mb-space-2) 0;
+}
+
+.maestro-budget-row + .maestro-budget-row {
+  border-top: 1px solid var(--mb-border);
+}
+
+.maestro-budget-row__top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mb-space-2);
+  margin-bottom: 6px;
+  font-size: var(--mb-font-size-sm);
+}
+
+.maestro-budget-row__top > span:first-child {
+  color: var(--mb-text-primary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.maestro-budget-row__top > span:last-child {
+  color: var(--mb-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.maestro-budget-row__over {
+  color: var(--mb-negative) !important;
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.maestro-budget-track {
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  overflow: hidden;
+}
+
+.maestro-budget-fill {
+  height: 100%;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-blue-500);
+}
+
+.maestro-budget-fill--over {
+  background: var(--mb-negative);
+}
+
+.maestro-budget-row__hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--mb-negative);
+  font-size: var(--mb-font-size-xs);
+}
+
+.maestro-action {
+  padding: var(--mb-space-4);
+  margin-bottom: var(--mb-space-4);
+  border: 1px solid var(--mb-blue-100);
+  border-radius: var(--mb-radius-lg);
+  background: var(--mb-blue-50);
+}
+
+.maestro-action__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  margin: 0 0 var(--mb-space-3);
+  color: var(--mb-text-primary);
+  font-size: var(--mb-font-size-sm);
+  line-height: 1.5;
+}
+
+.maestro-action__buttons {
+  display: flex;
+  gap: var(--mb-space-2);
+}
+
+.maestro-action__confirm,
+.maestro-action__cancel {
+  padding: 0.5rem 1rem;
+  border-radius: var(--mb-radius-sm);
+  font: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.maestro-action__confirm {
+  border: none;
+  color: #fff;
+  background: var(--mb-blue-600);
+}
+
+.maestro-action__confirm:hover {
+  background: var(--mb-blue-700);
+}
+
+.maestro-action__cancel {
+  border: 1px solid var(--mb-border-strong);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface);
+}
+
+.maestro-action__cancel:hover {
+  border-color: var(--mb-negative);
+  color: var(--mb-negative);
+}
+
+.maestro-action__status {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  margin: 0;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.maestro-action__status--success {
+  color: var(--mb-positive);
+}
+
+.maestro-action__status--error {
+  color: var(--mb-negative);
 }

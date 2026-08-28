@@ -25,18 +25,18 @@ export const SUPPORT_I18N: Record<string, TranslationEntry> = {
   'support.deleteConversation': { ro: 'Șterge conversația', en: 'Delete conversation' },
   'support.loadConversationError': { ro: 'Nu am putut încărca conversația.', en: "We couldn't load the conversation." },
   'support.deleteConversationError': { ro: 'Nu am putut șterge conversația.', en: "We couldn't delete the conversation." },
-  'support.redirectedToMaestroAgent': {
-    ro: 'Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.',
-    en: 'We sent you to MaestroAgent — your question is about budgeting/forecasting.',
+  'support.answeredByMaestroAgent': {
+    ro: 'Îți răspunde MaestroAgent — întrebarea ta ține de buget/prognoză.',
+    en: 'MaestroAgent is answering — your question is about budgeting/forecasting.',
   },
-  'support.redirectedToSupport': {
-    ro: 'Te-am direcționat către Support — întrebarea ta ține de cont/card/tranzacții.',
-    en: 'We sent you to Support — your question is about account/card/transactions.',
+  'support.answeredBySupport': {
+    ro: 'Îți răspunde Support — întrebarea ta ține de cont/card/tranzacții.',
+    en: 'Support is answering — your question is about account/card/transactions.',
   },
   'support.welcomeTitle': { ro: 'Cu ce te pot ajuta?', en: 'How can I help you?' },
   'support.welcomeDescription': {
-    ro: 'Întreabă orice — cont, card, tranzacții, tichete, sau chiar buget și cheltuieli. Dacă întrebarea ține de fapt de MaestroAgent, te trimit automat acolo.',
-    en: 'Ask anything — account, card, transactions, tickets, or even budgeting and spending. If your question is actually for MaestroAgent, I send you there automatically.',
+    ro: 'Întreabă orice — cont, card, tranzacții, tichete, sau chiar buget și cheltuieli. Îți răspunde automat agentul potrivit, direct aici.',
+    en: 'Ask anything — account, card, transactions, tickets, or even budgeting and spending. The right agent answers automatically, right here.',
   },
   'support.faqAffordQ': { ro: 'Îmi permit o vacanță de 2.000 lei luna asta?', en: 'Can I afford a 2,000 RON holiday this month?' },
   'support.faqAffordA': {
