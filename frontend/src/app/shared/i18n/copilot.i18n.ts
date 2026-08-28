@@ -82,4 +82,16 @@ export const COPILOT_I18N: Record<string, TranslationEntry> = {
   'copilot.newConversation': { ro: 'Conversație nouă', en: 'New conversation' },
   'copilot.noConversationsSaved': { ro: 'Nicio conversație salvată încă.', en: 'No conversations saved yet.' },
   'copilot.deleteConversation': { ro: 'Șterge conversația', en: 'Delete conversation' },
+  'copilot.breadcrumbTitle': { ro: 'Asistent → MaestroAssistent', en: 'Assistant → MaestroAssistent' },
+  'copilot.backToAssistant': { ro: 'Înapoi la Asistent', en: 'Back to Assistant' },
+  'copilot.backToAssistantTitle': {
+    ro: 'Înapoi la Asistent — pune o altă întrebare',
+    en: 'Back to the Assistant — ask a different question',
+  },
+  'copilot.redirectedFromSupport': {
+    ro: 'Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.',
+    en: 'We sent you to MaestroAgent — your question is about budgeting/forecasting.',
+  },
+  'copilot.loadConversationError': { ro: 'Nu am putut încărca conversația.', en: "We couldn't load the conversation." },
+  'copilot.deleteConversationError': { ro: 'Nu am putut șterge conversația.', en: "We couldn't delete the conversation." },
 };

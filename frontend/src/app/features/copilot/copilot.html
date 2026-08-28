@@ -1,5 +1,5 @@
 <div class="copilot-page">
-<app-page-header [title]="'copilot.title' | translate" [subtitle]="'copilot.subtitle' | translate" />
+<app-page-header [title]="'copilot.breadcrumbTitle' | translate" [subtitle]="'copilot.subtitle' | translate" />
 
 <div class="copilot-layout">
   <section class="copilot-chat" [class.copilot-chat--empty]="chatMessages().length === 0" [attr.aria-label]="'copilot.chatAriaLabel' | translate">
@@ -7,53 +7,69 @@
       <div class="copilot-chat__identity">
         <span class="copilot-chat__identity-avatar"><app-icon name="sparkles" [size]="17" /></span>
         <div class="copilot-chat__identity-text">
-          <strong>{{ 'copilot.assistantName' | translate }}</strong>
+          <strong class="copilot-chat__identity-breadcrumb">
+            <span>{{ 'nav.assistant' | translate }}</span>
+            <app-icon name="chevron-right" [size]="12" />
+            <span>{{ 'copilot.assistantName' | translate }}</span>
+          </strong>
           <span>{{ 'copilot.identitySubtitle' | translate }}</span>
         </div>
       </div>
 
-      <div class="copilot-chat__conversations" #conversationsMenuEl>
+      <div class="copilot-chat__bar-actions">
         <button
           type="button"
-          class="copilot-chat__conversations-trigger"
-          [class.copilot-chat__conversations-trigger--open]="conversationsMenuOpen()"
-          (click)="toggleConversationsMenu()"
+          class="copilot-chat__back-btn"
+          [title]="'copilot.backToAssistantTitle' | translate"
+          (click)="backToMainAgent()"
         >
-          <span>{{ activeConversationTitle() }}</span>
-          <app-icon name="chevron-down" [size]="14" />
+          <app-icon name="chevron-left" [size]="14" />
+          <span>{{ 'copilot.backToAssistant' | translate }}</span>
         </button>
 
-        @if (conversationsMenuOpen()) {
-          <div class="copilot-chat__conversations-menu">
-            <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
-              <app-icon name="plus" [size]="14" /> {{ 'copilot.newConversation' | translate }}
-            </button>
-            @if (conversations().length === 0) {
-              <p class="copilot-conversations__empty">{{ 'copilot.noConversationsSaved' | translate }}</p>
-            } @else {
-              <div class="copilot-conversations__list">
-                @for (conversation of conversations(); track conversation.id) {
-                  <button
-                    type="button"
-                    class="copilot-conversations__item"
-                    [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
-                    (click)="openConversation(conversation.id)"
-                  >
-                    <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
-                    <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-                    <span
-                      class="copilot-conversations__item-delete"
-                      [attr.aria-label]="'copilot.deleteConversation' | translate"
-                      (click)="deleteConversation($event, conversation.id)"
+        <div class="copilot-chat__conversations" #conversationsMenuEl>
+          <button
+            type="button"
+            class="copilot-chat__conversations-trigger"
+            [class.copilot-chat__conversations-trigger--open]="conversationsMenuOpen()"
+            (click)="toggleConversationsMenu()"
+          >
+            <span>{{ activeConversationTitle() }}</span>
+            <app-icon name="chevron-down" [size]="14" />
+          </button>
+
+          @if (conversationsMenuOpen()) {
+            <div class="copilot-chat__conversations-menu">
+              <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
+                <app-icon name="plus" [size]="14" /> {{ 'copilot.newConversation' | translate }}
+              </button>
+              @if (conversations().length === 0) {
+                <p class="copilot-conversations__empty">{{ 'copilot.noConversationsSaved' | translate }}</p>
+              } @else {
+                <div class="copilot-conversations__list">
+                  @for (conversation of conversations(); track conversation.id) {
+                    <button
+                      type="button"
+                      class="copilot-conversations__item"
+                      [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
+                      (click)="openConversation(conversation.id)"
                     >
-                      <app-icon name="trash" [size]="13" />
-                    </span>
-                  </button>
-                }
-              </div>
-            }
-          </div>
-        }
+                      <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
+                      <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+                      <span
+                        class="copilot-conversations__item-delete"
+                        [attr.aria-label]="'copilot.deleteConversation' | translate"
+                        (click)="deleteConversation($event, conversation.id)"
+                      >
+                        <app-icon name="trash" [size]="13" />
+                      </span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     </header>
 

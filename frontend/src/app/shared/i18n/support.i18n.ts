@@ -2,17 +2,51 @@ import { TranslationEntry } from './index';
 
 export const SUPPORT_I18N: Record<string, TranslationEntry> = {
   'support.title': { ro: 'Suport', en: 'Support' },
-  'support.subtitle': { ro: 'Suntem aici să te ajutăm.', en: "We're here to help." },
+  'support.subtitle': {
+    ro: 'Întreabă orice — te trimitem automat la răspunsul potrivit.',
+    en: 'Ask anything — we route you to the right answer automatically.',
+  },
   'support.chatAriaLabel': { ro: 'Chat cu Support Agent', en: 'Chat with Support Agent' },
   'support.agentName': { ro: 'Support Agent', en: 'Support Agent' },
+  'support.assistantName': { ro: 'Asistent MaestroBank', en: 'MaestroBank Assistant' },
+  'support.breadcrumbTitle': { ro: 'Asistent → Support Agent', en: 'Assistant → Support Agent' },
   'support.identitySubtitle': { ro: 'Cont, card, tranzacții și tichete', en: 'Account, card, transactions and tickets' },
+  'support.identitySubtitleGeneric': {
+    ro: 'Întreabă orice — te ajutăm sau te trimitem la agentul potrivit',
+    en: "Ask anything — we'll help or route you to the right agent",
+  },
+  'support.changeQuestion': { ro: 'Schimbă întrebarea', en: 'Change question' },
+  'support.changeQuestionTitle': {
+    ro: 'Pornește o conversație nouă — schimbă întrebarea',
+    en: 'Start a new conversation — change your question',
+  },
   'support.newConversation': { ro: 'Conversație nouă', en: 'New conversation' },
   'support.noConversationsSaved': { ro: 'Nicio conversație salvată încă.', en: 'No conversations saved yet.' },
   'support.deleteConversation': { ro: 'Șterge conversația', en: 'Delete conversation' },
+  'support.loadConversationError': { ro: 'Nu am putut încărca conversația.', en: "We couldn't load the conversation." },
+  'support.deleteConversationError': { ro: 'Nu am putut șterge conversația.', en: "We couldn't delete the conversation." },
+  'support.redirectedToMaestroAgent': {
+    ro: 'Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.',
+    en: 'We sent you to MaestroAgent — your question is about budgeting/forecasting.',
+  },
+  'support.redirectedToSupport': {
+    ro: 'Te-am direcționat către Support — întrebarea ta ține de cont/card/tranzacții.',
+    en: 'We sent you to Support — your question is about account/card/transactions.',
+  },
   'support.welcomeTitle': { ro: 'Cu ce te pot ajuta?', en: 'How can I help you?' },
   'support.welcomeDescription': {
-    ro: 'Răspund despre contul, cardul, tranzacțiile și tichetele tale, cu date reale din contul tău.',
-    en: 'I answer questions about your account, card, transactions, and tickets, using real data from your account.',
+    ro: 'Întreabă orice — cont, card, tranzacții, tichete, sau chiar buget și cheltuieli. Dacă întrebarea ține de fapt de MaestroAgent, te trimit automat acolo.',
+    en: 'Ask anything — account, card, transactions, tickets, or even budgeting and spending. If your question is actually for MaestroAgent, I send you there automatically.',
+  },
+  'support.faqAffordQ': { ro: 'Îmi permit o vacanță de 2.000 lei luna asta?', en: 'Can I afford a 2,000 RON holiday this month?' },
+  'support.faqAffordA': {
+    ro: 'Îți spune MaestroAgent, din prognoza ta reală de cheltuieli.',
+    en: 'MaestroAgent tells you, from your real spending forecast.',
+  },
+  'support.faqSpentQ': { ro: 'Cât am cheltuit luna asta?', en: 'How much have I spent this month?' },
+  'support.faqSpentA': {
+    ro: 'Îți spune MaestroAgent, din analiza ta reală de cheltuieli.',
+    en: 'MaestroAgent tells you, from your real spending analysis.',
   },
   'support.listen': { ro: 'Ascultă', en: 'Listen' },
   'support.stop': { ro: 'Oprește', en: 'Stop' },

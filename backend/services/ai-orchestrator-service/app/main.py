@@ -7,6 +7,12 @@ Doi agenți montați aici, fiecare cu propriul router/agent/tools:
   - Support Agent (vezi app/agents/support.py) — ajutor cont/card/tranzacții/
     tichete, propose-not-execute pentru scrierea unui tichet.
 
+Plus un orchestrator SUBȚIRE (app/routers/assistant.py) — clasifică prima
+întrebare a unei conversații NOI și spune frontend-ului cărui agent îi
+aparține, ca userul să nu mai aleagă manual pagina. NU e un al treilea
+agent, doar rutare deterministă — cei doi agenți de mai sus rămân complet
+neatinși.
+
 Niciunul dintre ei NU accesează MongoDB direct — toate datele de cont vin
 prin API Gateway (vezi app/tools/*), exact ca un client extern (Angular)
 ar face. Excepția e conversations_db (vezi app/database.py), care ține
@@ -21,6 +27,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.database import close_database_connection, ping_database
 from app.i18n import LanguageMiddleware
+from app.routers.assistant import router as assistant_router
 from app.routers.speech import router as speech_router
 from app.routers.spending_forecast import router as spending_forecast_router
 from app.routers.support import router as support_router
@@ -54,3 +61,4 @@ async def health_check():
 app.include_router(spending_forecast_router)
 app.include_router(support_router)
 app.include_router(speech_router)
+app.include_router(assistant_router)

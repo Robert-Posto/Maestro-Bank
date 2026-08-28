@@ -1,59 +1,81 @@
 <div class="support-page">
-<app-page-header [title]="'support.title' | translate" [subtitle]="'support.subtitle' | translate" />
+<app-page-header [title]="pageTitle()" [subtitle]="'support.subtitle' | translate" />
 
 <div class="support-layout">
   <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" [attr.aria-label]="'support.chatAriaLabel' | translate">
     <header class="support-chat__bar">
       <div class="support-chat__identity">
-        <span class="support-chat__identity-avatar"><app-icon name="support" [size]="17" /></span>
+        <span class="support-chat__identity-avatar"><app-icon [name]="identityIcon()" [size]="17" /></span>
         <div class="support-chat__identity-text">
-          <strong>{{ 'support.agentName' | translate }}</strong>
-          <span>{{ 'support.identitySubtitle' | translate }}</span>
+          @if (isConfirmedSupport()) {
+            <strong class="support-chat__identity-breadcrumb">
+              <span>{{ 'nav.assistant' | translate }}</span>
+              <app-icon name="chevron-right" [size]="12" />
+              <span>{{ 'support.agentName' | translate }}</span>
+            </strong>
+          } @else {
+            <strong>{{ 'support.assistantName' | translate }}</strong>
+          }
+          <span>{{ identitySubtitle() }}</span>
         </div>
       </div>
 
-      <div class="support-chat__conversations" #conversationsMenuEl>
-        <button
-          type="button"
-          class="support-chat__conversations-trigger"
-          [class.support-chat__conversations-trigger--open]="conversationsMenuOpen()"
-          (click)="toggleConversationsMenu()"
-        >
-          <span>{{ activeConversationTitle() }}</span>
-          <app-icon name="chevron-down" [size]="14" />
-        </button>
-
-        @if (conversationsMenuOpen()) {
-          <div class="support-chat__conversations-menu">
-            <button type="button" class="support-conversations__new" (click)="startNewConversation()">
-              <app-icon name="plus" [size]="14" /> {{ 'support.newConversation' | translate }}
-            </button>
-            @if (conversations().length === 0) {
-              <p class="support-conversations__empty">{{ 'support.noConversationsSaved' | translate }}</p>
-            } @else {
-              <div class="support-conversations__list">
-                @for (conversation of conversations(); track conversation.id) {
-                  <button
-                    type="button"
-                    class="support-conversations__item"
-                    [class.support-conversations__item--active]="conversation.id === activeConversationId()"
-                    (click)="openConversation(conversation.id)"
-                  >
-                    <span class="support-conversations__item-title">{{ conversation.title }}</span>
-                    <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-                    <span
-                      class="support-conversations__item-delete"
-                      [attr.aria-label]="'support.deleteConversation' | translate"
-                      (click)="deleteConversation($event, conversation.id)"
-                    >
-                      <app-icon name="trash" [size]="13" />
-                    </span>
-                  </button>
-                }
-              </div>
-            }
-          </div>
+      <div class="support-chat__bar-actions">
+        @if (isConfirmedSupport()) {
+          <button
+            type="button"
+            class="support-chat__back-btn"
+            [title]="'support.changeQuestionTitle' | translate"
+            (click)="startNewConversation()"
+          >
+            <app-icon name="chevron-left" [size]="14" />
+            <span>{{ 'support.changeQuestion' | translate }}</span>
+          </button>
         }
+
+        <div class="support-chat__conversations" #conversationsMenuEl>
+          <button
+            type="button"
+            class="support-chat__conversations-trigger"
+            [class.support-chat__conversations-trigger--open]="conversationsMenuOpen()"
+            (click)="toggleConversationsMenu()"
+          >
+            <span>{{ activeConversationTitle() }}</span>
+            <app-icon name="chevron-down" [size]="14" />
+          </button>
+
+          @if (conversationsMenuOpen()) {
+            <div class="support-chat__conversations-menu">
+              <button type="button" class="support-conversations__new" (click)="startNewConversation()">
+                <app-icon name="plus" [size]="14" /> {{ 'support.newConversation' | translate }}
+              </button>
+              @if (conversations().length === 0) {
+                <p class="support-conversations__empty">{{ 'support.noConversationsSaved' | translate }}</p>
+              } @else {
+                <div class="support-conversations__list">
+                  @for (conversation of conversations(); track conversation.id) {
+                    <button
+                      type="button"
+                      class="support-conversations__item"
+                      [class.support-conversations__item--active]="conversation.id === activeConversationId()"
+                      (click)="openConversation(conversation.id)"
+                    >
+                      <span class="support-conversations__item-title">{{ conversation.title }}</span>
+                      <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+                      <span
+                        class="support-conversations__item-delete"
+                        [attr.aria-label]="'support.deleteConversation' | translate"
+                        (click)="deleteConversation($event, conversation.id)"
+                      >
+                        <app-icon name="trash" [size]="13" />
+                      </span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     </header>
 
@@ -61,7 +83,7 @@
       @if (chatMessages().length === 0) {
         <div class="support-chat__welcome">
           <div class="support-chat__welcome-icon"><app-icon name="support" [size]="26" /></div>
-          <span class="support-chat__welcome-eyebrow">{{ 'support.agentName' | translate }}</span>
+          <span class="support-chat__welcome-eyebrow">{{ 'support.assistantName' | translate }}</span>
           <h2>{{ 'support.welcomeTitle' | translate }}</h2>
           <p>{{ 'support.welcomeDescription' | translate }}</p>
           <div class="support-chat__welcome-suggestions">

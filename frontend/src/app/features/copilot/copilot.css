@@ -90,13 +90,83 @@
 }
 
 .copilot-chat__identity-text strong {
+  overflow: hidden;
   font-size: var(--mb-font-size-sm);
   color: var(--mb-text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Săgeata REALĂ (iconiță, nu doar caracterul "→" din text) — vezi
+   support.css::.support-chat__identity-breadcrumb, aceeași idee, oglindită
+   aici (MaestroAssistent e neambiguu din prima, deci breadcrumb-ul e mereu
+   vizibil, nu condiționat ca la Support). */
+.copilot-chat__identity-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.copilot-chat__identity-breadcrumb app-icon {
+  flex-shrink: 0;
+  color: var(--mb-blue-500);
 }
 
 .copilot-chat__identity-text span {
+  overflow: hidden;
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Grupează "Înapoi la Asistent" + dropdown-ul de conversații ca un singur
+   bloc în dreapta — .copilot-chat__bar rămâne space-between între 2 copii
+   (identitate | acest grup), nu 3, altfel butonul nou s-ar înghesui la
+   mijloc, între identitate și conversații. */
+.copilot-chat__bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  flex: 0 0 auto;
+}
+
+.copilot-chat__back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--mb-border-strong);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  font: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--mb-transition-fast), background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.copilot-chat__back-btn app-icon {
+  flex-shrink: 0;
+  color: var(--mb-text-tertiary);
+}
+
+.copilot-chat__back-btn:hover {
+  border-color: var(--mb-blue-500);
+  background: var(--mb-surface);
+  color: var(--mb-text-primary);
+}
+
+@media (max-width: 640px) {
+  /* Pe ecrane mici, doar iconița — textul "Înapoi la Asistent" ar înghesui
+     titlul conversației din dropdown-ul de alături. */
+  .copilot-chat__back-btn span {
+    display: none;
+  }
 }
 
 .copilot-chat__conversations {

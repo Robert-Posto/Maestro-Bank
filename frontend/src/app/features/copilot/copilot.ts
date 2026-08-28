@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { AiCopilotService, ConversationDetail, ConversationSummary, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
@@ -19,15 +20,9 @@ const SUGGESTED_QUESTION_KEYS = ['copilot.suggestedQ1', 'copilot.suggestedQ2', '
 
 /** Cuvinte care se rotesc cât timp agentul lucrează — stil Claude
  * ("Pondering...", "Noodling..."): jocuri de cuvinte, nu descrieri reale a
- * ce face agentul în spate. */
-const THINKING_WORDS = [
-  'Maestroing',
-  'Bănuind',
-  'Cifrometrând',
-  'Leuind',
-  'Buzunărind',
-  'Chibzuind',
-];
+ * ce face agentul în spate. Set pe limbă (vezi `thinkingWords()`). */
+const THINKING_WORDS_RO = ['Maestroing', 'Bănuind', 'Cifrometrând', 'Leuind', 'Buzunărind', 'Chibzuind'];
+const THINKING_WORDS_EN = ['Maestroing', 'Pondering', 'Number-crunching', 'Tallying', 'Rummaging', 'Mulling'];
 
 type PendingActionState = 'pending' | 'confirming' | 'done' | 'cancelled' | 'error';
 
@@ -69,6 +64,8 @@ export class Copilot implements OnInit, OnDestroy {
   protected readonly speech = inject(SpeechService);
   private readonly language = inject(LanguageService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
   private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
@@ -83,16 +80,21 @@ export class Copilot implements OnInit, OnDestroy {
   protected readonly conversations = signal<ConversationSummary[]>([]);
   protected readonly activeConversationId = signal<string | null>(null);
   protected readonly conversationsMenuOpen = signal(false);
-  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
+  protected readonly thinkingWord = signal(THINKING_WORDS_RO[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
   private thinkingWordTimer?: ReturnType<typeof setInterval>;
+
+  /** Setul de cuvinte "gândește" pentru limba activă. */
+  private thinkingWords(): string[] {
+    return this.language.language() === 'en' ? THINKING_WORDS_EN : THINKING_WORDS_RO;
+  }
 
   /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
    * copilot.html header-ul chat-ului. */
   protected readonly activeConversationTitle = computed(() => {
     const id = this.activeConversationId();
-    if (!id) return 'Conversație nouă';
-    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+    if (!id) return this.language.t('copilot.newConversation');
+    return this.conversations().find((c) => c.id === id)?.title ?? this.language.t('copilot.newConversation');
   });
 
   /** Ultimul răspuns reușit — alimentează "Context financiar" din sidebar,
@@ -117,6 +119,19 @@ export class Copilot implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadConversations();
+
+    // Auto-trimite o întrebare venită prin hand-off de la Support (vezi
+    // support.ts::askAgent, care clasifică primul mesaj al unei conversații
+    // noi) — userul a scris-o o singură dată acolo, n-o retastează aici.
+    // Curățăm query param-ul imediat, ca un refresh al paginii să nu
+    // retrimită aceeași întrebare. Anunțăm explicit redirecționarea, ca
+    // userul să nu creadă că a nimerit din greșeală pe altă pagină.
+    const presetQuestion = this.route.snapshot.queryParamMap.get('q');
+    if (presetQuestion) {
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      this.toast.info(this.language.t('copilot.redirectedFromSupport'));
+      this.ask(presetQuestion);
+    }
   }
 
   ngOnDestroy(): void {
@@ -152,6 +167,18 @@ export class Copilot implements OnInit, OnDestroy {
     this.chatMessages.set([]);
   }
 
+  /** Buton "Înapoi la Asistent" din header — pentru un user ajuns aici prin
+   * redirecționare automată (vezi support.ts::askAgent) care vrea de fapt
+   * să pună o întrebare complet diferită (alt domeniu, nu buget/prognoză).
+   * Trimite explicit query param "fresh" (citit în support.ts::ngOnInit),
+   * ca acolo să pornească o conversație nouă — altfel prima întrebare ar
+   * continua o conversație veche, care nu se mai reclasifică (vezi
+   * askAgent, clasificarea rulează doar la prima tură a unei conversații
+   * NOI), și userul ar rămâne "blocat" pe Support chiar dacă vrea alt agent. */
+  protected backToMainAgent(): void {
+    this.router.navigate(['/app/support'], { queryParams: { fresh: '1' } });
+  }
+
   protected openConversation(id: string): void {
     this.conversationsMenuOpen.set(false);
     if (id === this.activeConversationId()) return;
@@ -175,7 +202,7 @@ export class Copilot implements OnInit, OnDestroy {
           })),
         );
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut încărca conversația.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('copilot.loadConversationError'))),
     });
   }
 
@@ -186,7 +213,7 @@ export class Copilot implements OnInit, OnDestroy {
         this.conversations.update((list) => list.filter((c) => c.id !== id));
         if (this.activeConversationId() === id) this.startNewConversation();
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut șterge conversația.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('copilot.deleteConversationError'))),
     });
   }
 
@@ -272,10 +299,11 @@ export class Copilot implements OnInit, OnDestroy {
    * cuvânt nou, mereu diferit de cel curent, la fiecare ~1.8s cât timp
    * așteptăm răspunsul. */
   private startThinkingWords(): void {
-    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    const words = this.thinkingWords();
+    this.thinkingWord.set(words[Math.floor(Math.random() * words.length)]);
     this.thinkingWordTimer = setInterval(() => {
       this.thinkingWord.update((current) => {
-        const options = THINKING_WORDS.filter((w) => w !== current);
+        const options = this.thinkingWords().filter((w) => w !== current);
         return options[Math.floor(Math.random() * options.length)];
       });
     }, 1800);

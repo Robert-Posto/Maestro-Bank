@@ -20,6 +20,7 @@ export const NAV_I18N: Record<string, TranslationEntry> = {
   'nav.forecast': { ro: 'Spending & Forecast', en: 'Spending & Forecast' },
   'nav.copilot': { ro: 'MaestroAgent', en: 'MaestroAgent' },
   'nav.support': { ro: 'Support', en: 'Support' },
+  'nav.assistant': { ro: 'Asistent', en: 'Assistant' },
 
   'topbar.search': { ro: 'Caută tranzacții, comercianți, categorii...', en: 'Search transactions, merchants, categories...' },
   'topbar.newTransaction': { ro: 'Tranzacție nouă', en: 'New transaction' },
