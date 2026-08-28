@@ -52,26 +52,20 @@ const NAV_GROUPS: NavGroup[] = [
     // ăsta ieșea în evidență ca "orfan" față de restul, inconsecvent
     // vizual, deși cele două intrări sunt deja rudă (ambele agenți AI
     // găzduiți de ai-orchestrator-service).
-    label: 'Asistenți AI',
+    label: 'Asistent AI',
     highlight: true,
     items: [
-      // Asistent — orchestrator SUBȚIRE (vezi features/assistant), NU un al
-      // treilea agent: clasifică o întrebare nouă și trimite userul direct
-      // la MaestroAgent sau Support, cu mesajul deja "pus" acolo. Primul în
-      // listă — e intrarea recomandată acum, dar MaestroAgent/Support rămân
-      // exact cum erau, complet neatinse, pentru cine vrea direct pe unul.
-      { label: 'Asistent', route: '/app/assistant', icon: 'sparkles' },
-      // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
-      // Spending + Forecast, peste GPT-5-mini), deci e o intrare normală
-      // de navigare, ca oricare alta — NU mai e un card promo în footer.
-      // Fără tratament vizual distinct (gradient/border/glow) — userul l-a
-      // vrut eliminat, arăta ca un element rupt/inconsecvent față de restul
-      // sidebar-ului. Fără insignă "AI" — Support e la fel de mult un
-      // agent AI și nu are una, deci ar fi inconsecvent să aibă doar
-      // MaestroAgent; grupul ("Asistenți AI") spune deja asta o dată,
-      // pentru amândouă, nu are nevoie s-o repete per-element.
-      { label: 'MaestroAgent', route: '/app/copilot', icon: 'copilot' },
-      { label: 'Support', route: '/app/support', icon: 'support' },
+      // O SINGURĂ intrare vizibilă (nu mai există pagină separată de
+      // "orchestrator" — userul a cerut explicit s-o eliminăm, era
+      // redundantă). Ajunge pe pagina Support (deja cel mai larg domeniu,
+      // catch-all), care clasifică EA ÎNSĂȘI primul mesaj al unei
+      // conversații noi (vezi support.ts::askAgent) — dacă ține de fapt de
+      // buget/prognoză, te trimite automat spre MaestroAgent, cu întrebarea
+      // deja pusă (query param "q", citit în copilot.ts::ngOnInit).
+      // MaestroAgent (/app/copilot) rămâne o rută validă, funcțională, doar
+      // nu mai are link direct în sidebar — se ajunge la el DOAR prin acest
+      // hand-off automat.
+      { label: 'Asistent', route: '/app/support', icon: 'sparkles' },
     ],
   },
   // Profil & Securitate și Ieși din cont NU sunt aici — trăiesc doar în

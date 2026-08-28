@@ -11,6 +11,7 @@ import {
   ConversationDetail,
   ConversationSummary,
 } from '../../services/ai-support.service';
+import { AssistantService } from '../../services/assistant.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
@@ -119,6 +120,7 @@ function formatChatTime(date: Date): string {
 export class Support implements OnInit, OnDestroy {
   private readonly supportApi = inject(SupportService);
   private readonly aiSupport = inject(AiSupportService);
+  private readonly assistant = inject(AssistantService);
   protected readonly speech = inject(SpeechService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -175,15 +177,6 @@ export class Support implements OnInit, OnDestroy {
     const presetCategory = this.route.snapshot.queryParamMap.get('category') as TicketCategory | null;
     if (presetCategory) this.category.set(presetCategory);
     if (shouldOpen) this.openModal();
-
-    // Auto-trimite o întrebare venită din pagina "Asistent" (orchestrator
-    // subțire, vezi features/assistant) — vezi Copilot::ngOnInit, același
-    // motiv (userul a scris-o o singură dată acolo, n-o retastează aici).
-    const presetQuestion = this.route.snapshot.queryParamMap.get('q');
-    if (presetQuestion) {
-      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
-      this.askAgent(presetQuestion);
-    }
   }
 
   ngOnDestroy(): void {
@@ -320,6 +313,33 @@ export class Support implements OnInit, OnDestroy {
   private askAgent(text: string): void {
     if (!text || this.supportTyping()) return;
 
+    // Support e singura intrare vizibilă în sidebar acum ("Asistent") — la
+    // PRIMUL mesaj al unei conversații noi (nu la fiecare tur), verificăm
+    // dacă întrebarea ține de fapt de MaestroAgent (buget/prognoză/
+    // economii/abonamente, vezi intent_router.py din backend) și, dacă da,
+    // trimitem userul direct acolo, cu întrebarea deja "pusă" (query param
+    // "q", citit în Copilot::ngOnInit) — nu o retastează. Turele următoare
+    // din ACEEAȘI conversație nu se reclasifică — rămân aici, cu Support.
+    if (!this.activeConversationId() && !this.pendingAction()) {
+      this.assistant.classify(text).subscribe({
+        next: (result) => {
+          if (result.agent === 'spending_forecast') {
+            this.router.navigate([result.route], { queryParams: { q: text } });
+          } else {
+            this.sendToSupportAgent(text);
+          }
+        },
+        // Clasificarea eșuată (ex. serviciul indisponibil) NU trebuie să
+        // blocheze conversația — Support e deja domeniul implicit/catch-all.
+        error: () => this.sendToSupportAgent(text),
+      });
+      return;
+    }
+
+    this.sendToSupportAgent(text);
+  }
+
+  private sendToSupportAgent(text: string): void {
     const pending = this.pendingAction();
     this.pendingAction.set(null);
 
