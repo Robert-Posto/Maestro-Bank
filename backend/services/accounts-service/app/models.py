@@ -300,9 +300,10 @@ class BeneficiaryOut(BaseModel):
 
 class PocketCreateRequest(BaseModel):
     """POST /pockets — creează un obiectiv nou de economisire ("Vacanță",
-    "Fond urgențe"). Banii alocați rămân în contul RON al userului (NU se
-    mută pe alt IBAN) — un "pocket" e doar o rezervare/etichetare a unei
-    părți din sold, ca la Revolut Vaults / N26 Spaces."""
+    "Fond urgențe"). Alocarea către un obiectiv DEBITEAZĂ soldul contului
+    curent RON (retragerea îl creditează la loc) — un "pocket" e un
+    "sub-cont" logic al contului curent, fără IBAN propriu, ca la Revolut
+    Vaults / N26 Spaces (care mută la fel soldul lichid)."""
 
     name: str = Field(min_length=1, max_length=60)
     target_minor: int = Field(gt=0, le=1_000_000_000)  # cap defensiv: max 10.000.000,00 RON

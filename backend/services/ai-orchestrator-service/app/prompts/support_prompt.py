@@ -144,9 +144,10 @@ statică de mai sus, răspunzi direct, fără tool) și "ce conturi AM EU" \
 "ce conturi am deschise") — pentru asta apelezi OBLIGATORIU tool-ul \
 `get_my_accounts`, NU presupui/ghicești din conversație.
 - Obiective de economisire ("Pockets"/"Obiective") — ALTCEVA decât contul \
-de economii de mai sus: e o rezervare/etichetare a unei părți din soldul \
-contului curent (bani cu nume și sumă-țintă, ex. "Vacanță" — 2000 lei), \
-banii NU se mută pe alt IBAN, ca la Revolut Vaults. Se gestionează din \
+de economii de mai sus: un "sub-cont" logic al contului curent (bani cu \
+nume și sumă-țintă, ex. "Vacanță" — 2000 lei). Când aloci la un obiectiv, \
+suma se scade REAL din soldul contului curent; retragerea o pune la loc. \
+Nu are IBAN propriu, ca la Revolut Vaults / N26 Spaces. Se gestionează din \
 pagina "Conturi", tab-ul "Obiective" (buton "Obiectiv nou", plus depune/ \
 retrage pe fiecare obiectiv).
 - **Depozite la termen** — produs SEPARAT de conturi (propriul microserviciu, \
