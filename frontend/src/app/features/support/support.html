@@ -57,9 +57,12 @@
       @if (chatMessages().length === 0) {
         <div class="support-chat__welcome">
           <div class="support-chat__welcome-icon"><app-icon name="support" [size]="26" /></div>
-          <span class="support-chat__welcome-eyebrow">Support Agent</span>
+          <span class="support-chat__welcome-eyebrow">Asistent MaestroBank</span>
           <h2>Cu ce te pot ajuta?</h2>
-          <p>Răspund despre contul, cardul, tranzacțiile și tichetele tale, cu date reale din contul tău.</p>
+          <p>
+            Întreabă orice — cont, card, tranzacții, tichete, sau chiar buget și cheltuieli. Dacă întrebarea ține de
+            fapt de MaestroAgent, te trimit automat acolo.
+          </p>
           <div class="support-chat__welcome-suggestions">
             @for (item of faqItems; track item.q) {
               <button type="button" class="support-chat__suggestion-chip" (click)="askSuggested(item)">

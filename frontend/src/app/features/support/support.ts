@@ -69,6 +69,12 @@ const FAQ_ITEMS = [
   { q: 'Cum fac un transfer?', a: 'Din Plăți & Transferuri, completează IBAN-ul destinație și suma, apoi confirmă.' },
   { q: 'De ce nu apare o tranzacție?', a: 'Tranzacțiile apar imediat după procesare. Reîmprospătează pagina Tranzacții.' },
   { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
+  // Astea două țin de fapt de MaestroAgent (buget/prognoză), nu de Support
+  // — apar aici intenționat, ca userul să vadă din prima că poate întreba
+  // orice, indiferent de agent, și e redirecționat automat (vezi askAgent
+  // mai jos, care clasifică primul mesaj al unei conversații noi).
+  { q: 'Îmi permit o vacanță de 2.000 lei luna asta?', a: 'Îți spune MaestroAgent, din prognoza ta reală de cheltuieli.' },
+  { q: 'Cât am cheltuit luna asta?', a: 'Îți spune MaestroAgent, din analiza ta reală de cheltuieli.' },
 ];
 
 /** Cuvinte care se rotesc cât timp agentul lucrează — vezi

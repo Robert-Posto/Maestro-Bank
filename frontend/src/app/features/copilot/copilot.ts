@@ -121,13 +121,16 @@ export class Copilot implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadConversations();
 
-    // Auto-trimite o întrebare venită din pagina "Asistent" (orchestrator
-    // subțire, vezi features/assistant) — userul a scris-o o singură dată
-    // acolo, n-o retastează aici. Curățăm query param-ul imediat, ca un
-    // refresh al paginii să nu retrimită aceeași întrebare.
+    // Auto-trimite o întrebare venită prin hand-off de la Support (vezi
+    // support.ts::askAgent, care clasifică primul mesaj al unei conversații
+    // noi) — userul a scris-o o singură dată acolo, n-o retastează aici.
+    // Curățăm query param-ul imediat, ca un refresh al paginii să nu
+    // retrimită aceeași întrebare. Anunțăm explicit redirecționarea, ca
+    // userul să nu creadă că a nimerit din greșeală pe altă pagină.
     const presetQuestion = this.route.snapshot.queryParamMap.get('q');
     if (presetQuestion) {
       this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      this.toast.info('Te-am adus la MaestroAgent — întrebarea ta ține de buget/prognoză.');
       this.ask(presetQuestion);
     }
   }
