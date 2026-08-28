@@ -8,11 +8,13 @@ import {
   SpendingAnalytics,
   TransactionsService,
 } from '../../services/transactions.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatCard } from '../../shared/components/stat-card/stat-card';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { categoryColorVar, categoryLabel } from '../../shared/categories';
 import { daysUntilBillingLabel } from '../../shared/subscription-display';
 
@@ -40,16 +42,20 @@ interface LinePoint {
 @Component({
   selector: 'app-spending-forecast',
   standalone: true,
-  imports: [PageHeader, StatCard, LoadingSkeleton, EmptyState, MoneyPipe, DecimalPipe],
+  imports: [PageHeader, StatCard, LoadingSkeleton, EmptyState, MoneyPipe, DecimalPipe, TranslatePipe],
   templateUrl: './spending-forecast.html',
   styleUrl: './spending-forecast.css',
 })
 export class SpendingForecast implements OnInit {
   private readonly transactionsApi = inject(TransactionsService);
+  private readonly language = inject(LanguageService);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
+
+  protected daysUntilBillingLabel(billingDay: number): string {
+    return daysUntilBillingLabel(billingDay, this.language.language());
+  }
 
   protected readonly spending = signal<SpendingAnalytics | null>(null);
   protected readonly cashFlow = signal<CashFlowAnalytics | null>(null);
@@ -57,11 +63,12 @@ export class SpendingForecast implements OnInit {
 
   protected readonly categoryBars = computed<CategoryBar[]>(() => {
     const data = this.spending();
+    const language = this.language.language();
     if (!data || data.by_category.length === 0) return [];
     const max = Math.max(...data.by_category.map((c) => c.amount_minor), 1);
     return data.by_category.map((c) => ({
       category: c.category,
-      label: categoryLabel(c.category),
+      label: categoryLabel(c.category, language),
       amountMinor: c.amount_minor,
       percentage: Math.round((c.amount_minor / max) * 100),
       colorVar: categoryColorVar(c.category),
@@ -89,7 +96,7 @@ export class SpendingForecast implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Nu am putut încărca analiza cheltuielilor.');
+        this.error.set(this.language.t('forecast.loadError'));
         this.loading.set(false);
       },
     });

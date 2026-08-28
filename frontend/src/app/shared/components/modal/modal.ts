@@ -1,15 +1,18 @@
 import { Component, HostListener, input, output } from '@angular/core';
 
+import { TranslatePipe } from '../../pipes/translate.pipe';
+
 /** Overlay generic reutilizabil — folosit de ConfirmDialog și de orice formular modal (ex. Add beneficiary). */
 @Component({
   selector: 'app-modal',
   standalone: true,
+  imports: [TranslatePipe],
   template: `
     <div class="modal-backdrop" (click)="closed.emit()">
       <div class="modal-panel" [style.maxWidth.px]="maxWidth()" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>{{ title() }}</h3>
-          <button type="button" class="modal-close" aria-label="Închide" (click)="closed.emit()">×</button>
+          <button type="button" class="modal-close" [attr.aria-label]="'common.close' | translate" (click)="closed.emit()">×</button>
         </div>
         <div class="modal-body">
           <ng-content />

@@ -26,6 +26,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.database import close_database_connection, ping_database
+from app.i18n import LanguageMiddleware
 from app.routers.assistant import router as assistant_router
 from app.routers.speech import router as speech_router
 from app.routers.spending_forecast import router as spending_forecast_router
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank AI Orchestrator Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 
 
 @app.get("/health")

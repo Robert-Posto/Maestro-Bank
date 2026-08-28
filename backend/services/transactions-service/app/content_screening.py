@@ -41,6 +41,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from app.i18n import translate
+
 # Rădăcini de cuvinte/expresii, NU forme flexionate complete — regexul de
 # mai jos adaugă `\w*` DUPĂ fiecare rădăcină, ca să prindă și flexiunile
 # uzuale, fără o listă infinită. Scrise FĂRĂ diacritice — matching-ul se
@@ -640,7 +642,4 @@ def screen_description(description: str) -> str | None:
     dacă transferul chiar s-a întâmplat sau doar scrie încă."""
     if not description or not _FLAGGED_TERM_PATTERN.search(_normalize(description)):
         return None
-    return (
-        "Descrierea conține termeni asociați cu activități ilegale/violente. "
-        "Te rugăm să reformulezi dacă a fost o confuzie."
-    )
+    return translate("contentWarningMessage")

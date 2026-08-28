@@ -1,5 +1,6 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 
+import { LanguageService } from '../../../services/language.service';
 import { Icon } from '../icon/icon';
 
 export interface SwipeDeckCard {
@@ -27,7 +28,7 @@ export interface SwipeDeckCard {
   template: `
     <div class="deck-panel">
       <div class="card-deck" tabindex="0" (keydown.arrowleft)="prev()" (keydown.arrowright)="next()">
-        <button type="button" class="card-deck__nav" aria-label="Cardul anterior" (click)="prev()">
+        <button type="button" class="card-deck__nav" [attr.aria-label]="language.t('common.previousCard')" (click)="prev()">
           <app-icon name="chevron-left" [size]="18" />
         </button>
 
@@ -53,7 +54,7 @@ export interface SwipeDeckCard {
           </div>
         </div>
 
-        <button type="button" class="card-deck__nav" aria-label="Cardul următor" (click)="next()">
+        <button type="button" class="card-deck__nav" [attr.aria-label]="language.t('common.nextCard')" (click)="next()">
           <app-icon name="chevron-right" [size]="18" />
         </button>
       </div>
@@ -64,7 +65,7 @@ export interface SwipeDeckCard {
             type="button"
             class="card-deck__dot"
             [class.card-deck__dot--active]="activeIndex() === i"
-            [attr.aria-label]="'Cardul ' + (i + 1)"
+            [attr.aria-label]="language.t('common.goToCard').replace('{n}', (i + 1) + '')"
             (click)="goTo(i)"
           ></button>
         }
@@ -255,6 +256,8 @@ export interface SwipeDeckCard {
   ],
 })
 export class SwipeCardDeck {
+  protected readonly language = inject(LanguageService);
+
   readonly cards = input.required<SwipeDeckCard[]>();
   readonly note = input<string>('');
 

@@ -1,3 +1,5 @@
+import { Language } from '../services/language.service';
+
 /**
  * Zile rămase până la următoarea facturare a unui abonament, plecând de la
  * ziua lunii (billing_day, 1-31 — vezi Subscription în budgets.service.ts).
@@ -24,13 +26,18 @@ export function daysUntilBilling(billingDay: number, from: Date = new Date()): n
 }
 
 /** Etichetă gata de afișat pentru un număr de zile rămase: "Astăzi", "Mâine" sau "În N zile". */
-export function daysRemainingLabel(days: number): string {
+export function daysRemainingLabel(days: number, language: Language = 'ro'): string {
+  if (language === 'en') {
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    return `In ${days} days`;
+  }
   if (days === 0) return 'Astăzi';
   if (days === 1) return 'Mâine';
   return `În ${days} zile`;
 }
 
 /** Etichetă gata de afișat pentru un abonament: "Astăzi", "Mâine" sau "În N zile". */
-export function daysUntilBillingLabel(billingDay: number, from: Date = new Date()): string {
-  return daysRemainingLabel(daysUntilBilling(billingDay, from));
+export function daysUntilBillingLabel(billingDay: number, language: Language = 'ro', from: Date = new Date()): string {
+  return daysRemainingLabel(daysUntilBilling(billingDay, from), language);
 }

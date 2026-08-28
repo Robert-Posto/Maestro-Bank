@@ -39,6 +39,7 @@ from app.models import (
     WheelSegmentOut,
     WheelSpinOut,
 )
+from app.i18n import localized, translate
 from app.rewards_catalog import REWARDS_CATALOG, get_reward
 from app.welcome_bonus import WELCOME_BONUS_POINTS
 from app.wheel_segments import REFERENCE_WAGER, WHEEL_SEGMENTS
@@ -54,27 +55,37 @@ async def _get_current_account(user_id: str) -> dict:
             )
         except httpx.RequestError as exc:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
             ) from exc
     if response.status_code == 404:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu am găsit contul tău curent.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("currentAccountNotFound"))
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
     return response.json()
 
 
-async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
+async def _notify_user(
+    user_id: str, kind: str, message_key: str, message_params: dict | None = None, reference_id: str | None = None
+) -> None:
     """Trimite o notificare persistentă către support-service. Best-effort —
     NU blochează și NU eșuează operația principală dacă support-service e
-    indisponibil, la fel ca _notify_user din transactions-service. Folosită
-    DOAR la răscumpărare recompensă / câștig la roată — NU la fiecare câștig
-    de puncte (ar spama userul la fiecare cumpărătură, decizie confirmată în
-    design)."""
+    indisponibil, la fel ca _notify_user din transactions-service.
+
+    Trimite `message_key` + `message_params` (valori BRUTE) — support-service
+    randează textul în limba CITITORULUI la fiecare citire (vezi
+    support-service/app/i18n.py::render_notification), deci notificarea își
+    schimbă limba la comutarea comutatorului, retroactiv."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id},
+                json={
+                    "user_id": user_id,
+                    "kind": kind,
+                    "message_key": message_key,
+                    "message_params": message_params or {},
+                    "reference_id": reference_id,
+                },
             )
     except httpx.HTTPError:
         logger.warning("points-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
@@ -89,10 +100,10 @@ async def _credit_account(account_id: str, amount_minor: int) -> None:
             )
         except httpx.RequestError as exc:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
             ) from exc
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la creditarea contului.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountCreditError"))
 
 
 async def _balance(user_id: str) -> int:
@@ -194,7 +205,7 @@ async def claim_welcome_bonus(user_id: str) -> ClaimWelcomeBonusOut:
     mic, o singură dată în viața contului), nu justifică o soluție mai
     complexă."""
     if await _has_claimed_welcome_bonus(user_id):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ai revendicat deja bonusul de bun-venit.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("welcomeBonusAlreadyClaimed"))
 
     await _insert_entry(user_id=user_id, entry_type="welcome_bonus", points_delta=WELCOME_BONUS_POINTS)
     new_balance = await _balance(user_id)
@@ -202,7 +213,8 @@ async def claim_welcome_bonus(user_id: str) -> ClaimWelcomeBonusOut:
     await _notify_user(
         user_id,
         "welcome_bonus_claimed",
-        f"Ai primit {WELCOME_BONUS_POINTS} puncte de bun-venit — le poți folosi direct pentru o recompensă.",
+        "welcomeBonus",
+        {"points": WELCOME_BONUS_POINTS},
     )
     return ClaimWelcomeBonusOut(new_balance=new_balance, points_awarded=WELCOME_BONUS_POINTS)
 
@@ -212,8 +224,8 @@ async def list_rewards(user_id: str) -> list[RewardOut]:
     return [
         RewardOut(
             id=reward["id"],
-            title=reward["title"],
-            description=reward["description"],
+            title=localized(reward, "title"),
+            description=localized(reward, "description"),
             cost_points=reward["cost_points"],
             reward_value_minor=reward["reward_value_minor"],
             affordable=balance >= reward["cost_points"],
@@ -225,12 +237,12 @@ async def list_rewards(user_id: str) -> list[RewardOut]:
 async def redeem_reward(user_id: str, reward_id: str) -> RedeemRewardOut:
     reward = get_reward(reward_id)
     if reward is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recompensă inexistentă.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("rewardNotFound"))
 
     balance = await _balance(user_id)
     if balance < reward["cost_points"]:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Nu ai suficiente puncte pentru această recompensă."
+            status_code=status.HTTP_409_CONFLICT, detail=translate("notEnoughPointsForReward")
         )
 
     account = await _get_current_account(user_id)
@@ -252,7 +264,12 @@ async def redeem_reward(user_id: str, reward_id: str) -> RedeemRewardOut:
     await _notify_user(
         user_id,
         "reward_redeemed",
-        f"Ai răscumpărat \"{reward['title']}\" — {reward['reward_value_minor'] / 100:.2f} lei creditați în cont.",
+        "rewardRedeemed",
+        {
+            "title_ro": reward["title"],
+            "title_en": reward.get("title_en", reward["title"]),
+            "amount_minor": reward["reward_value_minor"],
+        },
     )
     return RedeemRewardOut(
         new_balance=new_balance, ron_credited_minor=reward["reward_value_minor"], account_id=account["id"]
@@ -261,7 +278,7 @@ async def redeem_reward(user_id: str, reward_id: str) -> RedeemRewardOut:
 
 def list_wheel_segments() -> list[WheelSegmentOut]:
     return [
-        WheelSegmentOut(id=s["id"], label=s["label"], reward_value_minor=s.get("reward_value_minor"))
+        WheelSegmentOut(id=s["id"], label=localized(s, "label"), reward_value_minor=s.get("reward_value_minor"))
         for s in WHEEL_SEGMENTS
     ]
 
@@ -280,7 +297,7 @@ def _pick_weighted_segment(wagered_points: int) -> dict:
 async def spin_wheel(user_id: str, wagered_points: int) -> WheelSpinOut:
     balance = await _balance(user_id)
     if wagered_points > balance:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nu ai suficiente puncte pentru acest pariu.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("notEnoughPointsForWager"))
 
     spin_id = str(uuid.uuid4())
     # Pariul se scade IMEDIAT, indiferent de rezultat — e costul biletului,
@@ -309,7 +326,8 @@ async def spin_wheel(user_id: str, wagered_points: int) -> WheelSpinOut:
         await _notify_user(
             user_id,
             "raffle_win",
-            f"Ai câștigat {ron_credited_minor / 100:.2f} lei la roata norocului!",
+            "wheelWin",
+            {"amount_minor": ron_credited_minor},
             reference_id=spin_id,
         )
 
@@ -323,7 +341,7 @@ async def spin_wheel(user_id: str, wagered_points: int) -> WheelSpinOut:
     )
     return WheelSpinOut(
         winning_segment_id=winning_segment["id"],
-        winning_label=winning_segment["label"],
+        winning_label=localized(winning_segment, "label"),
         new_balance=new_balance,
         ron_credited_minor=ron_credited_minor,
         spin_id=spin_id,

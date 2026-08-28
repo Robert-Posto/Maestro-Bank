@@ -1,18 +1,18 @@
-<app-page-header title="Documente de semnat" subtitle="Trimite documente (PDF) clienților pentru semnare virtuală — vezi statusul mai jos.">
+<app-page-header [title]="'staffDocuments.title' | translate" [subtitle]="'staffDocuments.subtitle' | translate">
   <app-action-button variant="secondary" (pressed)="load()">
-    <app-icon name="reload" [size]="16" /> Reîmprospătează
+    <app-icon name="reload" [size]="16" /> {{ 'common.refresh' | translate }}
   </app-action-button>
   <app-action-button variant="primary" (pressed)="openSend()">
-    <app-icon name="plus" [size]="16" /> Trimite document
+    <app-icon name="plus" [size]="16" /> {{ 'staffDocuments.sendDocument' | translate }}
   </app-action-button>
 </app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="4" [height]="64" [gap]="12" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca documentele" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'staffDocuments.loadErrorTitle' | translate" [description]="error()!" />
 } @else if (documents().length === 0) {
-  <app-empty-state icon="receipt" title="Niciun document trimis" description="Trimite primul document unui client pentru semnare virtuală." />
+  <app-empty-state icon="receipt" [title]="'staffDocuments.emptyTitle' | translate" [description]="'staffDocuments.emptyDescription' | translate" />
 } @else {
   <div class="documents-list">
     @for (doc of documents(); track doc.id) {
@@ -32,7 +32,7 @@
 
         @if (doc.status === 'pending') {
           <app-action-button variant="danger" (pressed)="askCancel(doc)">
-            <app-icon name="close" [size]="15" /> Anulează
+            <app-icon name="close" [size]="15" /> {{ 'common.cancel' | translate }}
           </app-action-button>
         }
       </div>
@@ -41,16 +41,16 @@
 }
 
 @if (sendOpen()) {
-  <app-modal title="Trimite document" [maxWidth]="480" (closed)="closeSend()">
+  <app-modal [title]="'staffDocuments.sendDocument' | translate" [maxWidth]="480" (closed)="closeSend()">
     <form class="send-form" (ngSubmit)="submitSend()">
       <label class="send-form__field">
-        <span>Client</span>
+        <span>{{ 'staffDocuments.customerLabel' | translate }}</span>
         <input
           type="text"
           name="customerQuery"
           [ngModel]="customerQuery()"
           (ngModelChange)="onCustomerQueryChange($event)"
-          placeholder="Nume sau email..."
+          [placeholder]="'staffDocuments.customerPlaceholder' | translate"
           autocomplete="off"
         />
         @if (customerResults().length > 0) {
@@ -66,18 +66,18 @@
       </label>
 
       <label class="send-form__field">
-        <span>Titlu document</span>
+        <span>{{ 'staffDocuments.titleLabel' | translate }}</span>
         <input
           type="text"
           name="title"
           [ngModel]="titleInput()"
           (ngModelChange)="titleInput.set($event)"
-          placeholder="Ex: Contract de credit"
+          [placeholder]="'staffDocuments.titlePlaceholder' | translate"
         />
       </label>
 
       <label class="send-form__field">
-        <span>Fișier PDF (max 5MB)</span>
+        <span>{{ 'staffDocuments.fileLabel' | translate }}</span>
         <input type="file" name="pdfFile" accept="application/pdf" (change)="onFileSelected($event)" />
         @if (fileName()) {
           <span class="send-form__filename"><app-icon name="check" [size]="13" /> {{ fileName() }}</span>
@@ -89,8 +89,8 @@
       }
 
       <div class="send-form__actions">
-        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeSend()">Anulează</app-action-button>
-        <app-action-button type="submit" variant="primary" [loading]="saving()">Trimite</app-action-button>
+        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeSend()">{{ 'common.cancel' | translate }}</app-action-button>
+        <app-action-button type="submit" variant="primary" [loading]="saving()">{{ 'staffDocuments.send' | translate }}</app-action-button>
       </div>
     </form>
   </app-modal>
@@ -98,9 +98,9 @@
 
 @if (pendingCancel(); as doc) {
   <app-confirm-dialog
-    title="Anulezi documentul?"
-    [message]="'Clientul (' + doc.customer_name + ') nu va mai putea semna \'' + doc.title + '\'.'"
-    confirmLabel="Anulează documentul"
+    [title]="'staffDocuments.cancelConfirmTitle' | translate"
+    [message]="('staffDocuments.cancelConfirmMessage' | translate).replace('{name}', doc.customer_name).replace('{title}', doc.title)"
+    [confirmLabel]="'staffDocuments.cancelDocumentButton' | translate"
     [danger]="true"
     [loading]="cancelling()"
     (confirmed)="confirmCancel()"

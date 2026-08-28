@@ -22,6 +22,8 @@ import {
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { Select, SelectOption } from '../../shared/components/select/select';
+import { LanguageService } from '../../services/language.service';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 const PAGE_SIZE = 8;
 
@@ -41,6 +43,7 @@ const PAGE_SIZE = 8;
     MerchantAvatar,
     TransactionDetailsPanel,
     Select,
+    TranslatePipe,
   ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.css',
@@ -50,22 +53,26 @@ export class Transactions implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  protected readonly language = inject(LanguageService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected readonly categoryLabel = categoryLabel;
   protected readonly displayName = transactionDisplayName;
 
   /** "Toate categoriile" e opțiunea implicită (value: '') — nu un filtru real. */
-  protected readonly categoryOptions: SelectOption[] = [
-    { value: '', label: 'Toate categoriile' },
-    ...TRANSACTION_CATEGORIES.map((c) => ({ value: c.value, label: c.label, colorVar: c.colorVar })),
-  ];
+  protected readonly categoryOptions = computed<SelectOption[]>(() => {
+    const lang = this.language.language();
+    return [
+      { value: '', label: this.language.t('transactions.allCategories') },
+      ...TRANSACTION_CATEGORIES.map((c) => ({ value: c.value, label: categoryLabel(c.value, lang), colorVar: c.colorVar })),
+    ];
+  });
 
-  protected readonly directionOptions: SelectOption[] = [
-    { value: '', label: 'Toate' },
-    { value: 'incoming', label: 'Încasări' },
-    { value: 'outgoing', label: 'Plăți' },
-  ];
+  protected readonly directionOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.language.t('transactions.allDirections') },
+    { value: 'incoming', label: this.language.t('transactions.incoming') },
+    { value: 'outgoing', label: this.language.t('transactions.outgoing') },
+  ]);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -144,7 +151,7 @@ export class Transactions implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Nu am putut încărca tranzacțiile.');
+        this.error.set(this.language.t('transactions.loadError'));
         this.loading.set(false);
       },
     });
@@ -208,11 +215,11 @@ export class Transactions implements OnInit {
       next: (updated) => {
         this.updateLocal(updated);
         this.recognizing.set(false);
-        this.toast.success('Tranzacție marcată ca recunoscută.');
+        this.toast.success(this.language.t('transactions.markedRecognizedSuccess'));
       },
       error: (err) => {
         this.recognizing.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza tranzacția.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('transactions.updateError')));
       },
     });
   }
@@ -221,15 +228,15 @@ export class Transactions implements OnInit {
     const tx = this.selectedTransaction();
     if (!tx) return;
     this.reporting.set(true);
-    this.transactionsApi.report(tx.id, 'Semnalat de utilizator din aplicație').subscribe({
+    this.transactionsApi.report(tx.id, this.language.t('transactions.reportReasonDefault')).subscribe({
       next: (updated) => {
         this.updateLocal(updated);
         this.reporting.set(false);
-        this.toast.success('Tranzacția a fost raportată echipei de suport.');
+        this.toast.success(this.language.t('transactions.reportSuccess'));
       },
       error: (err) => {
         this.reporting.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut raporta tranzacția.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('transactions.reportError')));
       },
     });
   }
@@ -242,11 +249,11 @@ export class Transactions implements OnInit {
       next: (updated) => {
         this.updateLocal(updated);
         this.cancellingHold.set(false);
-        this.toast.success('Transfer anulat — fondurile au revenit în cont.');
+        this.toast.success(this.language.t('transactions.holdCancelledSuccess'));
       },
       error: (err) => {
         this.cancellingHold.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut anula transferul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('transactions.cancelHoldError')));
       },
     });
   }
@@ -275,11 +282,11 @@ export class Transactions implements OnInit {
         anchor.download = 'maestrobank-tranzactii.csv';
         anchor.click();
         URL.revokeObjectURL(url);
-        this.toast.success('Export CSV generat.');
+        this.toast.success(this.language.t('transactions.exportSuccess'));
       },
       error: (err) => {
         this.exporting.set(false);
-        this.toast.error(extractErrorMessage(err, 'Exportul a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('transactions.exportError')));
       },
     });
   }

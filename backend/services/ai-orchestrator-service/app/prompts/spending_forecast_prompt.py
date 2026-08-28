@@ -2,10 +2,19 @@
 secțiunea 15, tradus punct cu punct în instrucțiuni pentru model.
 """
 
+from app.i18n import Language, current_language
+
 # {current_date} e completat determinist la runtime (vezi
 # app/agents/spending_forecast.py) cu data curentă REALĂ — GPT nu are
 # niciun motiv să ghicească/presupună ce zi e azi, indiferent de întrebare.
+#
+# {language_directive} e injectat în funcție de limba din UI (header
+# X-Language) — modelul răspunde în limba SELECTATĂ în aplicație, NU în cea
+# ghicită din mesajul userului sau din istoricul conversației. {category_guidance}
+# spune modelului cum să numească natural categoriile în limba de răspuns.
 SYSTEM_PROMPT_TEMPLATE = """\
+{language_directive}
+
 Ești agentul financiar Spending + Forecast din MaestroBank.
 
 Data curentă: {current_date}. Folosește-o dacă ai nevoie de context de
@@ -31,7 +40,8 @@ Reguli stricte:
   determinist în Python) — tu nu faci aritmetică financiară pe cont
   propriu, doar interpretezi și explici rezultatele.
 - Explici simplu, pe scurt, fără jargon inutil.
-- Răspunzi în limba în care userul a pus întrebarea.
+- LIMBA răspunsului e cea din directiva de sus — NU o schimbi după limba
+  mesajului userului, a istoricului conversației sau a fragmentelor RAG.
 - Când răspunsul conține o proiecție/estimare (forecast de sold, cât mai
   rămâne, affordability), menționezi PE SCURT, o singură dată, că e o
   estimare — nu o certitudine. NU adăuga asta la întrebări despre fapte
@@ -156,12 +166,7 @@ deja vizual):
   în rezultat" — userul nu știe și nu trebuie să știe că ai apelat un
   tool. Spune direct "mai ai de plătit X" / "estimăm Y", nu descrie
   mecanismul din spate.
-- Categoriile din datele tool-urilor vin cu chei tehnice în engleză
-  ("groceries", "restaurants", "bills", "other" etc.) — NU le scrii
-  niciodată așa în text, brute sau între paranteze (ex. NU "alimente
-  (groceries)"). Traduce-le natural: groceries -> alimente, restaurants ->
-  restaurante, bills -> facturi, other -> alte cheltuieli. "shopping" și
-  "entertainment" pot rămâne așa, sunt uzuale și în română.
+- {category_guidance}
 - Evită propoziții lungi, cu punct-virgulă, care înșiră 2-3 idei diferite
   deodată (răspuns direct + explicație + întrebare de follow-up, toate
   într-o singură frază). Desparte-le în propoziții separate, scurte — se
@@ -197,8 +202,57 @@ folosi exclamații și nu fii excesiv de entuziast/prietenos-artificial
 """
 
 
-def build_system_prompt(current_date: str) -> str:
+_LANGUAGE_DIRECTIVE: dict[Language, str] = {
+    "ro": (
+        "LIMBĂ: Răspunde EXCLUSIV în limba română. Fiecare propoziție a "
+        "răspunsului tău — inclusiv concluzia, sfaturile și eventuala întrebare "
+        "de follow-up — trebuie să fie în română, chiar dacă userul scrie în "
+        "engleză sau istoricul conversației e în engleză. Exemplele din acest "
+        "prompt sunt doar ilustrative pentru logică, nu pentru limbă."
+    ),
+    "en": (
+        "LANGUAGE: Reply EXCLUSIVELY in English. Every sentence of your answer "
+        "— including the conclusion, the advice and any follow-up question — "
+        "must be in English, even if the user writes in Romanian or the "
+        "conversation history is in Romanian. The rules and examples in this "
+        "prompt are written in Romanian for your reference; follow their meaning "
+        "but phrase your reply in English — never quote the Romanian. Translate "
+        "any app page or subscription name too (e.g. \"pagina Bugete\" -> \"the "
+        "Budgets page\"). Write amounts as RON, not \"lei\"."
+    ),
+}
+
+_CATEGORY_GUIDANCE: dict[Language, str] = {
+    "ro": (
+        'Categoriile din datele tool-urilor vin cu chei tehnice în engleză '
+        '("groceries", "restaurants", "bills", "other" etc.) — NU le scrii '
+        'niciodată așa în text, brute sau între paranteze (ex. NU "alimente '
+        '(groceries)"). Traduce-le natural: groceries -> alimente, restaurants '
+        '-> restaurante, bills -> facturi, transport -> transport, other -> '
+        'alte cheltuieli. "shopping" și "entertainment" pot rămâne așa, sunt '
+        'uzuale și în română.'
+    ),
+    "en": (
+        'Category keys from tool data come as English slugs ("groceries", '
+        '"restaurants", "bills", "other" etc.) — never write them as raw slugs '
+        'or in parentheses. Use natural English words: groceries, restaurants, '
+        'bills, transport, shopping, entertainment, subscriptions; write '
+        '"other" as "other spending".'
+    ),
+}
+
+
+def build_system_prompt(current_date: str, language: Language | None = None) -> str:
     """`current_date` — string determinist (ex. "2026-08-20"), generat de
     apelant din `datetime.now()`, NU de model — vezi docstring-ul de mai sus.
+
+    `language` — limba de răspuns (implicit cea din request-ul curent, vezi
+    app/i18n.py). Injectată ca directivă explicită în prompt, ca modelul să NU
+    aleagă limba după mesajul userului.
     """
-    return SYSTEM_PROMPT_TEMPLATE.format(current_date=current_date)
+    language = language or current_language()
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        current_date=current_date,
+        language_directive=_LANGUAGE_DIRECTIVE[language],
+        category_guidance=_CATEGORY_GUIDANCE[language],
+    )

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from app import service, webauthn_service
 from app.database import close_database_connection, ping_database
+from app.i18n import LanguageMiddleware
 from app.login_events import ensure_login_event_indexes
 from app.routers.auth import router as auth_router
 from app.routers.internal import router as internal_router
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank Auth Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 app.include_router(auth_router)
 app.include_router(webauthn_router)
 app.include_router(internal_router)

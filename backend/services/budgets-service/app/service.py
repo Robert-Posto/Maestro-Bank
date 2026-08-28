@@ -16,6 +16,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.database import get_database
+from app.i18n import translate
 from app.models import BudgetCreate, BudgetUpdate, SubscriptionCreate, SubscriptionUpdate
 
 logger = logging.getLogger("budgets-service")
@@ -50,11 +51,11 @@ async def _get_budget_for_user(budget_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(budget_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de buget invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidBudgetId")) from exc
 
     doc = await db.budgets.find_one({"_id": object_id})
     if doc is None or doc["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bugetul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("budgetNotFound"))
     return doc
 
 
@@ -104,11 +105,11 @@ async def _get_subscription_for_user(subscription_id: str, user_id: str) -> dict
     try:
         object_id = ObjectId(subscription_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de abonament invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidSubscriptionId")) from exc
 
     doc = await db.subscriptions.find_one({"_id": object_id})
     if doc is None or doc["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abonamentul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("subscriptionNotFound"))
     return doc
 
 

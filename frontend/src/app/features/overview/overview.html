@@ -1,40 +1,40 @@
 @if (loading()) {
   <app-loading-skeleton [rows]="4" [height]="90" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Ceva nu a mers bine" [description]="error()!">
-    <button type="button" class="overview-retry" (click)="retry()">Reîncearcă</button>
+  <app-empty-state icon="info" [title]="'common.somethingWrong' | translate" [description]="error()!">
+    <button type="button" class="overview-retry" (click)="retry()">{{ 'common.retry' | translate }}</button>
   </app-empty-state>
 } @else {
   <div class="overview-stats">
     <article class="overview-stat-card">
-      <div class="overview-stat-card__top"><span>Sold total</span><app-icon name="info" [size]="15" /></div>
+      <div class="overview-stat-card__top"><span>{{ 'overview.totalBalance' | translate }}</span><app-icon name="info" [size]="15" /></div>
       <strong>{{ balanceDisplayMinor() | money: account()?.currency }}</strong>
-      <p>Sold disponibil în conturile tale</p>
+      <p>{{ 'overview.availableBalance' | translate }}</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--blue"><app-icon name="wallet" [size]="22" /></span>
     </article>
 
     <article class="overview-stat-card">
-      <div class="overview-stat-card__top"><span>Cheltuieli în această lună</span></div>
+      <div class="overview-stat-card__top"><span>{{ 'overview.spendingThisMonth' | translate }}</span></div>
       <strong>{{ spendingDisplayMinor() | money: 'RON' }}</strong>
-      <p class="overview-stat-card__trend--red">Total cheltuit luna aceasta</p>
+      <p class="overview-stat-card__trend--red">{{ 'overview.totalSpentThisMonth' | translate }}</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--red"><app-icon name="arrow-up-right" [size]="22" /></span>
     </article>
 
     <article class="overview-stat-card">
-      <div class="overview-stat-card__top"><span>Venituri în această lună</span></div>
+      <div class="overview-stat-card__top"><span>{{ 'overview.incomeThisMonth' | translate }}</span></div>
       <strong>{{ incomeDisplayMinor() | money: 'RON' }}</strong>
-      <p class="overview-stat-card__trend--green">Total încasat luna aceasta</p>
+      <p class="overview-stat-card__trend--green">{{ 'overview.totalReceivedThisMonth' | translate }}</p>
       <span class="overview-stat-card__icon overview-stat-card__icon--green"><app-icon name="arrow-down-right" [size]="22" /></span>
     </article>
 
     <article class="overview-stat-card overview-stat-card--progress">
       <div>
-        <div class="overview-stat-card__top"><span>Progres obiective de economii</span></div>
+        <div class="overview-stat-card__top"><span>{{ 'overview.savingsProgress' | translate }}</span></div>
         <strong>{{ budgetProgress() ? progressDisplayPercent() + '%' : '—' }}</strong>
         @if (budgetProgress()) {
-          <p>{{ budgetProgress()!.totalSpent | money: 'RON' }} din {{ budgetProgress()!.totalLimit | money: 'RON' }}</p>
+          <p>{{ budgetProgress()!.totalSpent | money: 'RON' }} {{ 'overview.of' | translate }} {{ budgetProgress()!.totalLimit | money: 'RON' }}</p>
         } @else {
-          <p><a routerLink="/app/budgets">Creează un buget</a></p>
+          <p><a routerLink="/app/budgets">{{ 'overview.createBudget' | translate }}</a></p>
         }
       </div>
       <div class="overview-progress-ring" aria-hidden="true">
@@ -50,32 +50,32 @@
   <section class="overview-insight">
     <span class="overview-insight__icon"><app-icon name="sparkles" [size]="24" /></span>
     <div class="overview-insight__content">
-      <strong>Insight financiar</strong>
-      <p>Ai cheltuit {{ (spending()?.total_spent_minor ?? 0) | money: 'RON' }} luna aceasta. Vezi analiza pentru o imagine completă asupra cheltuielilor tale.</p>
+      <strong>{{ 'overview.insight' | translate }}</strong>
+      <p>{{ 'overview.insightText1' | translate }} {{ (spending()?.total_spent_minor ?? 0) | money: 'RON' }} {{ 'overview.insightText2' | translate }}</p>
     </div>
-    <a routerLink="/app/spending-forecast">Vezi recomandările <span aria-hidden="true">›</span></a>
+    <a routerLink="/app/spending-forecast">{{ 'overview.seeRecommendations' | translate }} <span aria-hidden="true">›</span></a>
   </section>
 
   <div class="overview-grid">
     <section class="overview-panel">
       <div class="overview-panel__header">
-        <h2>Conturile mele</h2>
+        <h2>{{ 'overview.myAccounts' | translate }}</h2>
       </div>
       @if (account()) {
         <app-account-card [account]="account()!" (opened)="goTo('/app/accounts')" />
       }
-      <a class="overview-panel__link" routerLink="/app/accounts">Vezi toate conturile ›</a>
+      <a class="overview-panel__link" routerLink="/app/accounts">{{ 'overview.viewAllAccounts' | translate }} ›</a>
     </section>
 
     <section class="overview-panel">
       <div class="overview-panel__header">
-        <h2>Acțiuni rapide</h2>
+        <h2>{{ 'overview.quickActions' | translate }}</h2>
       </div>
       <div class="overview-actions">
         @for (action of quickActions; track action.route) {
           <button type="button" class="overview-action" (click)="goToQuickAction(action)">
             <app-icon [name]="action.icon" [size]="18" />
-            <span>{{ action.label }}</span>
+            <span>{{ action.label | translate }}</span>
           </button>
         }
       </div>
@@ -83,10 +83,10 @@
 
     <section class="overview-panel">
       <div class="overview-panel__header">
-        <h2>Plăți și abonamente următoare</h2>
+        <h2>{{ 'overview.upcomingPayments' | translate }}</h2>
       </div>
       @if (upcomingSubscriptions().length === 0) {
-        <app-empty-state icon="calendar" title="Niciun abonament activ" description="Adaugă unul din pagina Bugete." />
+        <app-empty-state icon="calendar" [title]="'overview.noActiveSubscriptions' | translate" [description]="'overview.addOneFromBudgets' | translate" />
       } @else {
         @for (sub of upcomingSubscriptions(); track sub.id) {
           <div class="overview-subscription">
@@ -99,28 +99,28 @@
           </div>
         }
       }
-      <a class="overview-panel__link" routerLink="/app/budgets">Vezi toate plățile programate ›</a>
+      <a class="overview-panel__link" routerLink="/app/budgets">{{ 'overview.viewAllScheduled' | translate }} ›</a>
     </section>
   </div>
 
   <div class="overview-lower-grid">
     <section class="overview-panel overview-panel--transactions">
       <div class="overview-panel__header">
-        <h2>Tranzacții recente</h2>
+        <h2>{{ 'overview.recentTransactions' | translate }}</h2>
       </div>
       @if (recentTransactions().length === 0) {
-        <app-empty-state icon="receipt" title="Nicio tranzacție încă" description="Fă un transfer sau o alimentare demo pentru a vedea istoricul aici." />
+        <app-empty-state icon="receipt" [title]="'overview.noTransactionsYet' | translate" [description]="'overview.noTransactionsHint' | translate" />
       } @else {
         @for (tx of recentTransactions(); track tx.id) {
           <app-transaction-row [transaction]="tx" (opened)="goTo('/app/transactions')" />
         }
       }
-      <a class="overview-panel__link" routerLink="/app/transactions">Vezi toate tranzacțiile ›</a>
+      <a class="overview-panel__link" routerLink="/app/transactions">{{ 'overview.viewAllTransactions' | translate }} ›</a>
     </section>
 
     <section class="overview-panel overview-analytics">
       <div class="overview-panel__header">
-        <h2>Analize &amp; Insights</h2>
+        <h2>{{ 'overview.analytics' | translate }}</h2>
       </div>
       <div class="overview-analytics__body">
         <div class="overview-analytics__illustration" aria-hidden="true">
@@ -128,8 +128,8 @@
           <app-icon name="spending" [size]="35" />
         </div>
         <div>
-          <p>Descoperă tendințele, analizează cheltuielile și ia decizii mai bune.</p>
-          <a routerLink="/app/spending-forecast" fragment="forecast">Deschide Forecast <span aria-hidden="true">›</span></a>
+          <p>{{ 'overview.analyticsText' | translate }}</p>
+          <a routerLink="/app/spending-forecast" fragment="forecast">{{ 'overview.openForecast' | translate }} <span aria-hidden="true">›</span></a>
         </div>
       </div>
     </section>

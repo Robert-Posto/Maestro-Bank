@@ -12,7 +12,7 @@
             @if (group.highlight) {
               <app-icon name="sparkles" [size]="11" />
             }
-            {{ group.label }}
+            {{ group.label | translate }}
           </p>
         }
         @for (item of group.items; track item.route) {
@@ -22,7 +22,7 @@
             routerLinkActive="sidebar__link--active"
           >
             <app-icon [name]="item.icon" [size]="19" />
-            <span class="sidebar__link-label">{{ item.label }}</span>
+            <span class="sidebar__link-label">{{ item.label | translate }}</span>
           </a>
         }
       </div>

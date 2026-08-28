@@ -21,6 +21,8 @@ Formula (exact ca în task):
 # top_discretionary_category (vezi evaluate_affordability mai jos).
 from __future__ import annotations
 
+from app.i18n import current_language, pick
+
 # Buffer-ul recomandat = o regulă simplă, documentată (task-ul, secțiunea
 # 10: "NU inventa un algoritm financiar sofisticat") — jumătate dintr-o
 # lună de cheltuieli, la ritmul mediu zilnic curent al userului.
@@ -72,9 +74,12 @@ def evaluate_affordability(
 def format_ron(amount_minor: int) -> str:
     """Formatare minimală, DOAR pentru textul `recommendation` (nu pentru
     UI — acolo frontend-ul formatează prin MoneyPipe din amount_minor).
+    Urmează limba curentă: "1234,50 lei" (ro) / "1234.50 RON" (en).
     """
     sign = "-" if amount_minor < 0 else ""
     major, minor = divmod(abs(amount_minor), 100)
+    if current_language() == "en":
+        return f"{sign}{major}.{minor:02d} RON"
     return f"{sign}{major},{minor:02d} lei"
 
 
@@ -92,21 +97,28 @@ def render_recommendation(result: dict) -> str:
     """
     buffer_text = format_ron(result["recommended_buffer_minor"])
     if result["affordable"]:
-        return (
-            f"Poți aloca {format_ron(result['requested_amount_minor'])}, "
-            f"dar păstrează cel puțin {buffer_text} rezervă pentru cheltuieli neprevăzute."
+        requested_text = format_ron(result["requested_amount_minor"])
+        return pick(
+            f"Poți aloca {requested_text}, dar păstrează cel puțin {buffer_text} rezervă pentru cheltuieli neprevăzute.",
+            f"You can set aside {requested_text}, but keep at least {buffer_text} as a reserve for unexpected costs.",
         )
     shortfall_minor = result["recommended_buffer_minor"] - result["estimated_balance_after_purchase_minor"]
-    base = (
-        f"Nu recomandăm această cheltuială acum — ai rămâne cu "
-        f"{format_ron(result['estimated_balance_after_purchase_minor'])}, sub bufferul de "
-        f"siguranță recomandat de {buffer_text} (îți lipsesc {format_ron(shortfall_minor)})."
+    after_text = format_ron(result["estimated_balance_after_purchase_minor"])
+    shortfall_text = format_ron(shortfall_minor)
+    base = pick(
+        f"Nu recomandăm această cheltuială acum — ai rămâne cu {after_text}, sub bufferul de "
+        f"siguranță recomandat de {buffer_text} (îți lipsesc {shortfall_text}).",
+        f"We don't recommend this purchase right now — you'd be left with {after_text}, below the "
+        f"recommended safety buffer of {buffer_text} (you're short by {shortfall_text}).",
     )
     top_category = result.get("top_discretionary_category")
     if top_category:
         label, amount_minor = top_category
-        base += (
+        amount_text = format_ron(amount_minor)
+        base += pick(
             f" Cea mai mare cheltuială discreționară de până acum e pe {label} "
-            f"({format_ron(amount_minor)}) — reducerea ei e cea mai rapidă cale să-ți acoperi diferența."
+            f"({amount_text}) — reducerea ei e cea mai rapidă cale să-ți acoperi diferența.",
+            f" Your largest discretionary spend so far is on {label} "
+            f"({amount_text}) — cutting it is the fastest way to close the gap.",
         )
     return base

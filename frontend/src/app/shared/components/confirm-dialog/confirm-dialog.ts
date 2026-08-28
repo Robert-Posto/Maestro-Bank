@@ -1,7 +1,8 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 
 import { ActionButton } from '../action-button/action-button';
 import { Modal } from '../modal/modal';
+import { LanguageService } from '../../../services/language.service';
 
 /**
  * Confirmare pentru acțiuni ireversibile/importante (ex. Delete budget,
@@ -16,12 +17,12 @@ import { Modal } from '../modal/modal';
   standalone: true,
   imports: [Modal, ActionButton],
   template: `
-    <app-modal [title]="title()" [maxWidth]="420" (closed)="cancelled.emit()">
+    <app-modal [title]="title() ?? defaultTitle()" [maxWidth]="420" (closed)="cancelled.emit()">
       <p class="confirm-message">{{ message() }}</p>
       <div class="confirm-actions">
-        <app-action-button variant="secondary" (pressed)="cancelled.emit()">{{ cancelLabel() }}</app-action-button>
+        <app-action-button variant="secondary" (pressed)="cancelled.emit()">{{ cancelLabel() ?? defaultCancelLabel() }}</app-action-button>
         <app-action-button [variant]="danger() ? 'danger' : 'primary'" [loading]="loading()" (pressed)="confirmed.emit()">
-          {{ confirmLabel() }}
+          {{ confirmLabel() ?? defaultConfirmLabel() }}
         </app-action-button>
       </div>
     </app-modal>
@@ -43,12 +44,18 @@ import { Modal } from '../modal/modal';
   ],
 })
 export class ConfirmDialog {
-  readonly title = input('Ești sigur?');
+  private readonly language = inject(LanguageService);
+
+  readonly title = input<string | undefined>(undefined);
   readonly message = input('');
-  readonly confirmLabel = input('Confirmă');
-  readonly cancelLabel = input('Anulează');
+  readonly confirmLabel = input<string | undefined>(undefined);
+  readonly cancelLabel = input<string | undefined>(undefined);
   readonly danger = input(false);
   readonly loading = input(false);
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();
+
+  protected readonly defaultTitle = computed(() => this.language.t('common.areYouSure'));
+  protected readonly defaultConfirmLabel = computed(() => this.language.t('common.confirm'));
+  protected readonly defaultCancelLabel = computed(() => this.language.t('common.cancel'));
 }

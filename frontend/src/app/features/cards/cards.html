@@ -1,14 +1,14 @@
-<app-page-header title="Cardurile mele" subtitle="Detalii, control și securitate pentru cardurile tale.">
-  <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> Card nou</app-action-button>
+<app-page-header [title]="'cards.title' | translate" [subtitle]="'cards.subtitle' | translate">
+  <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> {{ 'cards.newCard' | translate }}</app-action-button>
 </app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="5" [height]="80" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca cardul" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'cards.loadErrorTitle' | translate" [description]="error()!" />
 } @else if (cards().length === 0) {
-  <app-empty-state icon="cards" title="Niciun card încă" description="Adaugă primul tău card — virtual, instant, sau fizic.">
-    <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> Card nou</app-action-button>
+  <app-empty-state icon="cards" [title]="'cards.noCardsYet' | translate" [description]="'cards.noCardsYetDescription' | translate">
+    <app-action-button (pressed)="openAddCardModal()"><app-icon name="plus" [size]="16" /> {{ 'cards.newCard' | translate }}</app-action-button>
   </app-empty-state>
 } @else {
   <div class="cards-layout">
@@ -17,7 +17,7 @@
         <button
           type="button"
           class="card-carousel__arrow"
-          aria-label="Cardul anterior"
+          [attr.aria-label]="'cards.previousCard' | translate"
           [disabled]="cards().length <= 1"
           (click)="prevCard()"
         >
@@ -36,7 +36,7 @@
                 >
                   <div class="card-visual__top">
                     <span class="card-visual__brand">MaestroBank</span>
-                    <span class="card-visual__type">{{ c.type === 'physical' ? 'Fizic' : 'Virtual' }}</span>
+                    <span class="card-visual__type">{{ (c.type === 'physical' ? 'cards.physical' : 'cards.virtual') | translate }}</span>
                   </div>
 
                   <div class="card-visual__chip-row">
@@ -45,7 +45,7 @@
                     <button
                       type="button"
                       class="card-visual__eye"
-                      [attr.aria-label]="isRevealedCard(c.id) ? 'Ascunde datele cardului' : 'Vezi datele cardului și CVV'"
+                      [attr.aria-label]="(isRevealedCard(c.id) ? 'cards.hideCardData' : 'cards.viewCardData') | translate"
                       (click)="onEyeClick(c)"
                     >
                       <app-icon [name]="isRevealedCard(c.id) ? 'eye-off' : 'eye'" [size]="16" />
@@ -58,7 +58,7 @@
 
                   <div class="card-visual__bottom">
                     <div>
-                      <span class="card-visual__label">Cardholder</span>
+                      <span class="card-visual__label">{{ 'cards.cardholder' | translate }}</span>
                       <span class="card-visual__value">{{ cardholderName() }}</span>
                     </div>
                     @if (isRevealedCard(c.id)) {
@@ -68,7 +68,7 @@
                       </div>
                     }
                     <div>
-                      <span class="card-visual__label">Expiră</span>
+                      <span class="card-visual__label">{{ 'cards.expires' | translate }}</span>
                       <span class="card-visual__value"
                         >{{ c.expiry_month.toString().padStart(2, '0') }}/{{ c.expiry_year.toString().slice(-2) }}</span
                       >
@@ -77,12 +77,12 @@
 
                   @if (c.is_frozen) {
                     <div class="card-visual__frozen-badge">
-                      <app-icon name="lock" [size]="14" /> Blocat temporar
+                      <app-icon name="lock" [size]="14" /> {{ 'cards.frozenTemporarily' | translate }}
                     </div>
                   }
                   @if (c.is_one_time) {
                     <div class="card-visual__onetime-badge">
-                      <app-icon name="flash" [size]="13" /> Unică folosință
+                      <app-icon name="flash" [size]="13" /> {{ 'cards.oneTimeUse' | translate }}
                     </div>
                   }
                 </div>
@@ -94,7 +94,7 @@
         <button
           type="button"
           class="card-carousel__arrow"
-          aria-label="Cardul următor"
+          [attr.aria-label]="'cards.nextCard' | translate"
           [disabled]="cards().length <= 1"
           (click)="nextCard()"
         >
@@ -109,7 +109,7 @@
               type="button"
               class="card-carousel__dot"
               [class.card-carousel__dot--active]="i === activeIndex()"
-              [attr.aria-label]="'Cardul ' + (i + 1)"
+              [attr.aria-label]="('cards.cardNumberAria' | translate) + ' ' + (i + 1)"
               (click)="goToCard(i)"
             ></button>
           }
@@ -118,41 +118,41 @@
 
       @if (isRevealedCard(activeCard()!.id)) {
         <p class="card-carousel__reveal-hint">
-          <app-icon name="shield" [size]="13" /> Datele cardului se ascund automat în câteva secunde.
+          <app-icon name="shield" [size]="13" /> {{ 'cards.dataAutoHideHint' | translate }}
         </p>
       }
 
       <section class="card-panel accordion-group">
       <div class="accordion-item">
         <button type="button" class="accordion-header" (click)="toggleSection('details')" [attr.aria-expanded]="openSection() === 'details'">
-          <h2>Detalii card</h2>
+          <h2>{{ 'cards.cardDetails' | translate }}</h2>
           <app-icon name="chevron-down" [size]="16" class="accordion-chevron" [class.accordion-chevron--open]="openSection() === 'details'" />
         </button>
         <div class="accordion-body" [class.accordion-body--open]="openSection() === 'details'">
           <div class="accordion-body__inner">
             <dl class="card-detail-grid">
               <div>
-                <dt>Status</dt>
+                <dt>{{ 'common.status' | translate }}</dt>
                 <dd><app-status-badge [status]="activeCard()!.is_frozen ? 'frozen' : activeCard()!.status" /></dd>
               </div>
               <div>
-                <dt>Tip card</dt>
-                <dd>{{ activeCard()!.type === 'physical' ? 'Fizic' : 'Virtual' }} · {{ designLabel(activeCard()!.design) }}</dd>
+                <dt>{{ 'cards.cardType' | translate }}</dt>
+                <dd>{{ (activeCard()!.type === 'physical' ? 'cards.physical' : 'cards.virtual') | translate }} · {{ designLabel(activeCard()!.design) }}</dd>
               </div>
               <div>
-                <dt>Ultimele 4 cifre</dt>
+                <dt>{{ 'cards.lastFourDigits' | translate }}</dt>
                 <dd>{{ activeCard()!.last_four }}</dd>
               </div>
               <div>
-                <dt>Cont asociat</dt>
-                <dd>Cont curent {{ account()?.currency }}</dd>
+                <dt>{{ 'cards.linkedAccount' | translate }}</dt>
+                <dd>{{ 'cards.currentAccountCurrency' | translate }} {{ account()?.currency }}</dd>
               </div>
               <div>
-                <dt>Expirare</dt>
+                <dt>{{ 'cards.expiration' | translate }}</dt>
                 <dd>{{ activeCard()!.expiry_month.toString().padStart(2, '0') }}/{{ activeCard()!.expiry_year }}</dd>
               </div>
               <div>
-                <dt>IBAN asociat</dt>
+                <dt>{{ 'cards.linkedIban' | translate }}</dt>
                 <dd class="card-detail-grid__mono">{{ account()?.iban }}</dd>
               </div>
             </dl>
@@ -162,7 +162,7 @@
 
       <div class="accordion-item">
         <button type="button" class="accordion-header" (click)="toggleSection('control')" [attr.aria-expanded]="openSection() === 'control'">
-          <h2>Control card</h2>
+          <h2>{{ 'cards.cardControl' | translate }}</h2>
           <app-icon name="chevron-down" [size]="16" class="accordion-chevron" [class.accordion-chevron--open]="openSection() === 'control'" />
         </button>
         <div class="accordion-body" [class.accordion-body--open]="openSection() === 'control'">
@@ -170,8 +170,8 @@
             <div class="card-control">
               <app-icon name="lock" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Blocare temporară card</p>
-                <p class="card-control__desc">Blochează cardul pentru o perioadă scurtă.</p>
+                <p class="card-control__title">{{ 'cards.temporaryFreeze' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.temporaryFreezeDesc' | translate }}</p>
               </div>
               <app-toggle-control [checked]="activeCard()!.is_frozen" [disabled]="freezeBusy()" (toggled)="toggleFreeze()" />
             </div>
@@ -179,8 +179,8 @@
             <div class="card-control">
               <app-icon name="globe" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Plăți online</p>
-                <p class="card-control__desc">Permite plățile online cu cardul.</p>
+                <p class="card-control__title">{{ 'cards.onlinePayments' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.onlinePaymentsDesc' | translate }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.online_payments_enabled"
@@ -192,8 +192,8 @@
             <div class="card-control">
               <app-icon name="contactless" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Contactless</p>
-                <p class="card-control__desc">Plăți rapide prin apropierea cardului.</p>
+                <p class="card-control__title">{{ 'cards.contactless' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.contactlessDesc' | translate }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.contactless_enabled"
@@ -205,8 +205,8 @@
             <div class="card-control">
               <app-icon name="building" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Retrageri ATM</p>
-                <p class="card-control__desc">Permite retragerile de numerar de la ATM.</p>
+                <p class="card-control__title">{{ 'cards.atmWithdrawals' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.atmWithdrawalsDesc' | translate }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.atm_withdrawals_enabled"
@@ -218,8 +218,8 @@
             <div class="card-control">
               <app-icon name="globe" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Plăți internaționale</p>
-                <p class="card-control__desc">Permite utilizarea cardului în străinătate.</p>
+                <p class="card-control__title">{{ 'cards.internationalPayments' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.internationalPaymentsDesc' | translate }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.international_payments_enabled"
@@ -231,13 +231,13 @@
             <div class="card-control">
               <app-icon name="calendar" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Limită zilnică</p>
-                <p class="card-control__desc">Valoarea maximă pentru plăți și retrageri.</p>
+                <p class="card-control__title">{{ 'cards.dailyLimit' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.dailyLimitDesc' | translate }}</p>
               </div>
               @if (editingLimit()) {
                 <div class="card-control__limit-edit">
                   <input type="number" min="1" step="1" [ngModel]="limitInput()" (ngModelChange)="limitInput.set($event)" />
-                  <button type="button" class="card-control__limit-save" [disabled]="limitBusy()" (click)="saveLimit()">Salvează</button>
+                  <button type="button" class="card-control__limit-save" [disabled]="limitBusy()" (click)="saveLimit()">{{ 'common.save' | translate }}</button>
                 </div>
               } @else {
                 <button type="button" class="card-control__limit-value" (click)="openLimitEditor()">
@@ -252,7 +252,7 @@
 
       <div class="accordion-item">
         <button type="button" class="accordion-header" (click)="toggleSection('security')" [attr.aria-expanded]="openSection() === 'security'">
-          <h2>Security settings</h2>
+          <h2>{{ 'cards.securitySettings' | translate }}</h2>
           <app-icon name="chevron-down" [size]="16" class="accordion-chevron" [class.accordion-chevron--open]="openSection() === 'security'" />
         </button>
         <div class="accordion-body" [class.accordion-body--open]="openSection() === 'security'">
@@ -260,16 +260,16 @@
             <div class="card-control">
               <app-icon name="lock" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Change PIN</p>
-                <p class="card-control__desc">Schimbă codul PIN al cardului.</p>
+                <p class="card-control__title">{{ 'cards.changePin' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.changePinDesc' | translate }}</p>
               </div>
-              <button type="button" class="card-control__link" (click)="openChangePinModal()">Schimbă</button>
+              <button type="button" class="card-control__link" (click)="openChangePinModal()">{{ 'cards.change' | translate }}</button>
             </div>
             <div class="card-control">
               <app-icon name="bell" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Transaction alerts</p>
-                <p class="card-control__desc">Notificări la fiecare tranzacție cu cardul.</p>
+                <p class="card-control__title">{{ 'cards.transactionAlerts' | translate }}</p>
+                <p class="card-control__desc">{{ 'cards.transactionAlertsDesc' | translate }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.transaction_alerts_enabled"
@@ -280,8 +280,8 @@
             <div class="card-control">
               <app-icon name="shield" [size]="18" />
               <div class="card-control__info">
-                <p class="card-control__title">Payment confirmation</p>
-                <p class="card-control__desc">Confirmare suplimentară (PIN-ul cardului) pentru transferuri peste {{ paymentConfirmationThreshold | money: 'RON' }} din contul asociat.</p>
+                <p class="card-control__title">{{ 'cards.paymentConfirmation' | translate }}</p>
+                <p class="card-control__desc">{{ ('cards.paymentConfirmationDesc' | translate).replace('{amount}', (paymentConfirmationThreshold | money: 'RON')) }}</p>
               </div>
               <app-toggle-control
                 [checked]="activeCard()!.payment_confirmation_enabled"
@@ -298,20 +298,20 @@
     <aside class="cards-side">
       <div class="card-panel cards-side__stats">
         <div class="cards-side__stat">
-          <p class="cards-side__label">Sold disponibil</p>
+          <p class="cards-side__label">{{ 'cards.availableBalance' | translate }}</p>
           <p class="cards-side__value">{{ account()?.balance_minor ?? 0 | money: account()?.currency }}</p>
-          <p class="cards-side__hint">Cont curent {{ account()?.currency }}</p>
+          <p class="cards-side__hint">{{ 'cards.currentAccountCurrency' | translate }} {{ account()?.currency }}</p>
         </div>
         <div class="cards-side__stat">
-          <p class="cards-side__label">Cheltuieli cu cardul în luna aceasta</p>
+          <p class="cards-side__label">{{ 'cards.spendingThisMonth' | translate }}</p>
           <p class="cards-side__value">{{ spending()?.total_spent_minor ?? 0 | money: 'RON' }}</p>
         </div>
       </div>
 
       <div class="card-panel">
-        <h2>Tranzacții recente</h2>
+        <h2>{{ 'cards.recentTransactions' | translate }}</h2>
         @if (recentTransactions().length === 0) {
-          <app-empty-state icon="receipt" title="Nicio tranzacție încă" />
+          <app-empty-state icon="receipt" [title]="'cards.noTransactionsYet' | translate" />
         } @else {
           @for (tx of recentTransactions(); track tx.id) {
             <app-transaction-row [transaction]="tx" />
@@ -323,10 +323,10 @@
 }
 
 @if (addCardModalOpen()) {
-  <app-modal title="Card nou" [maxWidth]="540" (closed)="addCardModalOpen.set(false)">
+  <app-modal [title]="'cards.newCard' | translate" [maxWidth]="540" (closed)="addCardModalOpen.set(false)">
     <div class="add-card-form">
       <div class="add-card-section">
-        <p class="add-card-section__label">Alege un design</p>
+        <p class="add-card-section__label">{{ 'cards.chooseDesign' | translate }}</p>
         <div class="design-picker">
           @for (d of cardDesignOptions; track d.value) {
             <button
@@ -348,7 +348,7 @@
       </div>
 
       <div class="add-card-section">
-        <p class="add-card-section__label">Tip card</p>
+        <p class="add-card-section__label">{{ 'cards.cardType' | translate }}</p>
         <div class="card-type-picker">
           <button
             type="button"
@@ -357,8 +357,8 @@
             (click)="selectCardType('virtual')"
           >
             <app-icon name="cards" [size]="18" />
-            <span class="card-control__title">Virtual</span>
-            <small class="card-control__desc">Emis instant</small>
+            <span class="card-control__title">{{ 'cards.virtual' | translate }}</span>
+            <small class="card-control__desc">{{ 'cards.issuedInstantly' | translate }}</small>
           </button>
           <button
             type="button"
@@ -367,34 +367,34 @@
             (click)="selectCardType('physical')"
           >
             <app-icon name="wallet" [size]="18" />
-            <span class="card-control__title">Fizic</span>
-            <small class="card-control__desc">Taxă {{ physicalCardFeeMinor | money: 'RON' }}</small>
+            <span class="card-control__title">{{ 'cards.physical' | translate }}</span>
+            <small class="card-control__desc">{{ 'cards.feePrefix' | translate }} {{ physicalCardFeeMinor | money: 'RON' }}</small>
           </button>
         </div>
         @if (physicalFeeShortfall()) {
-          <p class="add-card-section__warning">Sold insuficient pentru taxa de emitere a cardului fizic.</p>
+          <p class="add-card-section__warning">{{ 'cards.insufficientBalanceForFee' | translate }}</p>
         }
       </div>
 
       <div class="card-control add-card-toggle-row" [class.card-control--muted]="addCardType() === 'physical'">
         <app-icon name="flash" [size]="18" />
         <div class="card-control__info">
-          <p class="card-control__title">Card de unică folosință</p>
-          <p class="card-control__desc">Ca la Revolut — folosește-l o singură dată, apoi îl poți dezactiva din Control card.</p>
+          <p class="card-control__title">{{ 'cards.oneTimeCard' | translate }}</p>
+          <p class="card-control__desc">{{ 'cards.oneTimeCardDesc' | translate }}</p>
         </div>
         <app-toggle-control [checked]="addCardOneTime()" [disabled]="addCardType() === 'physical'" (toggled)="toggleOneTime($event)" />
       </div>
 
       <div class="add-card-section">
-        <p class="add-card-section__label">Setează un PIN (4 cifre)</p>
-        <p class="add-card-section__hint">Îl vei folosi ca să vezi numărul complet și CVV-ul cardului — nu parola contului.</p>
+        <p class="add-card-section__label">{{ 'cards.setPin' | translate }}</p>
+        <p class="add-card-section__hint">{{ 'cards.setPinHint' | translate }}</p>
         <div class="add-card-pin-row">
           <input
             type="password"
             inputmode="numeric"
             maxlength="4"
             autocomplete="off"
-            placeholder="PIN nou"
+            [placeholder]="'cards.newPin' | translate"
             [ngModel]="addCardPin()"
             (ngModelChange)="addCardPin.set($event)"
             name="addCardPin"
@@ -404,7 +404,7 @@
             inputmode="numeric"
             maxlength="4"
             autocomplete="off"
-            placeholder="Confirmă PIN"
+            [placeholder]="'cards.confirmPin' | translate"
             [ngModel]="addCardPinConfirm()"
             (ngModelChange)="addCardPinConfirm.set($event)"
             name="addCardPinConfirm"
@@ -413,29 +413,29 @@
       </div>
 
       <app-action-button [fullWidth]="true" [loading]="addCardSaving()" [disabled]="physicalFeeShortfall()" (pressed)="saveNewCard()">
-        {{ addCardType() === 'physical' ? 'Comandă card fizic' : 'Emite card virtual' }}
+        {{ (addCardType() === 'physical' ? 'cards.orderPhysicalCard' : 'cards.issueVirtualCard') | translate }}
       </app-action-button>
     </div>
   </app-modal>
 }
 
 @if (revealModalOpen()) {
-  <app-modal title="Confirmă identitatea" [maxWidth]="400" (closed)="closeRevealModal()">
+  <app-modal [title]="'cards.confirmIdentity' | translate" [maxWidth]="400" (closed)="closeRevealModal()">
     <div class="reveal-form">
       <p class="reveal-form__desc">
-        Pentru a vedea numărul complet și CVV-ul cardului **** {{ revealTarget()?.last_four }}, confirmă identitatea.
+        {{ ('cards.revealDesc' | translate).replace('{lastFour}', revealTarget()?.last_four ?? '') }}
       </p>
 
       @if (passkeyAvailable()) {
         <app-action-button [fullWidth]="true" [loading]="revealBiometricBusy()" (pressed)="submitRevealWithBiometrics()">
-          <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
+          <app-icon name="fingerprint" [size]="16" /> {{ 'cards.confirmWithPasskey' | translate }}
         </app-action-button>
-        <div class="reveal-divider"><span>sau introdu PIN-ul cardului</span></div>
+        <div class="reveal-divider"><span>{{ 'cards.orEnterCardPin' | translate }}</span></div>
       }
 
       <form (ngSubmit)="submitReveal()">
         <label>
-          <span>PIN card</span>
+          <span>{{ 'cards.cardPinLabel' | translate }}</span>
           <input
             type="password"
             inputmode="numeric"
@@ -448,7 +448,7 @@
           />
         </label>
         <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="revealBusy()">
-          Confirmă cu PIN
+          {{ 'cards.confirmWithPin' | translate }}
         </app-action-button>
       </form>
     </div>
@@ -456,22 +456,22 @@
 }
 
 @if (changePinModalOpen()) {
-  <app-modal title="Schimbă PIN-ul cardului" [maxWidth]="400" (closed)="closeChangePinModal()">
+  <app-modal [title]="'cards.changePinModalTitle' | translate" [maxWidth]="400" (closed)="closeChangePinModal()">
     <div class="reveal-form">
       <p class="reveal-form__desc">
-        Confirmă identitatea, apoi alege noul PIN pentru cardul **** {{ activeCard()?.last_four }}.
+        {{ ('cards.changePinDescForCard' | translate).replace('{lastFour}', activeCard()?.last_four ?? '') }}
       </p>
 
       @if (passkeyAvailable()) {
         <app-action-button [fullWidth]="true" [loading]="changePinBiometricBusy()" (pressed)="submitChangePinWithBiometrics()">
-          <app-icon name="fingerprint" [size]="16" /> Confirmă cu passkey
+          <app-icon name="fingerprint" [size]="16" /> {{ 'cards.confirmWithPasskey' | translate }}
         </app-action-button>
-        <div class="reveal-divider"><span>sau introdu PIN-ul curent</span></div>
+        <div class="reveal-divider"><span>{{ 'cards.orEnterCurrentPin' | translate }}</span></div>
       }
 
       <form (ngSubmit)="submitChangePin()">
         <label>
-          <span>PIN curent</span>
+          <span>{{ 'cards.currentPin' | translate }}</span>
           <input
             type="password"
             inputmode="numeric"
@@ -484,33 +484,33 @@
           />
         </label>
         <label>
-          <span>PIN nou</span>
+          <span>{{ 'cards.newPin' | translate }}</span>
           <input
             type="password"
             inputmode="numeric"
             maxlength="4"
             autocomplete="off"
-            placeholder="PIN nou"
+            [placeholder]="'cards.newPin' | translate"
             [ngModel]="changePinNew()"
             (ngModelChange)="changePinNew.set($event)"
             name="changePinNew"
           />
         </label>
         <label>
-          <span>Confirmă PIN nou</span>
+          <span>{{ 'cards.confirmNewPin' | translate }}</span>
           <input
             type="password"
             inputmode="numeric"
             maxlength="4"
             autocomplete="off"
-            placeholder="Confirmă PIN nou"
+            [placeholder]="'cards.confirmNewPin' | translate"
             [ngModel]="changePinNewConfirm()"
             (ngModelChange)="changePinNewConfirm.set($event)"
             name="changePinNewConfirm"
           />
         </label>
         <app-action-button type="submit" variant="secondary" [fullWidth]="true" [loading]="changePinBusy()">
-          Schimbă PIN-ul
+          {{ 'cards.changePinSubmit' | translate }}
         </app-action-button>
       </form>
     </div>

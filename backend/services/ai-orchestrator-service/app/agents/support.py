@@ -20,9 +20,10 @@ import logging
 from typing import Any, Protocol
 
 from app.config import settings
+from app.i18n import translate
 from app.llm.azure_openai import chat_completion
 from app.models.support import ChatMessage
-from app.prompts.support_prompt import SUPPORT_SYSTEM_PROMPT
+from app.prompts.support_prompt import build_support_system_prompt
 from app.services import safety_guard
 from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
 
@@ -309,12 +310,12 @@ async def run_support_agent(
     # niciun filtru determinist ÎNAINTE de acest task).
     if safety_guard.detect_sensitive_data(message):
         logger.info("Support Agent: mesaj cu date sensibile de card — răspuns determinist, fără apel GPT")
-        return safety_guard.SENSITIVE_DATA_WARNING, "unknown", [], False, {}
+        return translate("sensitiveDataWarning"), "unknown", [], False, {}
     if safety_guard.detect_prompt_extraction_attempt(message):
         logger.info("Support Agent: încercare de extragere a promptului — răspuns determinist, fără apel GPT")
-        return safety_guard.PROMPT_EXTRACTION_REFUSAL, "unknown", [], False, {}
+        return translate("promptExtractionRefusal"), "unknown", [], False, {}
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SUPPORT_SYSTEM_PROMPT}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": build_support_system_prompt()}]
     messages.extend({"role": m.role, "content": m.content} for m in history[-_MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
 
@@ -382,7 +383,7 @@ async def run_support_agent(
 
     logger.warning("Support Agent: prea multe iterații fără respond_to_user — fallback.")
     return (
-        "Nu am putut finaliza răspunsul — poți reformula întrebarea, te rog?",
+        translate("supportFallbackAnswer"),
         "unknown",
         [],
         False,

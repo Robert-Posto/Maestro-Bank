@@ -8,32 +8,43 @@ care reutilizează exact primitivele deja construite la accounts-service
 pentru Depozite/Investiții.
 """
 
+# `title`/`description` = RO; `title_en`/`description_en` = EN — alese după
+# limba request-ului (header X-Language) la serializare — vezi
+# app/service.py::list_rewards / redeem_reward și app/i18n.py::localized_reward.
 REWARDS_CATALOG: list[dict] = [
     {
         "id": "cashback_10",
         "title": "10 lei cashback",
+        "title_en": "10 RON cashback",
         "description": "Convertește 500 de puncte în 10 lei, creditați direct în contul tău curent.",
+        "description_en": "Convert 500 points into 10 RON, credited straight to your current account.",
         "cost_points": 500,
         "reward_value_minor": 1_000,
     },
     {
         "id": "cashback_25",
         "title": "25 lei cashback",
+        "title_en": "25 RON cashback",
         "description": "Convertește 1.200 de puncte în 25 lei, creditați direct în contul tău curent.",
+        "description_en": "Convert 1,200 points into 25 RON, credited straight to your current account.",
         "cost_points": 1_200,
         "reward_value_minor": 2_500,
     },
     {
         "id": "cashback_40",
         "title": "40 lei cashback",
+        "title_en": "40 RON cashback",
         "description": "Convertește 2.000 de puncte în 40 lei, creditați direct în contul tău curent.",
+        "description_en": "Convert 2,000 points into 40 RON, credited straight to your current account.",
         "cost_points": 2_000,
         "reward_value_minor": 4_000,
     },
     {
         "id": "cashback_100",
         "title": "100 lei cashback",
+        "title_en": "100 RON cashback",
         "description": "Convertește 4.500 de puncte în 100 lei, creditați direct în contul tău curent.",
+        "description_en": "Convert 4,500 points into 100 RON, credited straight to your current account.",
         "cost_points": 4_500,
         "reward_value_minor": 10_000,
     },

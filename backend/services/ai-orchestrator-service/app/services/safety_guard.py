@@ -40,6 +40,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from app.i18n import translate
+
 
 def _normalize(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text)
@@ -140,5 +142,5 @@ def redact_if_sensitive(answer: str) -> str:
     problematic), preferăm un răspuns clar, sigur, chiar dacă mai puțin
     specific decât originalul."""
     if detect_sensitive_data(answer):
-        return SENSITIVE_DATA_WARNING
+        return translate("sensitiveDataWarning")
     return answer

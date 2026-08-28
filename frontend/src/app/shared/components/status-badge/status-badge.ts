@@ -1,4 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
+
+import { LanguageService } from '../../../services/language.service';
 
 export type BadgeTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
@@ -46,6 +48,25 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   paid_off: 'Achitat',
 };
 
+const STATUS_LABEL_MAP_EN: Record<string, string> = {
+  active: 'Active',
+  completed: 'Completed',
+  pending: 'Processing',
+  pending_review: 'On hold for review',
+  failed: 'Failed',
+  rejected: 'Rejected — blocked recipient',
+  resolved: 'Resolved',
+  open: 'Open',
+  in_progress: 'In progress',
+  frozen: 'Frozen',
+  cancelled: 'Cancelled',
+  inactive: 'Inactive',
+  disabled: 'Disabled',
+  matured_renewed: 'Auto-renewed',
+  liquidated_early: 'Liquidated early',
+  closed_paid_out: 'Paid out',
+};
+
 /** Badge de status reutilizabil — vezi "Status" pe carduri/tranzacții/tickete. */
 @Component({
   selector: 'app-status-badge',
@@ -88,10 +109,16 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   ],
 })
 export class StatusBadge {
+  private readonly language = inject(LanguageService);
+
   readonly status = input.required<string>();
   readonly toneOverride = input<BadgeTone | undefined>(undefined);
   readonly labelOverride = input<string | undefined>(undefined);
 
   protected readonly tone = computed<BadgeTone>(() => this.toneOverride() ?? STATUS_TONE_MAP[this.status()] ?? 'neutral');
-  protected readonly label = computed(() => this.labelOverride() ?? STATUS_LABEL_MAP[this.status()] ?? this.status());
+  protected readonly label = computed(() => {
+    if (this.labelOverride()) return this.labelOverride()!;
+    const map = this.language.language() === 'en' ? STATUS_LABEL_MAP_EN : STATUS_LABEL_MAP;
+    return map[this.status()] ?? this.status();
+  });
 }

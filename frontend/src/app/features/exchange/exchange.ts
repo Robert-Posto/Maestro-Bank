@@ -5,10 +5,12 @@ import { debounceTime, Subject } from 'rxjs';
 
 import { AccountView, BankingService } from '../../services/banking.service';
 import { ExchangeQuote, ExchangeRate, ExchangeService } from '../../services/exchange.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { currencyColorVar } from '../../shared/currencies';
@@ -25,7 +27,7 @@ import { Select, SelectOption } from '../../shared/components/select/select';
 @Component({
   selector: 'app-exchange',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, Select],
+  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, Select, TranslatePipe],
   templateUrl: './exchange.html',
   styleUrl: './exchange.css',
 })
@@ -34,6 +36,7 @@ export class Exchange implements OnInit {
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
   private readonly quoteTrigger = new Subject<void>();
 
   protected readonly accounts = signal<AccountView[]>([]);
@@ -152,7 +155,7 @@ export class Exchange implements OnInit {
       return;
     }
     if (this.fromCurrency() === this.toCurrency()) {
-      this.quoteError.set('Alege două monede diferite.');
+      this.quoteError.set(this.language.t('exchange.chooseTwoCurrencies'));
       this.quote.set(null);
       return;
     }
@@ -169,7 +172,7 @@ export class Exchange implements OnInit {
       error: (err) => {
         this.quote.set(null);
         this.quoting.set(false);
-        this.quoteError.set(extractErrorMessage(err, 'Nu am putut calcula cursul pentru această pereche.'));
+        this.quoteError.set(extractErrorMessage(err, this.language.t('exchange.quoteFailed')));
       },
     });
   }
@@ -181,14 +184,14 @@ export class Exchange implements OnInit {
       next: () => {
         this.confirming.set(false);
         this.confirmed.set(true);
-        this.toast.success('Schimb valutar realizat — soldurile s-au actualizat.');
+        this.toast.success(this.language.t('exchange.executeSuccess'));
         // Soldurile ambelor conturi (sursă + destinație) s-au schimbat efectiv —
         // reîncărcăm ca fx-hint-urile ("Sold disponibil") să reflecte realitatea.
         this.loadAccounts();
       },
       error: (err) => {
         this.confirming.set(false);
-        this.toast.error(extractErrorMessage(err, 'Schimbul valutar a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('exchange.executeFailed')));
       },
     });
   }

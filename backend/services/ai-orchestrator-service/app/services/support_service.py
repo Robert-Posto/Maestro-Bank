@@ -10,6 +10,7 @@ testabilă independent de comportamentul GPT-5-mini).
 import logging
 
 from app.agents.support import PendingConfirmationRequired, SupportLLMClient, _default_llm_client, run_support_agent
+from app.i18n import translate
 from app.models.support import ChatRequest, ChatResponse, PendingAction, RecommendedAction
 from app.services import moderation_service
 from app.tools import support_ticket_tools
@@ -62,11 +63,8 @@ def _build_confirmation_question(tool: str, arguments: dict) -> str:
     if tool == "create_support_ticket":
         subject = arguments.get("subject", "")
         category = arguments.get("category", "other")
-        return (
-            f'Vrei să creez o solicitare de suport cu subiectul "{subject}" '
-            f'(categorie: {category})? Confirmă cu "da".'
-        )
-    return "Confirmi această acțiune?"
+        return translate("confirmCreateTicket", subject=subject, category=category)
+    return translate("confirmGenericAction")
 
 
 async def _execute_confirmed_action(pending: PendingAction, authorization: str) -> ChatResponse:
@@ -74,19 +72,19 @@ async def _execute_confirmed_action(pending: PendingAction, authorization: str) 
         result = await support_ticket_tools.create_support_ticket(authorization, **pending.arguments)
         if isinstance(result, dict) and "error" in result:
             return ChatResponse(
-                answer=f"Nu am putut crea solicitarea: {result['error']}",
+                answer=translate("ticketCreateFailed", error=result["error"]),
                 intent="support_ticket",
                 context=result,
                 requires_confirmation=False,
             )
         return ChatResponse(
-            answer=f"Solicitarea a fost creată cu numărul {result.get('id')}. Status: {result.get('status', 'open')}.",
+            answer=translate("ticketCreated", id=result.get("id"), status=result.get("status", "open")),
             intent="support_ticket",
             context={"ticket": result},
-            recommended_actions=[_build_recommended_action("view_tickets", "Vezi solicitările mele")],
+            recommended_actions=[_build_recommended_action("view_tickets", translate("viewMyTickets"))],
             requires_confirmation=False,
         )
-    return ChatResponse(answer="Acțiune necunoscută.", intent="unknown")  # neatins în V1
+    return ChatResponse(answer=translate("unknownAction"), intent="unknown")  # neatins în V1
 
 
 async def handle_chat(
@@ -102,7 +100,7 @@ async def handle_chat(
     # turul anterior pe baza unui mesaj pe care oricum nu-l „răspundem".
     if moderation_service.contains_profanity(payload.message):
         logger.info("support_service: mesaj cu limbaj jignitor — răspuns determinist, fără apel GPT")
-        return ChatResponse(answer=moderation_service.REPHRASE_REQUEST_ANSWER, intent="unknown")
+        return ChatResponse(answer=translate("rephraseRequest"), intent="unknown")
 
     if payload.pending_action is not None:
         if _is_affirmative(payload.message):

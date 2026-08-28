@@ -17,16 +17,17 @@ import httpx
 from fastapi import HTTPException, UploadFile, status
 
 from app.config import settings
+from app.i18n import translate
 
 logger = logging.getLogger("verification-service")
 
 
-async def _read_and_validate_image(file: UploadFile, label: str) -> bytes:
+async def _read_and_validate_image(file: UploadFile, label_key: str) -> bytes:
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Imaginea pentru {label} lipsește.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("imageMissing", label=translate(label_key)))
     if len(content) > settings.max_image_size_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Imaginea pentru {label} e prea mare.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("imageTooLarge", label=translate(label_key)))
     return content
 
 
@@ -81,8 +82,8 @@ def _similarity_percent(distance: float) -> float:
 
 
 async def verify_identity(user_id: str, id_document: UploadFile, selfie: UploadFile) -> dict:
-    id_bytes = await _read_and_validate_image(id_document, "buletin")
-    selfie_bytes = await _read_and_validate_image(selfie, "selfie")
+    id_bytes = await _read_and_validate_image(id_document, "labelIdDocument")
+    selfie_bytes = await _read_and_validate_image(selfie, "labelSelfie")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         id_path = os.path.join(tmp_dir, "id_document.jpg")
@@ -130,7 +131,7 @@ async def verify_identity(user_id: str, id_document: UploadFile, selfie: UploadF
         logger.exception("verification-service: match reușit dar marcarea în auth-service a eșuat (user_id=%s)", user_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Verificarea a reușit, dar nu am putut actualiza contul. Încearcă din nou.",
+            detail=translate("identityUpdateFailedAfterVerification"),
         )
 
     return {

@@ -1,36 +1,36 @@
-<app-page-header title="Puncte & Recompense" subtitle="Câștigi puncte la plățile către comercianți, le răscumperi pentru cashback sau le pariezi la roata norocului." />
+<app-page-header [title]="'points.title' | translate" [subtitle]="'points.subtitle' | translate" />
 
 <section class="points-section" id="how-points-work">
-  <h2>Cum funcționează, pas cu pas</h2>
-  <p class="points-section__subtitle">Glisează stânga-dreapta prin cărți — de la o cumpărătură la cashback în cont.</p>
-  <app-swipe-card-deck [cards]="howPointsWorkCards" />
+  <h2>{{ 'points.howItWorksTitle' | translate }}</h2>
+  <p class="points-section__subtitle">{{ 'points.howItWorksSubtitle' | translate }}</p>
+  <app-swipe-card-deck [cards]="howPointsWorkCards()" />
 </section>
 
 @if (!welcomeBonusLoading() && !welcomeBonusClaimed()) {
   <div class="welcome-bonus-banner">
     <span class="welcome-bonus-banner__icon"><app-icon name="gift" [size]="22" /></span>
     <div class="welcome-bonus-banner__text">
-      <p class="welcome-bonus-banner__title">Ai {{ welcomeBonusPoints() | number }} puncte de bun-venit, nerevendicate</p>
-      <p class="welcome-bonus-banner__subtitle">Le poți folosi imediat pentru prima ta recompensă.</p>
+      <p class="welcome-bonus-banner__title">
+        {{ ('points.welcomeBannerTitle' | translate).replace('{n}', (welcomeBonusPoints() | number) + '') }}
+      </p>
+      <p class="welcome-bonus-banner__subtitle">{{ 'points.welcomeBannerSubtitle' | translate }}</p>
     </div>
-    <app-action-button [loading]="claimingWelcomeBonus()" (pressed)="claimWelcomeBonus()">Revendică</app-action-button>
+    <app-action-button [loading]="claimingWelcomeBonus()" (pressed)="claimWelcomeBonus()">{{ 'points.claim' | translate }}</app-action-button>
   </div>
 }
 
 <div class="points-balance-card">
-  <span class="points-balance-card__label">Sold puncte</span>
+  <span class="points-balance-card__label">{{ 'points.pointsBalance' | translate }}</span>
   @if (balanceLoading()) {
     <app-loading-skeleton [rows]="1" [height]="40" />
   } @else {
     <strong class="points-balance-card__value">{{ displayedBalance() | number }}</strong>
   }
-  <p class="points-balance-card__hint">
-    Câștigi puncte doar la plăți către comercianți (nu la transferuri către alți useri MaestroBank) — vezi ratele pe categorie mai jos.
-  </p>
+  <p class="points-balance-card__hint">{{ 'points.balanceHint' | translate }}</p>
 </div>
 
 <section class="points-section">
-  <h2>Rate de câștig, pe categorie</h2>
+  <h2>{{ 'points.earnRatesTitle' | translate }}</h2>
   @if (earnRatesLoading()) {
     <app-loading-skeleton [rows]="1" [height]="70" />
   } @else {
@@ -39,7 +39,7 @@
         @if (category.value !== 'income') {
           <div class="earn-rate-chip">
             <span class="earn-rate-chip__dot" [style.background]="'var(' + category.colorVar + ')'"></span>
-            <span class="earn-rate-chip__label">{{ category.label }}</span>
+            <span class="earn-rate-chip__label">{{ categoryLabelFor(category.value) }}</span>
             <span class="earn-rate-chip__rate">{{ earnRateFor(category.value) }}%</span>
           </div>
         }
@@ -49,11 +49,11 @@
 </section>
 
 <section class="points-section">
-  <h2>Recompense</h2>
+  <h2>{{ 'points.rewardsTitle' | translate }}</h2>
   @if (rewardsLoading()) {
     <app-loading-skeleton [rows]="2" [height]="90" />
   } @else if (rewards().length === 0) {
-    <app-empty-state icon="wallet" title="Niciun sold încă" description="Fă o plată la un comerciant ca să începi să câștigi puncte." />
+    <app-empty-state icon="wallet" [title]="'points.noBalanceTitle' | translate" [description]="'points.noBalanceDesc' | translate" />
   } @else {
     <div class="rewards-grid">
       @for (reward of rewards(); track reward.id) {
@@ -61,9 +61,9 @@
           <p class="reward-card__title">{{ reward.title }}</p>
           <p class="reward-card__description">{{ reward.description }}</p>
           <div class="reward-card__footer">
-            <span class="reward-card__cost">{{ reward.cost_points | number }} puncte</span>
+            <span class="reward-card__cost">{{ reward.cost_points | number }} {{ 'points.pointsWord' | translate }}</span>
             <app-action-button variant="secondary" [disabled]="!reward.affordable" (pressed)="openRedeemConfirm(reward)">
-              Răscumpără
+              {{ 'points.redeem' | translate }}
             </app-action-button>
           </div>
         </div>
@@ -73,10 +73,8 @@
 </section>
 
 <section class="points-section">
-  <h2>Roata norocului</h2>
-  <p class="points-section__subtitle">
-    Alege câte puncte pariezi la o învârtire — mai multe puncte pariate înseamnă șanse mai bune la premii mai bune. Punctele pariate se scad imediat, indiferent de rezultat.
-  </p>
+  <h2>{{ 'points.wheelTitle' | translate }}</h2>
+  <p class="points-section__subtitle">{{ 'points.wheelSubtitle' | translate }}</p>
 
   @if (wheelLoading()) {
     <app-loading-skeleton [rows]="2" [height]="200" />
@@ -101,7 +99,7 @@
               text-anchor="middle"
               dominant-baseline="middle"
             >
-              {{ segment.reward_value_minor ? (segment.reward_value_minor! / 100) + ' lei' : '—' }}
+              {{ segment.reward_value_minor ? (segment.reward_value_minor! / 100) + ' ' + ('common.lei' | translate) : '—' }}
             </text>
           }
         </svg>
@@ -109,7 +107,7 @@
 
       <div class="wheel-controls">
         <label class="wheel-wager">
-          <span>Puncte pariate</span>
+          <span>{{ 'points.pointsWagered' | translate }}</span>
           <input
             type="number"
             min="1"
@@ -119,14 +117,14 @@
             [disabled]="spinning()"
           />
         </label>
-        <p class="wheel-wager__hint">Sold disponibil: {{ balance() | number }} puncte</p>
+        <p class="wheel-wager__hint">{{ ('points.availableBalance' | translate).replace('{n}', (balance() | number) + '') }}</p>
         <app-action-button
           [fullWidth]="true"
           [disabled]="balance() < 1 || wagerAmount() > balance()"
           [loading]="spinning()"
           (pressed)="spin()"
         >
-          Rotește roata
+          {{ 'points.spinTheWheel' | translate }}
         </app-action-button>
       </div>
     </div>
@@ -134,26 +132,27 @@
 </section>
 
 @if (redeemModalReward(); as reward) {
-  <app-modal [title]="'Răscumpără ' + reward.title" (closed)="closeRedeemConfirm()">
+  <app-modal [title]="('points.redeemModalTitle' | translate).replace('{title}', reward.title)" (closed)="closeRedeemConfirm()">
     <p class="reward-confirm__text">
-      Confirmi? Se scad <strong>{{ reward.cost_points | number }} puncte</strong> și primești
-      <strong>{{ reward.reward_value_minor | money: 'RON' }}</strong>, creditați direct în contul tău curent.
+      {{ 'points.redeemConfirmBefore' | translate }} <strong>{{ reward.cost_points | number }} {{ 'points.pointsWord' | translate }}</strong>
+      {{ 'points.redeemConfirmMiddle' | translate }}
+      <strong>{{ reward.reward_value_minor | money: 'RON' }}</strong>{{ 'points.redeemConfirmAfter' | translate }}
     </p>
-    <app-action-button [fullWidth]="true" [loading]="redeeming()" (pressed)="confirmRedeem()">Confirmă</app-action-button>
+    <app-action-button [fullWidth]="true" [loading]="redeeming()" (pressed)="confirmRedeem()">{{ 'points.confirm' | translate }}</app-action-button>
   </app-modal>
 }
 
 @if (spinResult(); as result) {
-  <app-modal title="Rezultatul învârtirii" (closed)="closeSpinResult()">
+  <app-modal [title]="'points.spinResultTitle' | translate" (closed)="closeSpinResult()">
     <div class="spin-result">
       <p class="spin-result__label">{{ result.winning_label }}</p>
       @if (result.ron_credited_minor) {
-        <p class="spin-result__prize">+{{ result.ron_credited_minor | money: 'RON' }} creditați în cont</p>
+        <p class="spin-result__prize">+{{ result.ron_credited_minor | money: 'RON' }} {{ 'points.creditedToAccount' | translate }}</p>
       } @else {
-        <p class="spin-result__prize spin-result__prize--none">Mai încerci data viitoare.</p>
+        <p class="spin-result__prize spin-result__prize--none">{{ 'points.betterLuckNextTime' | translate }}</p>
       }
-      <p class="spin-result__balance">Sold rămas: {{ result.new_balance | number }} puncte</p>
-      <app-action-button [fullWidth]="true" (pressed)="closeSpinResult()">Am înțeles</app-action-button>
+      <p class="spin-result__balance">{{ ('points.remainingBalance' | translate).replace('{n}', (result.new_balance | number) + '') }}</p>
+      <app-action-button [fullWidth]="true" (pressed)="closeSpinResult()">{{ 'points.gotIt' | translate }}</app-action-button>
     </div>
   </app-modal>
 }

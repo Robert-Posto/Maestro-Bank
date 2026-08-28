@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
 import { Budget, BudgetPeriod, BudgetsService, Subscription, SubscriptionSuggestion } from '../../services/budgets.service';
+import { LanguageService } from '../../services/language.service';
 import { SpendingAnalytics, TransactionsService } from '../../services/transactions.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -14,6 +15,7 @@ import { Modal } from '../../shared/components/modal/modal';
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { TRANSACTION_CATEGORIES, categoryColorVar, categoryLabel } from '../../shared/categories';
 import { Select, SelectOption } from '../../shared/components/select/select';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { daysRemainingLabel, daysUntilBilling, daysUntilBillingLabel } from '../../shared/subscription-display';
@@ -44,7 +46,7 @@ interface SubscriptionsSummary {
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog, MerchantAvatar, Select],
+  imports: [FormsModule, PageHeader, ActionButton, Icon, MoneyPipe, EmptyState, LoadingSkeleton, Modal, ConfirmDialog, MerchantAvatar, Select, TranslatePipe],
   templateUrl: './budgets.html',
   styleUrl: './budgets.css',
 })
@@ -52,18 +54,29 @@ export class Budgets implements OnInit {
   private readonly budgetsApi = inject(BudgetsService);
   private readonly transactionsApi = inject(TransactionsService);
   private readonly toast = inject(ToastService);
+  private readonly language = inject(LanguageService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
-  protected readonly categoryOptions: SelectOption[] = TRANSACTION_CATEGORIES.map((c) => ({
-    value: c.value,
-    label: c.label,
-    colorVar: c.colorVar,
-  }));
-  protected readonly categoryLabel = categoryLabel;
+  protected readonly categoryOptions = computed<SelectOption[]>(() => {
+    const lang = this.language.language();
+    return TRANSACTION_CATEGORIES.map((c) => ({
+      value: c.value,
+      label: categoryLabel(c.value, lang),
+      colorVar: c.colorVar,
+    }));
+  });
+  protected categoryLabel(value: string | undefined | null): string {
+    return categoryLabel(value, this.language.language());
+  }
   protected readonly categoryColorVar = categoryColorVar;
   protected readonly daysUntilBilling = daysUntilBilling;
-  protected readonly daysUntilBillingLabel = daysUntilBillingLabel;
-  protected readonly daysRemainingLabel = daysRemainingLabel;
+  protected daysUntilBillingLabel(billingDay: number): string {
+    return daysUntilBillingLabel(billingDay, this.language.language());
+  }
+
+  protected daysRemainingLabel(days: number): string {
+    return daysRemainingLabel(days, this.language.language());
+  }
   protected readonly tab = signal<Tab>('budgets');
 
   protected readonly loading = signal(true);
@@ -174,7 +187,7 @@ export class Budgets implements OnInit {
 
   protected saveBudget(): void {
     if (!this.budgetName().trim() || !this.budgetLimit() || this.budgetLimit()! <= 0) {
-      this.toast.error('Completează numele și o limită validă.');
+      this.toast.error(this.language.t('budgets.fillNameAndLimit'));
       return;
     }
     this.budgetSaving.set(true);
@@ -190,11 +203,11 @@ export class Budgets implements OnInit {
           this.budgets.update((list) => [budget, ...list]);
           this.budgetSaving.set(false);
           this.budgetModalOpen.set(false);
-          this.toast.success('Buget creat.');
+          this.toast.success(this.language.t('budgets.budgetCreated'));
         },
         error: (err) => {
           this.budgetSaving.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut crea bugetul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('budgets.createBudgetError')));
         },
       });
   }
@@ -202,7 +215,7 @@ export class Budgets implements OnInit {
   protected toggleBudgetActive(budget: Budget): void {
     this.budgetsApi.updateBudget(budget.id, { active: !budget.active }).subscribe({
       next: (updated) => this.budgets.update((list) => list.map((b) => (b.id === updated.id ? updated : b))),
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza bugetul.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('budgets.updateBudgetError'))),
     });
   }
 
@@ -213,11 +226,11 @@ export class Budgets implements OnInit {
       next: () => {
         this.budgets.update((list) => list.filter((b) => b.id !== budget.id));
         this.pendingDeleteBudget.set(null);
-        this.toast.success('Buget șters.');
+        this.toast.success(this.language.t('budgets.budgetDeleted'));
       },
       error: (err) => {
         this.pendingDeleteBudget.set(null);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge bugetul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('budgets.deleteBudgetError')));
       },
     });
   }
@@ -233,7 +246,7 @@ export class Budgets implements OnInit {
 
   protected saveSubscription(): void {
     if (!this.subscriptionName().trim() || !this.subscriptionAmount() || this.subscriptionAmount()! <= 0) {
-      this.toast.error('Completează numele și o sumă validă.');
+      this.toast.error(this.language.t('budgets.fillNameAndAmount'));
       return;
     }
     this.subscriptionSaving.set(true);
@@ -248,11 +261,11 @@ export class Budgets implements OnInit {
           this.subscriptions.update((list) => [sub, ...list]);
           this.subscriptionSaving.set(false);
           this.subscriptionModalOpen.set(false);
-          this.toast.success('Abonament creat.');
+          this.toast.success(this.language.t('budgets.subscriptionCreated'));
         },
         error: (err) => {
           this.subscriptionSaving.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut crea abonamentul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('budgets.createSubscriptionError')));
         },
       });
   }
@@ -271,11 +284,11 @@ export class Budgets implements OnInit {
           this.subscriptions.update((list) => [sub, ...list]);
           this.suggestions.update((list) => list.filter((s) => s.name !== suggestion.name));
           this.acceptingSuggestion.set(null);
-          this.toast.success(`"${sub.name}" adăugat ca abonament.`);
+          this.toast.success(`"${sub.name}" ${this.language.t('budgets.addedAsSubscription')}`);
         },
         error: (err) => {
           this.acceptingSuggestion.set(null);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut adăuga abonamentul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('budgets.addSubscriptionError')));
         },
       });
   }
@@ -290,7 +303,7 @@ export class Budgets implements OnInit {
   protected toggleSubscriptionActive(sub: Subscription): void {
     this.budgetsApi.updateSubscription(sub.id, { active: !sub.active }).subscribe({
       next: (updated) => this.subscriptions.update((list) => list.map((s) => (s.id === updated.id ? updated : s))),
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza abonamentul.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('budgets.updateSubscriptionError'))),
     });
   }
 
@@ -301,11 +314,11 @@ export class Budgets implements OnInit {
       next: () => {
         this.subscriptions.update((list) => list.filter((s) => s.id !== sub.id));
         this.pendingDeleteSubscription.set(null);
-        this.toast.success('Abonament șters.');
+        this.toast.success(this.language.t('budgets.subscriptionDeleted'));
       },
       error: (err) => {
         this.pendingDeleteSubscription.set(null);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge abonamentul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('budgets.deleteSubscriptionError')));
       },
     });
   }

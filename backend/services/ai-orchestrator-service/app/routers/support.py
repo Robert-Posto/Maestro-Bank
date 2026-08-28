@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from openai import APIError
 
+from app.i18n import translate
 from app.models.conversation import ConversationDetail, ConversationSummary, to_detail, to_summary
 from app.models.support import ChatRequest, ChatResponse
 from app.security import CurrentAuthorization, CurrentUserId
@@ -66,7 +67,9 @@ async def chat(
     except RuntimeError as exc:
         # Ridicată de app/llm/azure_openai.py când AZURE_OPENAI_ENDPOINT /
         # AZURE_OPENAI_API_KEY lipsesc — răspuns curat, NU un 500 brut.
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=translate("assistantNotConfigured")
+        ) from exc
     except APIError as exc:
         # Eroare REALĂ de la Azure (endpoint/deployment greșit, cheie
         # invalidă, model indisponibil etc.) — nu propagăm mesajul brut al
@@ -74,7 +77,7 @@ async def chat(
         logger.error("Azure OpenAI a răspuns cu eroare: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Azure OpenAI a răspuns cu eroare ({type(exc).__name__}). Verifică endpoint/deployment/cheia din .env.",
+            detail=translate("azureError", error_type=type(exc).__name__),
         ) from exc
 
     await conversation_service.append_turn(conversation["_id"], payload.message, response.answer, response.model_dump())

@@ -1,6 +1,7 @@
-import { Component, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 
 import { Icon } from '../icon/icon';
+import { LanguageService } from '../../../services/language.service';
 
 /**
  * Stare "gol" reutilizabilă — "No transactions yet", "No budgets yet" etc.
@@ -16,7 +17,7 @@ import { Icon } from '../icon/icon';
       <div class="empty-state__icon" aria-hidden="true">
         <app-icon [name]="icon()" [size]="26" />
       </div>
-      <p class="empty-state__title">{{ title() }}</p>
+      <p class="empty-state__title">{{ title() ?? defaultTitle() }}</p>
       @if (description()) {
         <p class="empty-state__description">{{ description() }}</p>
       }
@@ -51,7 +52,11 @@ import { Icon } from '../icon/icon';
   ],
 })
 export class EmptyState {
+  private readonly language = inject(LanguageService);
+
   readonly icon = input('info');
-  readonly title = input('Nimic de afișat încă');
+  readonly title = input<string | undefined>(undefined);
   readonly description = input<string | undefined>(undefined);
+
+  protected readonly defaultTitle = computed(() => this.language.t('common.nothingToShow'));
 }

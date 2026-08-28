@@ -1,7 +1,7 @@
 <aside class="details-panel">
   <div class="details-panel__header">
-    <h3>Detalii tranzacție</h3>
-    <button type="button" class="details-panel__close" aria-label="Închide" (click)="closed.emit()">×</button>
+    <h3>{{ 'transactions.detailsTitle' | translate }}</h3>
+    <button type="button" class="details-panel__close" [attr.aria-label]="'common.close' | translate" (click)="closed.emit()">×</button>
   </div>
 
   <div class="details-panel__hero">
@@ -23,27 +23,27 @@
       [class.details-panel__amount--in]="transaction().direction === 'incoming'"
     >
       {{ transaction().direction === 'incoming' ? '+' : '-' }}{{ transaction().amount_minor | money: transaction().currency : false }}
-      {{ transaction().currency === 'RON' ? 'lei' : transaction().currency }}
+      {{ transaction().currency === 'RON' ? ('common.lei' | translate) : transaction().currency }}
     </p>
   </div>
 
   <dl class="details-panel__grid">
     @if (transaction().description) {
       <div class="details-panel__field details-panel__field--wide">
-        <dt>Descriere</dt>
+        <dt>{{ 'common.description' | translate }}</dt>
         <dd>{{ transaction().description }}</dd>
       </div>
     }
     <div class="details-panel__field">
-      <dt>Cont / Card</dt>
-      <dd>{{ accountLabel() }}</dd>
+      <dt>{{ 'transactions.accountCard' | translate }}</dt>
+      <dd>{{ resolvedAccountLabel() }}</dd>
     </div>
     <div class="details-panel__field">
-      <dt>Categorie</dt>
+      <dt>{{ 'common.category' | translate }}</dt>
       <dd>{{ categoryLabel() }}</dd>
     </div>
     <div class="details-panel__field">
-      <dt>Contrapartidă</dt>
+      <dt>{{ 'transactions.counterparty' | translate }}</dt>
       @if (transaction().counterparty_name) {
         <dd>
           {{ transaction().counterparty_name }}
@@ -54,11 +54,11 @@
       }
     </div>
     <div class="details-panel__field">
-      <dt>Status</dt>
+      <dt>{{ 'common.status' | translate }}</dt>
       <dd><app-status-badge [status]="transaction().status" /></dd>
     </div>
     <div class="details-panel__field details-panel__field--wide">
-      <dt>ID tranzacție</dt>
+      <dt>{{ 'transactions.transactionId' | translate }}</dt>
       <dd class="details-panel__mono">{{ transaction().id }}</dd>
     </div>
   </dl>
@@ -67,23 +67,27 @@
     <div class="details-panel__hold-notice">
       <app-icon name="shield" [size]="17" />
       <div>
-        <p><strong>Transfer reținut pentru verificare de securitate.</strong></p>
+        <p><strong>{{ 'transactions.holdNoticeTitle' | translate }}</strong></p>
         @if (transaction().hold?.expires_at) {
-          <p>Se anulează automat pe {{ transaction().hold!.expires_at | date: 'dd MMM yyyy, HH:mm' }} dacă nu e rezolvat.</p>
+          <p>
+            {{ 'transactions.holdAutoCancelPrefix' | translate }}
+            {{ transaction().hold!.expires_at | date: 'dd MMM yyyy, HH:mm' }}
+            {{ 'transactions.holdAutoCancelSuffix' | translate }}
+          </p>
         }
       </div>
     </div>
     @if (!readonly()) {
       <div class="details-panel__actions">
         <app-action-button variant="danger" [fullWidth]="true" [loading]="cancellingHold()" (pressed)="cancelHold.emit()">
-          <app-icon name="close" [size]="17" /> Anulează transferul
+          <app-icon name="close" [size]="17" /> {{ 'transactions.cancelTransferAction' | translate }}
         </app-action-button>
       </div>
     }
   } @else if (!readonly()) {
     <div class="details-panel__actions">
       <app-action-button variant="secondary" [fullWidth]="true" [loading]="reporting()" (pressed)="report.emit()">
-        <app-icon name="shield" [size]="17" /> Nu recunosc această tranzacție
+        <app-icon name="shield" [size]="17" /> {{ 'transactions.dontRecognizeAction' | translate }}
       </app-action-button>
       <app-action-button
         variant="secondary"
@@ -93,13 +97,13 @@
         (pressed)="recognize.emit()"
       >
         <app-icon name="check" [size]="17" />
-        {{ transaction().recognized ? 'Marcată ca recunoscută' : 'Marchează ca recunoscută' }}
+        {{ transaction().recognized ? ('transactions.markedRecognized' | translate) : ('transactions.markRecognizedAction' | translate) }}
       </app-action-button>
     </div>
   }
 
   @if (transaction().reported) {
-    <p class="details-panel__reported-note">Tranzacția a fost raportată echipei de suport MaestroBank.</p>
+    <p class="details-panel__reported-note">{{ 'transactions.reportedNote' | translate }}</p>
   }
 
   @if (transaction().risk; as risk) {
@@ -110,7 +114,7 @@
         <app-status-badge status="risk" [toneOverride]="riskTone()" [labelOverride]="riskLabel()" />
       </div>
       @if (risk.status === 'pending') {
-        <p>Se analizează tranzacția…</p>
+        <p>{{ 'transactions.guardianAnalyzing' | translate }}</p>
       } @else {
         <p>{{ risk.phrase }}</p>
       }
@@ -126,9 +130,9 @@
 
   @if (!readonly()) {
     <div class="details-panel__support">
-      <p>Ai nevoie de ajutor cu această tranzacție?</p>
+      <p>{{ 'transactions.supportQuestion' | translate }}</p>
       <button type="button" class="details-panel__support-link" (click)="contactSupport.emit()">
-        Contactează suportul MaestroBank →
+        {{ 'transactions.contactSupportAction' | translate }} →
       </button>
     </div>
   }

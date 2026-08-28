@@ -1,19 +1,19 @@
-<app-page-header title="Investiții" subtitle="Cumpără și vinde acțiuni și ETF-uri, cu preț real de piață." />
+<app-page-header [title]="'investments.title' | translate" [subtitle]="'investments.subtitle' | translate" />
 
 @if (!usdAccount()) {
   <app-empty-state
     icon="globe"
-    title="Ai nevoie de un cont USD"
-    description="Toate instrumentele se tranzacționează în USD — deschide un cont USD din pagina Conturi înainte de a investi."
+    [title]="'investments.needUsdAccountTitle' | translate"
+    [description]="'investments.needUsdAccountDescription' | translate"
   >
-    <app-action-button (pressed)="goToOpenAccount()">Deschide cont USD</app-action-button>
+    <app-action-button (pressed)="goToOpenAccount()">{{ 'investments.openUsdAccount' | translate }}</app-action-button>
   </app-empty-state>
 } @else {
   <div class="investments-summary">
     <div class="investments-summary__card">
       <span class="investments-summary__icon investments-summary__icon--blue"><app-icon name="wallet" [size]="18" /></span>
       <div>
-        <span class="investments-summary__label">Valoare portofoliu</span>
+        <span class="investments-summary__label">{{ 'investments.portfolioValue' | translate }}</span>
         <strong>{{ portfolioValueMinor() | money: 'USD' }}</strong>
       </div>
     </div>
@@ -26,7 +26,7 @@
         <app-icon [name]="portfolioGainMinor() >= 0 ? 'arrow-up-right' : 'arrow-down-right'" [size]="18" />
       </span>
       <div>
-        <span class="investments-summary__label">Câștig/pierdere nerealizat(ă)</span>
+        <span class="investments-summary__label">{{ 'investments.unrealizedGainLoss' | translate }}</span>
         <strong class="change-text" [class.change-text--positive]="portfolioGainMinor() >= 0" [class.change-text--negative]="portfolioGainMinor() < 0">
           {{ portfolioGainMinor() | money: 'USD' }}
         </strong>
@@ -35,30 +35,30 @@
     <div class="investments-summary__card">
       <span class="investments-summary__icon investments-summary__icon--navy"><app-icon name="building" [size]="18" /></span>
       <div>
-        <span class="investments-summary__label">Sold disponibil (USD)</span>
+        <span class="investments-summary__label">{{ 'investments.availableBalanceUsd' | translate }}</span>
         <strong>{{ usdAccount()?.balance_minor | money: 'USD' }}</strong>
       </div>
     </div>
   </div>
 
   <section class="investments-section">
-    <h2>Portofoliul tău</h2>
+    <h2>{{ 'investments.yourPortfolio' | translate }}</h2>
     @if (portfolioLoading()) {
       <app-loading-skeleton [rows]="2" [height]="60" />
     } @else if (portfolio().length === 0) {
-      <app-empty-state icon="trending-up" title="Niciun instrument încă" description="Alege ceva din catalogul de mai jos ca să începi." />
+      <app-empty-state icon="trending-up" [title]="'investments.noInstrumentsYet' | translate" [description]="'investments.noInstrumentsDescription' | translate" />
     } @else {
       <div class="holdings-table-wrap">
         <table class="holdings-table">
           <thead>
             <tr>
-              <th>Simbol</th>
-              <th>Cantitate</th>
-              <th>Preț mediu</th>
-              <th>Preț curent</th>
-              <th>Valoare</th>
-              <th>Câștig/pierdere</th>
-              <th aria-label="Acțiuni"></th>
+              <th>{{ 'investments.symbol' | translate }}</th>
+              <th>{{ 'investments.quantity' | translate }}</th>
+              <th>{{ 'investments.avgPrice' | translate }}</th>
+              <th>{{ 'investments.currentPrice' | translate }}</th>
+              <th>{{ 'investments.value' | translate }}</th>
+              <th>{{ 'investments.gainLoss' | translate }}</th>
+              <th [attr.aria-label]="'investments.actionsAria' | translate"></th>
             </tr>
           </thead>
           <tbody>
@@ -78,7 +78,7 @@
                   </span>
                 </td>
                 <td (click)="$event.stopPropagation()">
-                  <app-action-button variant="ghost" (pressed)="openSellModal(holding)">Vinde</app-action-button>
+                  <app-action-button variant="ghost" (pressed)="openSellModal(holding)">{{ 'investments.sell' | translate }}</app-action-button>
                 </td>
               </tr>
             }
@@ -89,8 +89,8 @@
   </section>
 
   <section class="investments-section">
-    <h2>Indici bursieri</h2>
-    <p class="investments-section__subtitle">Informativ — un indice nu se cumpără direct; SPY/QQQ din catalogul de mai jos sunt ETF-urile care-l urmăresc.</p>
+    <h2>{{ 'investments.marketIndices' | translate }}</h2>
+    <p class="investments-section__subtitle">{{ 'investments.indicesSubtitle' | translate }}</p>
     @if (indicesLoading()) {
       <app-loading-skeleton [rows]="1" [height]="90" />
     } @else {
@@ -121,7 +121,7 @@
   </section>
 
   <section class="investments-section">
-    <h2>Catalog</h2>
+    <h2>{{ 'investments.catalog' | translate }}</h2>
     @if (instrumentsLoading()) {
       <app-loading-skeleton [rows]="3" [height]="90" />
     } @else {
@@ -132,7 +132,7 @@
           [class.category-filter__chip--active]="selectedCategory() === null"
           (click)="selectCategory(null)"
         >
-          Toate
+          {{ 'investments.allCategories' | translate }}
         </button>
         @for (group of catalogGroups(); track group.label) {
           <button
@@ -143,7 +143,7 @@
             (click)="selectCategory(group.label)"
           >
             <app-icon [name]="categoryIcon(group.label)" [size]="13" />
-            {{ group.label }}
+            {{ categoryDisplayLabel(group.label) }}
           </button>
         }
       </div>
@@ -154,9 +154,9 @@
             <div class="catalog-group__header">
               <span class="category-pill" [class]="categoryPillClass(group.label)">
                 <app-icon [name]="categoryIcon(group.label)" [size]="13" />
-                {{ group.label }}
+                {{ categoryDisplayLabel(group.label) }}
               </span>
-              <span class="catalog-group__count">{{ group.items.length }} instrumente</span>
+              <span class="catalog-group__count">{{ group.items.length }} {{ 'investments.instrumentsSuffix' | translate }}</span>
             </div>
             <div class="instruments-grid">
               @for (instrument of group.items; track instrument.symbol) {
@@ -185,7 +185,7 @@
                     (click)="$event.stopPropagation()"
                     (pressed)="openBuyModal(instrument)"
                   >
-                    Cumpără
+                    {{ 'investments.buy' | translate }}
                   </app-action-button>
                 </div>
               }
@@ -203,7 +203,7 @@
     @if (detailLoading()) {
       <app-loading-skeleton [rows]="3" [height]="50" />
     } @else if (detailError()) {
-      <app-empty-state icon="info" title="Nu am putut încărca detaliile" [description]="detailError()!" />
+      <app-empty-state icon="info" [title]="'investments.couldNotLoadDetails' | translate" [description]="detailError()!" />
     } @else if (detailData(); as detail) {
       <div class="instrument-detail">
         <div class="instrument-detail__header">
@@ -232,7 +232,7 @@
 
         <div class="instrument-detail__range">
           <div class="instrument-detail__range-label">
-            <span>Interval zi</span>
+            <span>{{ 'investments.dayRange' | translate }}</span>
             <span>{{ detail.day_low_minor | money: 'USD' }} – {{ detail.day_high_minor | money: 'USD' }}</span>
           </div>
           <div class="range-bar">
@@ -242,7 +242,7 @@
 
         <div class="instrument-detail__range">
           <div class="instrument-detail__range-label">
-            <span>52 săptămâni</span>
+            <span>{{ 'investments.week52Range' | translate }}</span>
             <span>{{ detail.week52_low_minor | money: 'USD' }} – {{ detail.week52_high_minor | money: 'USD' }}</span>
           </div>
           <div class="range-bar">
@@ -251,13 +251,13 @@
         </div>
 
         @if (detail.volume) {
-          <p class="instrument-detail__volume">Volum: {{ detail.volume | number: '1.0-0' }} acțiuni</p>
+          <p class="instrument-detail__volume">{{ 'investments.volumeLabel' | translate }} {{ detail.volume | number: '1.0-0' }} {{ 'investments.shares' | translate }}</p>
         }
 
         @if (detail.is_tradable) {
-          <app-action-button [fullWidth]="true" (pressed)="buyFromDetail()">Cumpără {{ detail.symbol }}</app-action-button>
+          <app-action-button [fullWidth]="true" (pressed)="buyFromDetail()">{{ 'investments.buy' | translate }} {{ detail.symbol }}</app-action-button>
         } @else {
-          <p class="instrument-detail__info-note">Indice informativ — nu se tranzacționează direct.</p>
+          <p class="instrument-detail__info-note">{{ 'investments.indexInfoNote' | translate }}</p>
         }
       </div>
     }
@@ -265,29 +265,29 @@
 }
 
 @if (buyModalInstrument(); as instrument) {
-  <app-modal [title]="'Cumpără ' + instrument.symbol" (closed)="closeBuyModal()">
+  <app-modal [title]="(('investments.buy' | translate) + ' ' + instrument.symbol)" (closed)="closeBuyModal()">
     <div class="trade-form">
-      <p class="trade-form__price">Preț curent: {{ instrument.price_minor | money: 'USD' }} / acțiune</p>
+      <p class="trade-form__price">{{ 'investments.currentPriceLabel' | translate }} {{ instrument.price_minor | money: 'USD' }} {{ 'investments.perShare' | translate }}</p>
       <label>
-        <span>Sumă (USD)</span>
+        <span>{{ 'investments.amountUsd' | translate }}</span>
         <input type="number" min="1" step="1" [ngModel]="buyAmountUsd()" (ngModelChange)="buyAmountUsd.set($event)" />
       </label>
       @if (instrument.price_minor) {
         <p class="trade-form__hint">
-          ≈ {{ (buyAmountUsd() * 100 / instrument.price_minor) | number: '1.0-4' }} acțiuni
+          ≈ {{ (buyAmountUsd() * 100 / instrument.price_minor) | number: '1.0-4' }} {{ 'investments.shares' | translate }}
         </p>
       }
-      <app-action-button [fullWidth]="true" [loading]="buying()" (pressed)="confirmBuy()">Confirmă cumpărarea</app-action-button>
+      <app-action-button [fullWidth]="true" [loading]="buying()" (pressed)="confirmBuy()">{{ 'investments.confirmBuy' | translate }}</app-action-button>
     </div>
   </app-modal>
 }
 
 @if (sellModalHolding(); as holding) {
-  <app-modal [title]="'Vinde ' + holding.symbol" (closed)="sellModalHolding.set(null)">
+  <app-modal [title]="(('investments.sell' | translate) + ' ' + holding.symbol)" (closed)="sellModalHolding.set(null)">
     <div class="trade-form">
-      <p class="trade-form__price">Deții {{ holding.quantity | number: '1.0-4' }} · preț curent {{ holding.current_price_minor | money: 'USD' }} / acțiune</p>
+      <p class="trade-form__price">{{ 'investments.youHold' | translate }} {{ holding.quantity | number: '1.0-4' }} · {{ 'investments.currentPriceInline' | translate }} {{ holding.current_price_minor | money: 'USD' }} {{ 'investments.perShare' | translate }}</p>
       <label>
-        <span>Cantitate</span>
+        <span>{{ 'investments.quantity' | translate }}</span>
         <input
           type="number"
           min="0"
@@ -298,9 +298,9 @@
         />
       </label>
       <p class="trade-form__hint">
-        ≈ {{ (sellQuantity() * holding.current_price_minor) | money: 'USD' }} încasați
+        ≈ {{ (sellQuantity() * holding.current_price_minor) | money: 'USD' }} {{ 'investments.approxReceived' | translate }}
       </p>
-      <app-action-button [fullWidth]="true" [loading]="selling()" (pressed)="confirmSell()">Confirmă vânzarea</app-action-button>
+      <app-action-button [fullWidth]="true" [loading]="selling()" (pressed)="confirmSell()">{{ 'investments.confirmSell' | translate }}</app-action-button>
     </div>
   </app-modal>
 }

@@ -11,7 +11,9 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { Modal } from '../../shared/components/modal/modal';
 import { Icon } from '../../shared/components/icon/icon';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { LanguageService } from '../../services/language.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5MB — vezi backend DocumentCreate.pdf_data (max_length=7_000_000 encodat)
@@ -25,13 +27,14 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 @Component({
   selector: 'app-staff-documents',
   standalone: true,
-  imports: [DatePipe, FormsModule, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Modal, Icon],
+  imports: [DatePipe, FormsModule, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Modal, Icon, TranslatePipe],
   templateUrl: './staff-documents.html',
   styleUrl: './staff-documents.css',
 })
 export class StaffDocuments implements OnInit {
   private readonly staffApi = inject(StaffService);
   private readonly toast = inject(ToastService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -64,7 +67,7 @@ export class StaffDocuments implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(extractErrorMessage(err, 'Nu am putut încărca documentele trimise.'));
+        this.error.set(extractErrorMessage(err, this.language.t('staffDocuments.loadError')));
         this.loading.set(false);
       },
     });
@@ -76,10 +79,14 @@ export class StaffDocuments implements OnInit {
     return 'warning';
   }
 
+  // 'signed' nu are o etichetă generică potrivită în STATUS_LABEL_MAP-ul
+  // StatusBadge (acela mapează 'pending' pe "În procesare", nu pe "În
+  // așteptare" — cuvânt diferit, intenționat, pentru un document care
+  // așteaptă semnătura clientului) — labelOverride rămâne, cu text propriu.
   protected statusLabel(status: StaffDocumentView['status']): string {
-    if (status === 'signed') return 'Semnat';
-    if (status === 'cancelled') return 'Anulat';
-    return 'În așteptare';
+    if (status === 'signed') return this.language.t('staffDocuments.statusSigned');
+    if (status === 'cancelled') return this.language.t('staffDocuments.statusCancelled');
+    return this.language.t('staffDocuments.statusPending');
   }
 
   // --- Trimitere document nou -----------------------------------------------
@@ -136,17 +143,17 @@ export class StaffDocuments implements OnInit {
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      this.sendError.set('Alege un fișier PDF.');
+      this.sendError.set(this.language.t('staffDocuments.choosePdf'));
       return;
     }
     if (file.size > MAX_PDF_BYTES) {
-      this.sendError.set('Fișierul este prea mare (limită 5MB).');
+      this.sendError.set(this.language.t('staffDocuments.fileTooLarge'));
       return;
     }
 
     this.sendError.set(null);
     const reader = new FileReader();
-    reader.onerror = () => this.sendError.set('Nu am putut citi fișierul — încearcă din nou.');
+    reader.onerror = () => this.sendError.set(this.language.t('staffDocuments.fileReadError'));
     reader.onload = () => {
       this.pdfDataUri = reader.result as string;
       this.fileName.set(file.name);
@@ -159,15 +166,15 @@ export class StaffDocuments implements OnInit {
     const title = this.titleInput().trim();
 
     if (!customer) {
-      this.sendError.set('Alege un client din rezultatele căutării.');
+      this.sendError.set(this.language.t('staffDocuments.chooseCustomer'));
       return;
     }
     if (!title) {
-      this.sendError.set('Titlul este obligatoriu.');
+      this.sendError.set(this.language.t('staffDocuments.titleRequired'));
       return;
     }
     if (!this.pdfDataUri) {
-      this.sendError.set('Alege un fișier PDF.');
+      this.sendError.set(this.language.t('staffDocuments.choosePdf'));
       return;
     }
 
@@ -178,11 +185,13 @@ export class StaffDocuments implements OnInit {
         this.saving.set(false);
         this.sendOpen.set(false);
         this.documents.update((list) => [doc, ...list]);
-        this.toast.success(`Documentul a fost trimis către ${customer.first_name} ${customer.last_name}.`);
+        this.toast.success(
+          this.language.t('staffDocuments.sentToast').replace('{name}', `${customer.first_name} ${customer.last_name}`),
+        );
       },
       error: (err) => {
         this.saving.set(false);
-        this.sendError.set(extractErrorMessage(err, 'Nu am putut trimite documentul.'));
+        this.sendError.set(extractErrorMessage(err, this.language.t('staffDocuments.sendError')));
       },
     });
   }
@@ -208,11 +217,11 @@ export class StaffDocuments implements OnInit {
         this.cancelling.set(false);
         this.pendingCancel.set(null);
         this.documents.update((list) => list.map((d) => (d.id === target.id ? { ...d, status: 'cancelled' } : d)));
-        this.toast.success('Documentul a fost anulat.');
+        this.toast.success(this.language.t('staffDocuments.cancelledToast'));
       },
       error: (err) => {
         this.cancelling.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut anula documentul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('staffDocuments.cancelError')));
       },
     });
   }

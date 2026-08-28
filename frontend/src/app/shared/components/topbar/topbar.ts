@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 
 import { AuthService } from '../../../services/auth.service';
+import { LanguageService } from '../../../services/language.service';
 import { ThemeService } from '../../../services/theme.service';
 import { AppNotification, NotificationKind, NotificationsService } from '../notifications/notifications.service';
 import { Icon } from '../icon/icon';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /** Unde duce click-ul pe o notificare, după tipul ei — vezi
  * NotificationKind (support-service/app/models.py e sursa reală a
@@ -51,7 +53,7 @@ const NOTIFICATIONS_POLL_INTERVAL_MS = 30_000;
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [RouterLink, FormsModule, Icon, DatePipe],
+  imports: [RouterLink, FormsModule, Icon, DatePipe, TranslatePipe],
   templateUrl: './topbar.html',
   styleUrl: './topbar.css',
 })
@@ -61,6 +63,7 @@ export class Topbar implements OnInit, OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   protected readonly notificationsService = inject(NotificationsService);
   protected readonly themeService = inject(ThemeService);
+  protected readonly languageService = inject(LanguageService);
 
   protected readonly currentUser = this.auth.currentUser;
   protected readonly fullName = computed(() => {
