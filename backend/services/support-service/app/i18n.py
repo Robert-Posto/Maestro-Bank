@@ -87,7 +87,7 @@ T: dict[str, dict[Language, str]] = {
 # --- Notificări: catalog RENDERED-AT-READ ---------------------------------
 #
 # Notificările NU se mai stochează ca text gata-format — serviciile-sursă
-# (accounts/loans/points/transactions + support-service însuși) trimit doar
+# (accounts/loans/transactions + support-service însuși) trimit doar
 # `message_key` + `message_params` (valori BRUTE: `*_minor`, `currency`,
 # nume, numere). `render_notification()` de mai jos le compune în limba
 # CITITORULUI, la fiecare `GET /notifications` — deci o notificare veche își
@@ -144,19 +144,6 @@ NOTIFICATION_MESSAGES: dict[str, dict[Language, str]] = {
     "loanClosed": {
         "ro": "Ultima rată a fost plătită — creditul e închis.",
         "en": "The final instalment was paid — the loan is closed.",
-    },
-    # points-service
-    "welcomeBonus": {
-        "ro": "Ai primit {points} puncte de bun-venit — le poți folosi direct pentru o recompensă.",
-        "en": "You received {points} welcome points — you can use them right away for a reward.",
-    },
-    "rewardRedeemed": {
-        "ro": 'Ai răscumpărat "{title}" — {amount} creditați în cont.',
-        "en": 'You redeemed "{title}" — {amount} credited to your account.',
-    },
-    "wheelWin": {
-        "ro": "Ai câștigat {amount} la roata norocului!",
-        "en": "You won {amount} on the wheel of fortune!",
     },
 }
 
@@ -266,7 +253,8 @@ def render_notification(
     lang: Language = language or _current_language.get()
     params = dict(message_params or {})
     currency = str(params.pop("currency", "RON"))
-    # `title` cu variante ro/en (recompensele din points-service)
+    # `title` cu variante ro/en, când o notificare veche e potrivită înapoi
+    # din text (vezi render_notification_from_text)
     if "title_ro" in params or "title_en" in params:
         params["title"] = params.pop("title_en" if lang == "en" else "title_ro", None) or params.pop(
             "title_ro", ""

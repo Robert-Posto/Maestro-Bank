@@ -49,9 +49,8 @@ class TicketOut(BaseModel):
 
 NotificationKind = Literal[
     "budget", "card", "transfer", "transfer_received", "transfer_hold", "transfer_hold_cancelled", "system",
-    "document_sign", "reward_redeemed", "raffle_win",
+    "document_sign",
     "loan_approved", "loan_payment", "loan_payment_missed", "loan_paid_off",
-    "welcome_bonus_claimed",
 ]
 
 
