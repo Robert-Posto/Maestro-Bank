@@ -98,6 +98,23 @@
   text-overflow: ellipsis;
 }
 
+/* Săgeata REALĂ (iconiță, nu doar caracterul "→" din text) care arată că
+   ai fost redirecționat de la Asistentul general la Support Agent — vezi
+   isConfirmedSupport în support.ts. Colorată distinct (nu gri, ca restul
+   textului secundar), ca să nu se piardă vizual lângă titlul îngroșat. */
+.support-chat__identity-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.support-chat__identity-breadcrumb app-icon {
+  flex-shrink: 0;
+  color: var(--mb-blue-500);
+}
+
 .support-chat__identity-text span {
   overflow: hidden;
   font-size: var(--mb-font-size-xs);

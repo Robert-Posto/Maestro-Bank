@@ -173,18 +173,17 @@ export class Support implements OnInit, OnDestroy {
    * (ramura spending_forecast din askAgent navighează imediat la Copilot,
    * nu populează niciodată chatMessages aici). Înainte de primul mesaj
    * identitatea rămâne generică ("Asistent"), fiindcă întrebarea încă
-   * n-a fost clasificată — poate ajunge oricare din cei doi agenți. */
-  private readonly isConfirmedSupport = computed(() => this.chatMessages().length > 0);
+   * n-a fost clasificată — poate ajunge oricare din cei doi agenți.
+   * Folosit și în template (vezi support.html), de-aia e protected, nu
+   * private ca înainte. */
+  protected readonly isConfirmedSupport = computed(() => this.chatMessages().length > 0);
 
-  /** Titlul de sus al paginii (PageHeader) — vezi isConfirmedSupport. */
+  /** Titlul de sus al paginii (PageHeader, doar text — vezi
+   * support.html pentru săgeata REALĂ, ca iconiță, din bara de
+   * identitate a chat-ului, care nu poate exista aici, PageHeader
+   * acceptă doar string). */
   protected readonly pageTitle = computed(() => (this.isConfirmedSupport() ? 'Asistent → Support Agent' : 'Asistent'));
 
-  /** Numele + iconița din bara de identitate a chat-ului — aceeași logică
-   * ca pageTitle, dar cu subtitlu propriu (mai descriptiv aici decât în
-   * PageHeader). */
-  protected readonly identityName = computed(() =>
-    this.isConfirmedSupport() ? 'Asistent → Support Agent' : 'Asistent MaestroBank',
-  );
   protected readonly identitySubtitle = computed(() =>
     this.isConfirmedSupport()
       ? 'Cont, card, tranzacții și tichete'

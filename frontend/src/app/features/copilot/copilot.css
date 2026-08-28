@@ -97,6 +97,23 @@
   text-overflow: ellipsis;
 }
 
+/* Săgeata REALĂ (iconiță, nu doar caracterul "→" din text) — vezi
+   support.css::.support-chat__identity-breadcrumb, aceeași idee, oglindită
+   aici (MaestroAssistent e neambiguu din prima, deci breadcrumb-ul e mereu
+   vizibil, nu condiționat ca la Support). */
+.copilot-chat__identity-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.copilot-chat__identity-breadcrumb app-icon {
+  flex-shrink: 0;
+  color: var(--mb-blue-500);
+}
+
 .copilot-chat__identity-text span {
   overflow: hidden;
   font-size: var(--mb-font-size-xs);

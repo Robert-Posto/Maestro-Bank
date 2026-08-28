@@ -7,7 +7,15 @@
       <div class="support-chat__identity">
         <span class="support-chat__identity-avatar"><app-icon [name]="identityIcon()" [size]="17" /></span>
         <div class="support-chat__identity-text">
-          <strong>{{ identityName() }}</strong>
+          @if (isConfirmedSupport()) {
+            <strong class="support-chat__identity-breadcrumb">
+              <span>Asistent</span>
+              <app-icon name="chevron-right" [size]="12" />
+              <span>Support Agent</span>
+            </strong>
+          } @else {
+            <strong>Asistent MaestroBank</strong>
+          }
           <span>{{ identitySubtitle() }}</span>
         </div>
       </div>
