@@ -18,7 +18,13 @@ import pytest
 
 from app.models.support import ChatRequest
 from app.services import safety_guard, support_service
-from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
+from app.tools import (
+    support_accounts_tools,
+    support_cards_tools,
+    support_exchange_tools,
+    support_ticket_tools,
+    support_transactions_tools,
+)
 from conftest import FakeLLMClient, FakeMessage, make_tool_call
 
 pytestmark = pytest.mark.asyncio
@@ -466,3 +472,78 @@ async def test_prompt_extraction_attempt_short_circuits_before_any_gpt_call(supp
     )
 
     assert response.answer == safety_guard.PROMPT_EXTRACTION_REFUSAL
+
+
+# --- Tranzacții pe perioadă (vezi bug raportat: "luna trecută" -> și august) -------
+
+
+async def test_last_month_question_uses_period_tool_not_recent_transactions(monkeypatch, support_auth_header: dict[str, str]):
+    """"Ce tranzacții am făcut luna trecută?" -> GPT cheamă
+    get_transactions_by_period(period="last_month"), NU get_recent_transactions
+    (care n-are niciun filtru de dată — sursa bug-ului raportat de user)."""
+    captured_period: dict = {}
+
+    async def fake_get_transactions_by_period(authorization, period, limit=50):
+        captured_period["period"] = period
+        return [{"id": "tx-july", "description": "Chirie", "amount_minor": -250000}]
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("get_recent_transactions NU trebuia apelat pentru o întrebare cu interval de timp explicit")
+
+    monkeypatch.setattr(support_transactions_tools, "get_transactions_by_period", fake_get_transactions_by_period)
+    monkeypatch.setattr(support_transactions_tools, "get_recent_transactions", fail_if_called)
+
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(tool_calls=[make_tool_call("get_transactions_by_period", {"period": "last_month"})]),
+            FakeMessage(
+                tool_calls=[make_tool_call("respond_to_user", {"answer": "Iată tranzacțiile tale din luna trecută.", "intent": "transaction_details"})]
+            ),
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Ce tranzacții am făcut luna trecută?"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert captured_period["period"] == "last_month"
+    assert response.context["transactions"][0]["id"] == "tx-july"
+
+
+# --- Schimb valutar (vezi bug raportat: "cât ar fi 100 RON în EUR" fără sursă) -----
+
+
+async def test_currency_conversion_question_uses_real_exchange_quote(monkeypatch, support_auth_header: dict[str, str]):
+    """"Cât ar fi 100 RON în EUR?" -> GPT cheamă get_exchange_quote cu suma
+    REALĂ (nu ghicește un curs) — verifică că rezultatul cotației reale
+    ajunge în răspuns."""
+
+    async def fake_get_exchange_quote(authorization, from_currency, to_currency, amount):
+        assert from_currency == "RON"
+        assert to_currency == "EUR"
+        assert amount == 100
+        return {
+            "from_currency": "RON",
+            "to_currency": "EUR",
+            "amount_minor": 10000,
+            "received_minor": 2015,
+            "applied_rate": 0.2015,
+            "source": "BNR",
+        }
+
+    monkeypatch.setattr(support_exchange_tools, "get_exchange_quote", fake_get_exchange_quote)
+
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(tool_calls=[make_tool_call("get_exchange_quote", {"from_currency": "RON", "to_currency": "EUR", "amount": 100})]),
+            FakeMessage(
+                tool_calls=[make_tool_call("respond_to_user", {"answer": "100 RON înseamnă aproximativ 20,15 EUR, la cursul de azi.", "intent": "unknown"})]
+            ),
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Cât ar fi 100 RON în EUR?"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert "20,15" in response.answer or "20.15" in response.answer

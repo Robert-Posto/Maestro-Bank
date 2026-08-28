@@ -25,7 +25,13 @@ from app.llm.azure_openai import chat_completion
 from app.models.support import ChatMessage
 from app.prompts.support_prompt import build_support_system_prompt
 from app.services import safety_guard
-from app.tools import support_accounts_tools, support_cards_tools, support_ticket_tools, support_transactions_tools
+from app.tools import (
+    support_accounts_tools,
+    support_cards_tools,
+    support_exchange_tools,
+    support_ticket_tools,
+    support_transactions_tools,
+)
 
 logger = logging.getLogger("ai-orchestrator-service")
 
@@ -72,8 +78,11 @@ _READ_TOOL_MODULES: dict[str, Any] = {
     "get_card_status": support_cards_tools,
     "get_transaction_details": support_transactions_tools,
     "get_recent_transactions": support_transactions_tools,
+    "get_transactions_by_period": support_transactions_tools,
     "get_transfer_status": support_transactions_tools,
     "get_my_support_tickets": support_ticket_tools,
+    "get_exchange_rates": support_exchange_tools,
+    "get_exchange_quote": support_exchange_tools,
 }
 
 WRITE_TOOLS = {"create_support_ticket"}
@@ -87,6 +96,7 @@ CONTROL_TOOL = "respond_to_user"
 # NU de model — modelul nu poate "inventa" sau denatura ce ajunge aici.
 _CONTEXT_KEY_BY_TOOL: dict[str, str] = {
     "get_recent_transactions": "transactions",
+    "get_transactions_by_period": "transactions",
     "get_transaction_details": "transaction",
     "get_transfer_status": "transaction",
     "get_card_status": "card",
@@ -165,6 +175,68 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Câte tranzacții, implicit 10."}},
                 "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_transactions_by_period",
+            "description": (
+                "Întoarce tranzacțiile userului dintr-o perioadă NUMITĂ, cu limite EXACTE calculate "
+                "determinist (NU de tine). Folosește ACEST tool, NU get_recent_transactions, de îndată "
+                "ce userul menționează (explicit sau implicit) un interval de timp — 'luna trecută', "
+                "'luna asta', 'săptămâna asta', 'azi', 'ultimele 7/30/90 de zile'. NU încerca să deduci "
+                "singur ce e 'luna trecută' dintr-o listă brută de tranzacții — vei greși."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["today", "this_week", "this_month", "last_month", "last_7_days", "last_30_days", "last_90_days"],
+                    },
+                    "limit": {"type": "integer", "description": "Câte tranzacții maxim, implicit 50."},
+                },
+                "required": ["period"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_exchange_rates",
+            "description": (
+                "Întoarce cursurile curente (BNR + comisionul MaestroBank) pentru toate valutele "
+                "suportate. Folosește-l pentru o întrebare generală despre curs, FĂRĂ o sumă anume "
+                "de convertit (ex. 'cât e cursul la euro azi?')."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_exchange_quote",
+            "description": (
+                "Calculează o cotație REALĂ (curs BNR + comisionul MaestroBank, exact ca pagina "
+                "Schimb valutar) pentru schimbul unei sume dintr-o valută în alta. Folosește ACEST "
+                "tool pentru orice întrebare de tip 'cât ar fi X RON în EUR' / 'cât primesc dacă "
+                "schimb 50 de euro' — NU ghici, NU calcula tu un curs, NU refuza răspunsul cu "
+                "'nu am informația asta' (schimbul valutar AI o sursă certă, spre deosebire de alte "
+                "comisioane despre care chiar nu ai date)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_currency": {"type": "string", "description": "Cod ISO 3 litere, ex. RON."},
+                    "to_currency": {"type": "string", "description": "Cod ISO 3 litere, ex. EUR."},
+                    "amount": {
+                        "type": "number",
+                        "description": "Suma în unități întregi ale valutei sursă (ex. 100 pentru 100 RON), NU în bani/cenți.",
+                    },
+                },
+                "required": ["from_currency", "to_currency", "amount"],
             },
         },
     },
