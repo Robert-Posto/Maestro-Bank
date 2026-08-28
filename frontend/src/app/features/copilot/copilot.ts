@@ -130,7 +130,7 @@ export class Copilot implements OnInit, OnDestroy {
     const presetQuestion = this.route.snapshot.queryParamMap.get('q');
     if (presetQuestion) {
       this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
-      this.toast.info('Te-am adus la MaestroAgent — întrebarea ta ține de buget/prognoză.');
+      this.toast.info('Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.');
       this.ask(presetQuestion);
     }
   }

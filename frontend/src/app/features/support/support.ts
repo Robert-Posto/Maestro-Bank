@@ -330,8 +330,10 @@ export class Support implements OnInit, OnDestroy {
       this.assistant.classify(text).subscribe({
         next: (result) => {
           if (result.agent === 'spending_forecast') {
+            this.toast.info('Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.');
             this.router.navigate([result.route], { queryParams: { q: text } });
           } else {
+            this.toast.info('Te-am direcționat către Support — întrebarea ta ține de cont/card/tranzacții.');
             this.sendToSupportAgent(text);
           }
         },
