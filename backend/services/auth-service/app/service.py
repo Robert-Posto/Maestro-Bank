@@ -21,6 +21,7 @@ from app import webauthn_service
 from app.config import settings
 from app.database import get_database
 from app.email_service import send_verification_email
+from app.i18n import translate
 from app.login_events import get_recent_login_events, record_login_attempt
 from app.models import ChangePasswordRequest, ProfilePictureUpdate, UserLogin, UserRegister
 from app.security import create_access_token, decode_access_token, hash_password, verify_password
@@ -67,7 +68,7 @@ async def register_user(payload: UserRegister) -> dict:
 
     existing = await db.users.find_one({"email": payload.email})
     if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Există deja un cont cu acest email.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("userExists"))
 
     user_doc = {
         "first_name": payload.first_name,
@@ -119,7 +120,7 @@ async def send_verification_code(user_id: str) -> None:
     db = get_database()
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
 
     code = _generate_verification_code()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.email_verification_code_ttl_minutes)
@@ -134,7 +135,7 @@ async def verify_email_code(user_id: str, code: str) -> None:
     db = get_database()
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
 
     if user.get("email_verified"):
         return
@@ -152,15 +153,15 @@ async def verify_email_code(user_id: str, code: str) -> None:
     stored_code = user.get("email_verification_code")
     expires_at = user.get("email_verification_expires_at")
     if not stored_code or not expires_at:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cere mai întâi un cod de verificare.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("requestVerificationCodeFirst"))
 
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) > expires_at:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codul a expirat. Cere unul nou.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("codeExpired"))
 
     if not secrets.compare_digest(stored_code, code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cod incorect.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("incorrectCode"))
 
     await db.users.update_one(
         {"_id": user["_id"]},
@@ -191,11 +192,11 @@ async def mark_identity_verified(user_id: str) -> None:
     try:
         object_id = ObjectId(user_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidUserId")) from exc
 
     result = await db.users.update_one({"_id": object_id}, {"$set": {"identity_verified": True}})
     if result.matched_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
     logger.info("auth-service: identitate verificată pentru user_id=%s", user_id)
 
 
@@ -212,14 +213,14 @@ async def authenticate_user(payload: UserLogin, *, ip_address: str | None = None
             ip_address=ip_address,
             user_agent=user_agent,
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email sau parolă incorectă.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalidCredentials"))
 
     if not user.get("is_active", True):
         await record_login_attempt(
             user_id=str(user["_id"]), email_attempted=payload.email, success=False,
             ip_address=ip_address, user_agent=user_agent,
         )
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Contul este dezactivat.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("accountDisabled"))
 
     token = create_access_token(user_id=str(user["_id"]), email=user["email"], role=user.get("role", "customer"))
     await record_login_attempt(
@@ -234,24 +235,24 @@ async def get_current_user(authorization: str | None) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Lipsește header-ul Authorization: Bearer <token>.",
+            detail=translate("missingAuthorizationHeader"),
         )
 
     token = authorization.split(" ", 1)[1]
     try:
         payload = decode_access_token(token)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid sau expirat.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenInvalidOrExpired")) from exc
 
     try:
         user_object_id = ObjectId(payload.get("sub", ""))
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenInvalid")) from exc
 
     db = get_database()
     user = await db.users.find_one({"_id": user_object_id})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu mai există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNoLongerExists"))
 
     return user
 
@@ -267,7 +268,7 @@ async def change_password(authorization: str | None, payload: ChangePasswordRequ
 
     if not verify_password(payload.current_password, user["password_hash"]):
         logger.info("auth-service: schimbare parolă eșuată (parolă curentă incorectă) pentru user_id=%s", user["_id"])
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Parola curentă este incorectă.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("currentPasswordIncorrect"))
 
     db = get_database()
     now = datetime.now(timezone.utc)
@@ -317,12 +318,12 @@ async def get_user_name(user_id: str) -> dict:
     try:
         object_id = ObjectId(user_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidUserId")) from exc
 
     db = get_database()
     user = await db.users.find_one({"_id": object_id})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
 
     return {"first_name": user["first_name"], "last_name": user["last_name"]}
 
@@ -335,12 +336,12 @@ async def get_user_contact(user_id: str) -> dict:
     try:
         object_id = ObjectId(user_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidUserId")) from exc
 
     db = get_database()
     user = await db.users.find_one({"_id": object_id})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
 
     return {
         "first_name": user["first_name"],
@@ -392,12 +393,12 @@ async def get_security_facts(user_id: str) -> dict:
     try:
         object_id = ObjectId(user_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de utilizator invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidUserId")) from exc
 
     db = get_database()
     user = await db.users.find_one({"_id": object_id})
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizatorul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("userNotFound"))
 
     # naiv-UTC, nu aware — get_recent_credential_events face comparații
     # Python directe pe datetime-uri citite din Mongo, care vin mereu

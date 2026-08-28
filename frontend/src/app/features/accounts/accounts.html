@@ -1,42 +1,42 @@
-<app-page-header title="Conturi" subtitle="Toate conturile tale MaestroBank.">
+<app-page-header [title]="'accounts.title' | translate" [subtitle]="'accounts.subtitle' | translate">
   @if (availableTypes().length > 0) {
-    <app-action-button (pressed)="openCreateModal()"><app-icon name="plus" [size]="16" /> Cont nou</app-action-button>
+    <app-action-button (pressed)="openCreateModal()"><app-icon name="plus" [size]="16" /> {{ 'accounts.newAccount' | translate }}</app-action-button>
   }
 </app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="2" [height]="180" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca conturile" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'accounts.loadErrorTitle' | translate" [description]="error()!" />
 } @else if (accounts().length === 0) {
-  <app-empty-state icon="wallet" title="Niciun cont încă" description="Contul tău se creează automat la înregistrare." />
+  <app-empty-state icon="wallet" [title]="'accounts.noAccountsYet' | translate" [description]="'accounts.noAccountsYetDescription' | translate" />
 } @else {
   <div class="accounts-summary">
     <div class="accounts-summary__card">
       <span class="accounts-summary__icon accounts-summary__icon--blue"><app-icon name="wallet" [size]="18" /></span>
       <div>
-        <span class="accounts-summary__label">Sold total</span>
+        <span class="accounts-summary__label">{{ 'accounts.totalBalance' | translate }}</span>
         <strong>{{ totalBalanceMinor() | money: 'RON' }}</strong>
       </div>
     </div>
     <div class="accounts-summary__card">
       <span class="accounts-summary__icon accounts-summary__icon--navy"><app-icon name="cards" [size]="18" /></span>
       <div>
-        <span class="accounts-summary__label">Cont curent</span>
+        <span class="accounts-summary__label">{{ 'accounts.currentAccount' | translate }}</span>
         <strong>{{ (currentAccount()?.balance_minor ?? 0) | money: 'RON' }}</strong>
       </div>
     </div>
     <div class="accounts-summary__card">
       <span class="accounts-summary__icon accounts-summary__icon--green"><app-icon name="sparkles" [size]="18" /></span>
       <div>
-        <span class="accounts-summary__label">Pus deoparte</span>
+        <span class="accounts-summary__label">{{ 'accounts.setAside' | translate }}</span>
         <strong>{{ setAsideMinor() | money: 'RON' }}</strong>
       </div>
     </div>
     <div class="accounts-summary__card">
       <span class="accounts-summary__icon accounts-summary__icon--navy"><app-icon name="building" [size]="18" /></span>
       <div>
-        <span class="accounts-summary__label">Conturi deschise</span>
+        <span class="accounts-summary__label">{{ 'accounts.accountsOpened' | translate }}</span>
         <strong>{{ accounts().length }} / {{ maxAccounts }}</strong>
       </div>
     </div>
@@ -44,17 +44,17 @@
 
   <div class="accounts-tabs">
     <button type="button" [class.accounts-tab--active]="tab() === 'accounts'" (click)="tab.set('accounts')">
-      <app-icon name="accounts" [size]="15" /> Conturi
+      <app-icon name="accounts" [size]="15" /> {{ 'accounts.tabAccounts' | translate }}
       <span class="accounts-tabs__count">{{ accounts().length }}</span>
     </button>
     <button type="button" [class.accounts-tab--active]="tab() === 'pockets'" (click)="tab.set('pockets')">
-      <app-icon name="wallet" [size]="15" /> Obiective
+      <app-icon name="wallet" [size]="15" /> {{ 'accounts.tabGoals' | translate }}
       @if (pockets().length > 0) {
         <span class="accounts-tabs__count">{{ pockets().length }}</span>
       }
     </button>
     <button type="button" [class.accounts-tab--active]="tab() === 'deposits'" (click)="tab.set('deposits')">
-      <app-icon name="shield" [size]="15" /> Depozite
+      <app-icon name="shield" [size]="15" /> {{ 'accounts.tabDeposits' | translate }}
       @if (activeTermDeposits().length > 0) {
         <span class="accounts-tabs__count">{{ activeTermDeposits().length }}</span>
       }
@@ -79,44 +79,44 @@
         </div>
 
         <p class="account-card__type">
-          {{ catalog[account.account_type].label }}
+          {{ accountTypeLabelFor(account.account_type) }}
           @if (account.verification_document_name) {
-            <span class="account-card__verified" title="Document justificativ atașat"><app-icon name="check" [size]="11" /> Verificat</span>
+            <span class="account-card__verified" [title]="'accounts.documentAttachedTitle' | translate"><app-icon name="check" [size]="11" /> {{ 'accounts.verified' | translate }}</span>
           }
         </p>
         <p class="account-card__iban">{{ account.iban }}</p>
 
         <div class="account-card__balance">
-          <span>Sold disponibil</span>
+          <span>{{ 'accounts.availableBalance' | translate }}</span>
           <strong>{{ account.balance_minor | money: account.currency }}</strong>
         </div>
 
         <dl class="account-card__meta">
           <div>
-            <dt>Monedă</dt>
+            <dt>{{ 'accounts.currency' | translate }}</dt>
             <dd>{{ account.currency }}</dd>
           </div>
           <div>
-            <dt>Deschis la</dt>
+            <dt>{{ 'accounts.openedAt' | translate }}</dt>
             <dd>{{ account.created_at | date: 'dd MMM yyyy' }}</dd>
           </div>
         </dl>
 
         <div class="account-card__actions">
-          <button type="button" class="account-card__icon-btn" title="Copiază IBAN" (click)="copyIban(account)">
+          <button type="button" class="account-card__icon-btn" [title]="'accounts.copyIban' | translate" (click)="copyIban(account)">
             <app-icon [name]="copiedId() === account.id ? 'check' : 'copy'" [size]="15" />
           </button>
-          <button type="button" class="account-card__icon-btn" title="Transfer" (click)="goToTransfer()">
+          <button type="button" class="account-card__icon-btn" [title]="'accounts.transfer' | translate" (click)="goToTransfer()">
             <app-icon name="transfer" [size]="15" />
           </button>
-          <button type="button" class="account-card__icon-btn" title="Extras de cont" (click)="openStatementModal(account)">
+          <button type="button" class="account-card__icon-btn" [title]="'accounts.statement' | translate" (click)="openStatementModal(account)">
             <app-icon name="receipt" [size]="15" />
           </button>
           <button
             type="button"
             class="account-card__icon-btn account-card__icon-btn--danger"
             [disabled]="!canDelete(account)"
-            [title]="canDelete(account) ? 'Șterge contul' : 'Contul curent nu poate fi șters'"
+            [title]="(canDelete(account) ? 'accounts.deleteAccount' : 'accounts.currentAccountCannotBeDeleted') | translate"
             (click)="requestDelete(account)"
           >
             <app-icon name="trash" [size]="15" />
@@ -128,7 +128,7 @@
 
   <div class="accounts-footer">
     <app-action-button variant="secondary" (pressed)="goToTransactions()">
-      <app-icon name="transactions" [size]="16" /> Vezi toate tranzacțiile
+      <app-icon name="transactions" [size]="16" /> {{ 'accounts.viewAllTransactions' | translate }}
     </app-action-button>
   </div>
   }
@@ -137,14 +137,14 @@
   <section class="pockets-section">
     <div class="pockets-section__header">
       <div>
-        <h2>Obiective de economisire</h2>
+        <h2>{{ 'accounts.savingsGoals' | translate }}</h2>
         <p class="pockets-section__subtitle">
-          Bani rezervați din contul tău RON — rămân disponibili instant, doar etichetați pentru un scop.
+          {{ 'accounts.savingsGoalsSubtitle' | translate }}
         </p>
       </div>
       <app-action-button variant="secondary" (pressed)="openPocketCreateModal()">
         <app-icon name="plus" [size]="16" />
-        Obiectiv nou
+        {{ 'accounts.newGoal' | translate }}
       </app-action-button>
     </div>
 
@@ -153,8 +153,8 @@
     } @else if (pockets().length === 0) {
       <app-empty-state
         icon="wallet"
-        title="Niciun obiectiv încă"
-        description="Creează unul pentru vacanță, un fond de urgență sau orice altceva vrei să economisești."
+        [title]="'accounts.noGoalsYet' | translate"
+        [description]="'accounts.noGoalsYetDescription' | translate"
       />
     } @else {
       <div class="pockets-grid">
@@ -165,7 +165,7 @@
               <button
                 type="button"
                 class="pocket-card__delete"
-                aria-label="Șterge obiectivul"
+                [attr.aria-label]="'accounts.deleteGoal' | translate"
                 (click)="deletePocket(pocket)"
               >
                 <app-icon name="trash" [size]="15" />
@@ -174,7 +174,7 @@
 
             <div class="pocket-card__amounts">
               <span class="pocket-card__saved">{{ pocket.saved_minor | money: currentAccount()?.currency }}</span>
-              <span class="pocket-card__target">din {{ pocket.target_minor | money: currentAccount()?.currency }}</span>
+              <span class="pocket-card__target">{{ 'accounts.of' | translate }} {{ pocket.target_minor | money: currentAccount()?.currency }}</span>
             </div>
 
             <div class="pocket-card__bar">
@@ -185,9 +185,9 @@
             </div>
 
             <div class="pocket-card__actions">
-              <app-action-button variant="secondary" (pressed)="openDepositModal(pocket)">Adaugă</app-action-button>
+              <app-action-button variant="secondary" (pressed)="openDepositModal(pocket)">{{ 'common.add' | translate }}</app-action-button>
               @if (pocket.saved_minor > 0) {
-                <app-action-button variant="ghost" (pressed)="withdrawAll(pocket)">Eliberează tot</app-action-button>
+                <app-action-button variant="ghost" (pressed)="withdrawAll(pocket)">{{ 'accounts.releaseAll' | translate }}</app-action-button>
               }
             </div>
           </div>
@@ -195,7 +195,7 @@
       </div>
 
       <p class="pockets-section__total">
-        Total alocat: {{ totalAllocatedMinor() | money: currentAccount()?.currency }}
+        {{ 'accounts.totalAllocated' | translate }} {{ totalAllocatedMinor() | money: currentAccount()?.currency }}
       </p>
     }
   </section>
@@ -205,14 +205,14 @@
   <section class="deposits-section">
     <div class="pockets-section__header">
       <div>
-        <h2>Depozite la termen</h2>
+        <h2>{{ 'accounts.termDeposits' | translate }}</h2>
         <p class="pockets-section__subtitle">
-          Dobândă mai bună pentru bani pe care nu-i atingi o vreme — RON, EUR, USD sau GBP.
+          {{ 'accounts.termDepositsSubtitle' | translate }}
         </p>
       </div>
       <app-action-button variant="secondary" (pressed)="openDepositCreateModal()">
         <app-icon name="plus" [size]="16" />
-        Depozit nou
+        {{ 'accounts.newDeposit' | translate }}
       </app-action-button>
     </div>
 
@@ -221,8 +221,8 @@
     } @else if (termDeposits().length === 0) {
       <app-empty-state
         icon="shield"
-        title="Niciun depozit încă"
-        description="Deschide un depozit la termen pentru o dobândă mai bună decât la un cont de economii."
+        [title]="'accounts.noDepositsYet' | translate"
+        [description]="'accounts.noDepositsYetDescription' | translate"
       />
     } @else {
       <div class="pockets-grid">
@@ -235,7 +235,7 @@
 
             <div class="deposit-card__amount">
               <strong>{{ deposit.principal_minor | money: deposit.currency }}</strong>
-              <span>{{ deposit.term_months }} luni · {{ deposit.rate_percent_annual }}%/an</span>
+              <span>{{ deposit.term_months }} {{ 'accounts.months' | translate }} · {{ deposit.rate_percent_annual }}%/{{ 'accounts.perYear' | translate }}</span>
             </div>
 
             @if (deposit.status === 'active') {
@@ -243,23 +243,23 @@
                 <div class="pocket-card__bar-fill" [style.width.%]="depositProgressPercent(deposit)"></div>
               </div>
               <p class="deposit-card__meta">
-                {{ depositDaysRemaining(deposit) }} zile până la scadență ·
-                dobândă estimată {{ deposit.interest_minor | money: deposit.currency }}
+                {{ depositDaysRemaining(deposit) }} {{ 'accounts.daysUntilMaturity' | translate }} ·
+                {{ 'accounts.estimatedInterest' | translate }} {{ deposit.interest_minor | money: deposit.currency }}
                 @if (deposit.renew_at_maturity) {
-                  · se reînnoiește automat
+                  · {{ 'accounts.autoRenews' | translate }}
                 }
               </p>
               <div class="deposit-card__actions">
                 <app-action-button variant="ghost" (pressed)="requestLiquidateDeposit(deposit)">
-                  Lichidează anticipat
+                  {{ 'accounts.liquidateEarly' | translate }}
                 </app-action-button>
               </div>
             } @else if (deposit.status === 'matured_renewed') {
-              <p class="deposit-card__meta">Reînnoit automat la scadență.</p>
+              <p class="deposit-card__meta">{{ 'accounts.autoRenewedAtMaturity' | translate }}</p>
             } @else if (deposit.status === 'liquidated_early') {
-              <p class="deposit-card__meta">Lichidat anticipat — dobânda a fost pierdută.</p>
+              <p class="deposit-card__meta">{{ 'accounts.liquidatedEarlyLostInterest' | translate }}</p>
             } @else {
-              <p class="deposit-card__meta">Plătit la scadență, în cont.</p>
+              <p class="deposit-card__meta">{{ 'accounts.paidOutAtMaturity' | translate }}</p>
             }
           </div>
         }
@@ -270,9 +270,9 @@
 }
 
 @if (createModalOpen()) {
-  <app-modal title="Deschide un cont nou" [maxWidth]="560" (closed)="closeCreateModal()">
+  <app-modal [title]="'accounts.openNewAccount' | translate" [maxWidth]="560" (closed)="closeCreateModal()">
     @if (availableTypes().length === 0) {
-      <app-empty-state icon="check" title="Ai deschis toate conturile disponibile" description="Economii, depozit și student — le ai deja pe toate." />
+      <app-empty-state icon="check" [title]="'accounts.allAccountsOpened' | translate" [description]="'accounts.allAccountsOpenedDescription' | translate" />
     } @else {
       <app-account-type-carousel [types]="availableTypes()" [creatingType]="creatingType()" (create)="createAccount($event)" />
     }
@@ -281,9 +281,9 @@
 
 @if (pendingDeleteAccount(); as a) {
   <app-confirm-dialog
-    title="Șterge contul?"
-    [message]="'Sigur vrei să ștergi ' + (catalog[a.account_type].label | lowercase) + ' (' + a.iban + ')? Această acțiune nu poate fi anulată.'"
-    confirmLabel="Șterge"
+    [title]="'accounts.deleteAccountQ' | translate"
+    [message]="('accounts.deleteAccountMessage' | translate).replace('{type}', accountTypeLabelFor(a.account_type).toLowerCase()).replace('{iban}', a.iban)"
+    [confirmLabel]="'common.delete' | translate"
     [danger]="true"
     [loading]="deleting()"
     (confirmed)="confirmDelete()"
@@ -292,19 +292,19 @@
 }
 
 @if (pocketCreateModalOpen()) {
-  <app-modal title="Obiectiv nou" (closed)="pocketCreateModalOpen.set(false)">
+  <app-modal [title]="'accounts.newGoal' | translate" (closed)="pocketCreateModalOpen.set(false)">
     <div class="pocket-form">
       <label>
-        <span>Nume</span>
+        <span>{{ 'common.name' | translate }}</span>
         <input
           type="text"
-          placeholder="Ex: Vacanță"
+          [placeholder]="'accounts.namePlaceholderGoal' | translate"
           [ngModel]="newPocketName()"
           (ngModelChange)="newPocketName.set($event)"
         />
       </label>
       <label>
-        <span>Sumă țintă (lei)</span>
+        <span>{{ 'accounts.targetAmountLei' | translate }}</span>
         <input
           type="number"
           min="1"
@@ -314,36 +314,36 @@
         />
       </label>
       <app-action-button [fullWidth]="true" [loading]="creatingPocket()" (pressed)="saveNewPocket()">
-        Creează obiectiv
+        {{ 'accounts.createGoal' | translate }}
       </app-action-button>
     </div>
   </app-modal>
 }
 
 @if (statementAccount(); as statementAcc) {
-  <app-modal title="Extras de cont" (closed)="closeStatementModal()">
+  <app-modal [title]="'accounts.statement' | translate" (closed)="closeStatementModal()">
     <div class="pocket-form">
-      <p class="statement-modal__account">{{ catalog[statementAcc.account_type].label }} · {{ statementAcc.iban }}</p>
+      <p class="statement-modal__account">{{ accountTypeLabelFor(statementAcc.account_type) }} · {{ statementAcc.iban }}</p>
       <label>
-        <span>De la</span>
+        <span>{{ 'accounts.from' | translate }}</span>
         <input type="date" [ngModel]="statementFrom()" (ngModelChange)="statementFrom.set($event)" />
       </label>
       <label>
-        <span>Până la</span>
+        <span>{{ 'accounts.to' | translate }}</span>
         <input type="date" [ngModel]="statementTo()" (ngModelChange)="statementTo.set($event)" />
       </label>
       <app-action-button [fullWidth]="true" [loading]="generatingStatement()" (pressed)="downloadStatement()">
-        <app-icon name="download" [size]="16" /> Descarcă PDF
+        <app-icon name="download" [size]="16" /> {{ 'accounts.downloadPdf' | translate }}
       </app-action-button>
     </div>
   </app-modal>
 }
 
 @if (depositCreateModalOpen()) {
-  <app-modal title="Depozit nou" (closed)="closeDepositCreateModal()">
+  <app-modal [title]="'accounts.newDeposit' | translate" (closed)="closeDepositCreateModal()">
     <div class="pocket-form">
       <label>
-        <span>Monedă</span>
+        <span>{{ 'accounts.currency' | translate }}</span>
         <app-select
           [options]="depositCurrencyOptions.map(c => ({ value: c, label: c }))"
           [value]="newDepositCurrency()"
@@ -352,26 +352,26 @@
       </label>
 
       <label>
-        <span>Termen</span>
+        <span>{{ 'accounts.term' | translate }}</span>
         <app-select
-          [options]="depositTermOptions.map(t => ({ value: t.toString(), label: t + ' luni (' + (rateFor(newDepositCurrency(), t) ?? '—') + '%/an)' }))"
+          [options]="depositTermSelectOptions()"
           [value]="newDepositTerm().toString()"
           (changed)="newDepositTerm.set($any(+$event))"
         />
       </label>
 
       <label>
-        <span>Sumă ({{ newDepositCurrency() }})</span>
+        <span>{{ 'common.amount' | translate }} ({{ newDepositCurrency() }})</span>
         <input type="number" min="1" step="1" [ngModel]="newDepositAmount()" (ngModelChange)="newDepositAmount.set($event)" />
       </label>
 
       <label class="deposit-form__renew">
         <input type="checkbox" [ngModel]="newDepositRenew()" (ngModelChange)="newDepositRenew.set($event)" />
-        <span>Reînnoiește automat la scadență</span>
+        <span>{{ 'accounts.autoRenewAtMaturity' | translate }}</span>
       </label>
 
       <app-action-button [fullWidth]="true" [loading]="creatingTermDeposit()" (pressed)="createTermDeposit()">
-        Deschide depozitul
+        {{ 'accounts.openDeposit' | translate }}
       </app-action-button>
     </div>
   </app-modal>
@@ -379,9 +379,9 @@
 
 @if (pendingLiquidateDeposit(); as pd) {
   <app-confirm-dialog
-    title="Lichidezi depozitul anticipat?"
-    [message]="'Primești înapoi DOAR suma depusă (' + (pd.principal_minor | money: pd.currency) + ') — dobânda acumulată (' + (pd.interest_minor | money: pd.currency) + ') se pierde integral. Această acțiune nu poate fi anulată.'"
-    confirmLabel="Lichidează"
+    [title]="'accounts.liquidateDepositQ' | translate"
+    [message]="('accounts.liquidateDepositMessage' | translate).replace('{principal}', (pd.principal_minor | money: pd.currency)).replace('{interest}', (pd.interest_minor | money: pd.currency))"
+    [confirmLabel]="'accounts.liquidate' | translate"
     [danger]="true"
     [loading]="liquidatingDeposit()"
     (confirmed)="confirmLiquidateDeposit()"
@@ -390,10 +390,10 @@
 }
 
 @if (depositModalPocket(); as pocket) {
-  <app-modal [title]="'Adaugă la \'' + pocket.name + '\''" (closed)="depositModalPocket.set(null)">
+  <app-modal [title]="(('accounts.addToGoalPrefix' | translate) + ' \'' + pocket.name + '\'')" (closed)="depositModalPocket.set(null)">
     <div class="pocket-form">
       <label>
-        <span>Sumă (lei)</span>
+        <span>{{ 'accounts.amountLei' | translate }}</span>
         <input
           type="number"
           min="1"
@@ -403,7 +403,7 @@
         />
       </label>
       <app-action-button [fullWidth]="true" [loading]="depositBusy()" (pressed)="confirmDeposit()">
-        Confirmă
+        {{ 'common.confirm' | translate }}
       </app-action-button>
     </div>
   </app-modal>

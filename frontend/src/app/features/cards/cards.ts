@@ -16,6 +16,7 @@ import {
 import { TransactionsService, SpendingAnalytics } from '../../services/transactions.service';
 import { AuthService } from '../../services/auth.service';
 import { WebauthnService } from '../../services/webauthn.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { ToggleControl } from '../../shared/components/toggle-control/toggle-control';
@@ -28,6 +29,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { Icon } from '../../shared/components/icon/icon';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 type ToggleKey =
   | 'online_payments_enabled'
@@ -78,6 +80,7 @@ const CARD_DESIGN_OPTIONS: CardDesignOption[] = [
     MoneyPipe,
     Icon,
     FormsModule,
+    TranslatePipe,
   ],
   templateUrl: './cards.html',
   styleUrl: './cards.css',
@@ -88,6 +91,7 @@ export class Cards implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly webauthn = inject(WebauthnService);
   private readonly toast = inject(ToastService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -192,7 +196,7 @@ export class Cards implements OnInit, OnDestroy {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Nu am putut încărca datele cardului.');
+        this.error.set(this.language.t('cards.loadError'));
         this.loading.set(false);
       },
     });
@@ -241,11 +245,11 @@ export class Cards implements OnInit, OnDestroy {
       next: (updated) => {
         this.replaceCard(updated);
         this.freezeBusy.set(false);
-        this.toast.success(updated.is_frozen ? 'Card blocat temporar.' : 'Card deblocat.');
+        this.toast.success(this.language.t(updated.is_frozen ? 'cards.cardFrozen' : 'cards.cardUnfrozen'));
       },
       error: (err) => {
         this.freezeBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza statusul cardului.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.updateStatusError')));
       },
     });
   }
@@ -259,11 +263,11 @@ export class Cards implements OnInit, OnDestroy {
       next: (updated) => {
         this.replaceCard(updated);
         this.settingsBusy.set(null);
-        this.toast.success('Setările cardului au fost actualizate.');
+        this.toast.success(this.language.t('cards.settingsUpdated'));
       },
       error: (err) => {
         this.settingsBusy.set(null);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza setarea.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.updateSettingError')));
       },
     });
   }
@@ -280,7 +284,7 @@ export class Cards implements OnInit, OnDestroy {
     if (!current) return;
     const minor = Math.round(this.limitInput() * 100);
     if (minor <= 0) {
-      this.toast.error('Introdu o limită validă.');
+      this.toast.error(this.language.t('cards.enterValidLimit'));
       return;
     }
 
@@ -290,11 +294,11 @@ export class Cards implements OnInit, OnDestroy {
         this.replaceCard(updated);
         this.limitBusy.set(false);
         this.editingLimit.set(false);
-        this.toast.success('Limita zilnică a fost actualizată.');
+        this.toast.success(this.language.t('cards.dailyLimitUpdated'));
       },
       error: (err) => {
         this.limitBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut actualiza limita.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.updateLimitError')));
       },
     });
   }
@@ -326,15 +330,15 @@ export class Cards implements OnInit, OnDestroy {
 
   protected saveNewCard(): void {
     if (this.physicalFeeShortfall()) {
-      this.toast.error('Sold insuficient pentru taxa de emitere a cardului fizic.');
+      this.toast.error(this.language.t('cards.insufficientBalanceForFee'));
       return;
     }
     if (!/^\d{4}$/.test(this.addCardPin())) {
-      this.toast.error('PIN-ul trebuie să conțină exact 4 cifre.');
+      this.toast.error(this.language.t('cards.pinMustBe4Digits'));
       return;
     }
     if (this.addCardPin() !== this.addCardPinConfirm()) {
-      this.toast.error('PIN-urile introduse nu coincid.');
+      this.toast.error(this.language.t('cards.pinsDoNotMatch'));
       return;
     }
 
@@ -353,7 +357,7 @@ export class Cards implements OnInit, OnDestroy {
         this.onActiveCardChanged();
         this.addCardSaving.set(false);
         this.addCardModalOpen.set(false);
-        this.toast.success(payload.type === 'physical' ? 'Card fizic comandat.' : 'Card virtual emis.');
+        this.toast.success(this.language.t(payload.type === 'physical' ? 'cards.physicalCardOrdered' : 'cards.virtualCardIssued'));
 
         if (payload.type === 'physical') {
           this.banking.getMyAccount().subscribe((account) => this.account.set(account));
@@ -361,7 +365,7 @@ export class Cards implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.addCardSaving.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut emite cardul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.issueCardError')));
       },
     });
   }
@@ -392,7 +396,7 @@ export class Cards implements OnInit, OnDestroy {
     const target = this.revealTarget();
     if (!target) return;
     if (!/^\d{4}$/.test(this.revealPin())) {
-      this.toast.error('Introdu PIN-ul cardului (4 cifre).');
+      this.toast.error(this.language.t('cards.enterCardPin4Digits'));
       return;
     }
 
@@ -401,7 +405,7 @@ export class Cards implements OnInit, OnDestroy {
       next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBusy.set(false)),
       error: (err) => {
         this.revealBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'PIN incorect.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.incorrectPin')));
       },
     });
   }
@@ -417,7 +421,7 @@ export class Cards implements OnInit, OnDestroy {
         next: (data) => this.applyRevealSuccess(target.id, data, () => this.revealBiometricBusy.set(false)),
         error: (err) => {
           this.revealBiometricBusy.set(false);
-          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi PIN-ul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('cards.biometricFailedUsePin')));
         },
       });
     } catch (err) {
@@ -425,7 +429,7 @@ export class Cards implements OnInit, OnDestroy {
       // Userul a anulat prompt-ul biometric (NotAllowedError) — nu e o
       // eroare de afișat, câmpul PIN-ului rămâne oricum disponibil mai jos.
       if ((err as { name?: string })?.name !== 'NotAllowedError') {
-        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi PIN-ul.');
+        this.toast.error(this.language.t('cards.biometricNotWorkingUsePin'));
       }
     }
   }
@@ -480,11 +484,11 @@ export class Cards implements OnInit, OnDestroy {
 
   private validateNewPin(): boolean {
     if (!/^\d{4}$/.test(this.changePinNew())) {
-      this.toast.error('PIN-ul nou trebuie să conțină exact 4 cifre.');
+      this.toast.error(this.language.t('cards.newPinMustBe4Digits'));
       return false;
     }
     if (this.changePinNew() !== this.changePinNewConfirm()) {
-      this.toast.error('PIN-urile introduse nu coincid.');
+      this.toast.error(this.language.t('cards.pinsDoNotMatch'));
       return false;
     }
     return true;
@@ -494,7 +498,7 @@ export class Cards implements OnInit, OnDestroy {
     const target = this.activeCard();
     if (!target || !this.validateNewPin()) return;
     if (!/^\d{4}$/.test(this.changePinCurrent())) {
-      this.toast.error('Introdu PIN-ul curent (4 cifre).');
+      this.toast.error(this.language.t('cards.enterCurrentPin4Digits'));
       return;
     }
 
@@ -503,7 +507,7 @@ export class Cards implements OnInit, OnDestroy {
       next: (updated) => this.applyChangePinSuccess(updated, () => this.changePinBusy.set(false)),
       error: (err) => {
         this.changePinBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'PIN curent incorect.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('cards.currentPinIncorrect')));
       },
     });
   }
@@ -519,13 +523,13 @@ export class Cards implements OnInit, OnDestroy {
         next: (updated) => this.applyChangePinSuccess(updated, () => this.changePinBiometricBusy.set(false)),
         error: (err) => {
           this.changePinBiometricBusy.set(false);
-          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi PIN-ul curent.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('cards.biometricFailedUseCurrentPin')));
         },
       });
     } catch (err) {
       this.changePinBiometricBusy.set(false);
       if ((err as { name?: string })?.name !== 'NotAllowedError') {
-        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi PIN-ul curent.');
+        this.toast.error(this.language.t('cards.biometricNotWorkingUseCurrentPin'));
       }
     }
   }
@@ -534,7 +538,7 @@ export class Cards implements OnInit, OnDestroy {
     this.replaceCard(updated);
     clearBusy();
     this.closeChangePinModal();
-    this.toast.success('PIN-ul cardului a fost schimbat.');
+    this.toast.success(this.language.t('cards.pinChanged'));
   }
 
   private designOption(design: CardDesign): CardDesignOption | undefined {

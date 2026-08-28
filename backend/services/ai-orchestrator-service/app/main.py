@@ -16,6 +16,7 @@ import logging
 from fastapi import FastAPI
 
 from app.config import settings
+from app.i18n import LanguageMiddleware
 from app.routers.speech import router as speech_router
 from app.routers.spending_forecast import router as spending_forecast_router
 from app.routers.support import router as support_router
@@ -23,6 +24,7 @@ from app.routers.support import router as support_router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [ai-orchestrator-service] %(levelname)s %(message)s")
 
 app = FastAPI(title="MaestroBank AI Orchestrator Service")
+app.add_middleware(LanguageMiddleware)
 
 
 @app.get("/health")

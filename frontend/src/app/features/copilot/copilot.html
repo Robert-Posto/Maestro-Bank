@@ -1,16 +1,16 @@
-<app-page-header title="MaestroAssistent" subtitle="Întreabă orice despre banii tăi." />
+<app-page-header [title]="'copilot.title' | translate" [subtitle]="'copilot.subtitle' | translate" />
 
 <div class="copilot-layout">
-  <section class="copilot-chat" [class.copilot-chat--empty]="chatMessages().length === 0" aria-label="Chat MaestroAssistent">
+  <section class="copilot-chat" [class.copilot-chat--empty]="chatMessages().length === 0" [attr.aria-label]="'copilot.chatAriaLabel' | translate">
     <div class="copilot-chat__messages" #messagesEl aria-live="polite">
       @if (chatMessages().length === 0) {
         <div class="copilot-welcome">
           <div class="copilot-welcome__icon"><app-icon name="sparkles" [size]="26" /></div>
-          <span class="copilot-welcome__eyebrow">Asistent financiar personal</span>
-          <h2>Cu ce te pot ajuta astăzi?</h2>
-          <p>Analizez datele din contul tău pentru răspunsuri personalizate despre cheltuieli, buget și estimări financiare.</p>
+          <span class="copilot-welcome__eyebrow">{{ 'copilot.welcomeEyebrow' | translate }}</span>
+          <h2>{{ 'copilot.welcomeTitle' | translate }}</h2>
+          <p>{{ 'copilot.welcomeDescription' | translate }}</p>
           <div class="copilot-suggestions">
-            @for (q of suggestedQuestions; track q) {
+            @for (q of suggestedQuestions(); track q) {
               <button type="button" class="copilot-suggestion-chip" (click)="askSuggested(q)">
                 <span>{{ q }}</span><app-icon name="chevron-right" [size]="16" />
               </button>
@@ -26,7 +26,7 @@
           }
           <div class="copilot-message-col">
             @if (msg.role === 'assistant') {
-              <span class="copilot-message-name">MaestroAssistent <span class="copilot-message-time">{{ msg.time }}</span></span>
+              <span class="copilot-message-name">{{ 'copilot.assistantName' | translate }} <span class="copilot-message-time">{{ msg.time }}</span></span>
             }
 
             @if (msg.role === 'user') {
@@ -45,7 +45,7 @@
                   (click)="toggleSpeak(msg)"
                 >
                   <app-icon [name]="speech.speakingMessageId() === msg.id ? 'stop' : 'volume'" [size]="13" />
-                  {{ speech.speakingMessageId() === msg.id ? 'Oprește' : 'Ascultă' }}
+                  {{ (speech.speakingMessageId() === msg.id ? 'copilot.stop' : 'copilot.listen') | translate }}
                 </button>
               }
 
@@ -58,42 +58,42 @@
                     [class.copilot-card--positive]="r.affordable === true"
                     [class.copilot-card--negative]="r.affordable === false"
                   >
-                    <div class="copilot-card__header"><app-icon name="shield" [size]="15" /> Analiză</div>
+                    <div class="copilot-card__header"><app-icon name="shield" [size]="15" /> {{ 'copilot.analysisHeader' | translate }}</div>
                     @if (r.affordable !== null) {
-                      <strong class="copilot-verdict">{{ r.affordable ? 'Da, îți permiți!' : 'Nu recomandăm acum' }}</strong>
+                      <strong class="copilot-verdict">{{ (r.affordable ? 'copilot.affordableYes' : 'copilot.affordableNo') | translate }}</strong>
                     }
-                    <div class="copilot-card__row"><span>Sold curent</span><span>{{ r.analysis.current_balance_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row"><span>Buffer recomandat</span><span>{{ r.analysis.recommended_buffer_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.currentBalance' | translate }}</span><span>{{ r.analysis.current_balance_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.recommendedBuffer' | translate }}</span><span>{{ r.analysis.recommended_buffer_minor | money: 'RON' }}</span></div>
                   </div>
                   }
 
                   @if (r.relevant_cards.includes('recurring_payments')) {
                   <div class="copilot-card">
-                    <div class="copilot-card__header"><app-icon name="calendar" [size]="15" /> Plăți recurente rămase</div>
-                    <div class="copilot-card__row"><span>Total luna asta</span><span>{{ r.recurring_payments.total_remaining_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row"><span>Deja plătite</span><span>{{ r.recurring_payments.already_paid_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row copilot-card__row--total"><span>Rămase de plată</span><span>{{ r.recurring_payments.remaining_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__header"><app-icon name="calendar" [size]="15" /> {{ 'copilot.recurringHeader' | translate }}</div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.totalThisMonth' | translate }}</span><span>{{ r.recurring_payments.total_remaining_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.alreadyPaid' | translate }}</span><span>{{ r.recurring_payments.already_paid_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row copilot-card__row--total"><span>{{ 'copilot.remainingToPay' | translate }}</span><span>{{ r.recurring_payments.remaining_minor | money: 'RON' }}</span></div>
                   </div>
                   }
 
                   @if (r.relevant_cards.includes('estimated_expenses')) {
                   <div class="copilot-card">
-                    <div class="copilot-card__header"><app-icon name="receipt" [size]="15" /> Cheltuieli estimate</div>
-                    <div class="copilot-card__row"><span>Esențiale</span><span>{{ r.estimated_expenses.variable_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row"><span>Discreționare</span><span>{{ r.estimated_expenses.discretionary_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row copilot-card__row--total"><span>Total estimat</span><span>{{ r.estimated_expenses.total_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__header"><app-icon name="receipt" [size]="15" /> {{ 'copilot.estimatedExpensesHeader' | translate }}</div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.essential' | translate }}</span><span>{{ r.estimated_expenses.variable_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.discretionary' | translate }}</span><span>{{ r.estimated_expenses.discretionary_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row copilot-card__row--total"><span>{{ 'copilot.totalEstimated' | translate }}</span><span>{{ r.estimated_expenses.total_minor | money: 'RON' }}</span></div>
                   </div>
                   }
 
                   @if (r.relevant_cards.includes('financial_summary')) {
                   <div class="copilot-card">
-                    <div class="copilot-card__header"><app-icon name="wallet" [size]="15" /> Rezumat financiar</div>
-                    <div class="copilot-card__row"><span>Sold disponibil</span><span>{{ r.financial_summary.current_balance_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__header"><app-icon name="wallet" [size]="15" /> {{ 'copilot.financialSummaryHeader' | translate }}</div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.availableBalance' | translate }}</span><span>{{ r.financial_summary.current_balance_minor | money: 'RON' }}</span></div>
                     @if (r.financial_summary.remaining_income_minor !== null) {
-                      <div class="copilot-card__row"><span>Venituri rămase (estimat)</span><span>+{{ r.financial_summary.remaining_income_minor | money: 'RON' }}</span></div>
+                      <div class="copilot-card__row"><span>{{ 'copilot.remainingIncome' | translate }}</span><span>+{{ r.financial_summary.remaining_income_minor | money: 'RON' }}</span></div>
                     }
-                    <div class="copilot-card__row"><span>Cheltuieli proiectate</span><span>-{{ r.financial_summary.projected_expenses_minor | money: 'RON' }}</span></div>
-                    <div class="copilot-card__row copilot-card__row--total"><span>Sold estimat la final</span><span>{{ r.financial_summary.estimated_end_balance_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row"><span>{{ 'copilot.projectedExpenses' | translate }}</span><span>-{{ r.financial_summary.projected_expenses_minor | money: 'RON' }}</span></div>
+                    <div class="copilot-card__row copilot-card__row--total"><span>{{ 'copilot.estimatedFinalBalance' | translate }}</span><span>{{ r.financial_summary.estimated_end_balance_minor | money: 'RON' }}</span></div>
                   </div>
                   }
                 </div>
@@ -101,7 +101,7 @@
 
                 @if (r.budgets && r.budgets.length > 0) {
                   <div class="copilot-budgets">
-                    <div class="copilot-card__header"><app-icon name="budgets" [size]="15" /> Bugete active</div>
+                    <div class="copilot-card__header"><app-icon name="budgets" [size]="15" /> {{ 'copilot.activeBudgetsHeader' | translate }}</div>
                     @for (b of r.budgets; track b.id) {
                       <div class="copilot-budget-row">
                         <div class="copilot-budget-row__top">
@@ -118,7 +118,7 @@
                           ></div>
                         </div>
                         @if (b.over_budget) {
-                          <span class="copilot-budget-row__hint">Depășit cu {{ (b.spent_minor - b.limit_minor) | money: 'RON' }}</span>
+                          <span class="copilot-budget-row__hint">{{ 'copilot.overBudgetBy' | translate }} {{ (b.spent_minor - b.limit_minor) | money: 'RON' }}</span>
                         }
                       </div>
                     }
@@ -137,12 +137,12 @@
                     @switch (msg.actionState) {
                       @case ('pending') {
                         <div class="copilot-action__buttons">
-                          <button type="button" class="copilot-action__confirm" (click)="confirmPendingAction(msg)">Confirmă</button>
-                          <button type="button" class="copilot-action__cancel" (click)="cancelPendingAction(msg)">Anulează</button>
+                          <button type="button" class="copilot-action__confirm" (click)="confirmPendingAction(msg)">{{ 'common.confirm' | translate }}</button>
+                          <button type="button" class="copilot-action__cancel" (click)="cancelPendingAction(msg)">{{ 'common.cancel' | translate }}</button>
                         </div>
                       }
                       @case ('confirming') {
-                        <p class="copilot-action__status">Se procesează...</p>
+                        <p class="copilot-action__status">{{ 'copilot.processing' | translate }}</p>
                       }
                       @case ('done') {
                         <p class="copilot-action__status copilot-action__status--success"><app-icon name="check" [size]="14" /> {{ msg.actionResultText }}</p>
@@ -151,14 +151,14 @@
                         <p class="copilot-action__status copilot-action__status--error">{{ msg.actionResultText }}</p>
                       }
                       @case ('cancelled') {
-                        <p class="copilot-action__status">Anulat — nimic nu a fost modificat.</p>
+                        <p class="copilot-action__status">{{ 'copilot.cancelledNoChanges' | translate }}</p>
                       }
                     }
                   </div>
                 }
 
                 @if (r.knowledge_used.length > 0) {
-                  <p class="copilot-sources">Context folosit: {{ sourceLabels(r.knowledge_used) }}</p>
+                  <p class="copilot-sources">{{ 'copilot.contextUsed' | translate }} {{ sourceLabels(r.knowledge_used) }}</p>
                 }
               }
             }
@@ -173,12 +173,12 @@
         <div class="copilot-message-row">
           <span class="copilot-message-avatar"><app-icon name="sparkles" [size]="16" /></span>
           <div class="copilot-message-col">
-            <span class="copilot-message-name">MaestroAssistent</span>
-            <div class="copilot-bubble copilot-bubble--typing" aria-label="MaestroAssistent analizează datele tale...">
+            <span class="copilot-message-name">{{ 'copilot.assistantName' | translate }}</span>
+            <div class="copilot-bubble copilot-bubble--typing" [attr.aria-label]="'copilot.typingAriaLabel' | translate">
               <span></span><span></span><span></span>
             </div>
             @if (sendingSlow()) {
-              <span class="copilot-slow-hint">Analizez cheltuielile, forecast-ul și abonamentele tale — mai durează puțin.</span>
+              <span class="copilot-slow-hint">{{ 'copilot.slowHint' | translate }}</span>
             }
           </div>
         </div>
@@ -186,8 +186,8 @@
     </div>
 
     @if (chatMessages().length > 0) {
-      <div class="copilot-quick-replies" role="group" aria-label="Întrebări rapide">
-        @for (q of suggestedQuestions; track q) {
+      <div class="copilot-quick-replies" role="group" [attr.aria-label]="'copilot.quickRepliesAriaLabel' | translate">
+        @for (q of suggestedQuestions(); track q) {
           <button type="button" class="copilot-quick-reply" [disabled]="sending()" (click)="askSuggested(q)">{{ q }}</button>
         }
       </div>
@@ -199,7 +199,7 @@
           type="button"
           class="copilot-mic-btn"
           [class.copilot-mic-btn--active]="speech.listening()"
-          [attr.aria-label]="speech.listening() ? 'Oprește ascultarea' : 'Vorbește mesajul'"
+          [attr.aria-label]="(speech.listening() ? 'copilot.micStop' : 'copilot.micStart') | translate"
           [disabled]="sending()"
           (click)="toggleListening()"
         >
@@ -210,49 +210,49 @@
         type="text"
         name="copilotMessage"
         autocomplete="off"
-        aria-label="Întreabă ceva despre finanțele tale"
-        [placeholder]="speech.listening() ? 'Te ascult...' : 'Întreabă ceva despre finanțele tale...'"
+        [attr.aria-label]="'copilot.inputAriaLabel' | translate"
+        [placeholder]="(speech.listening() ? 'copilot.listeningPlaceholder' : 'copilot.inputPlaceholder') | translate"
         [ngModel]="chatInput()"
         (ngModelChange)="chatInput.set($event)"
         [disabled]="sending()"
       />
-      <button type="submit" [disabled]="!chatInput().trim() || sending()" aria-label="Trimite">
+      <button type="submit" [disabled]="!chatInput().trim() || sending()" [attr.aria-label]="'copilot.send' | translate">
         <app-icon name="send" [size]="18" />
       </button>
     </form>
-    <p class="copilot-notice">Răspunsurile AI sunt informative și nu constituie sfaturi financiare.</p>
+    <p class="copilot-notice">{{ 'copilot.notice' | translate }}</p>
   </section>
 
   <aside class="copilot-side">
     <div class="copilot-side-card">
-      <div class="copilot-side-card__header"><strong>Context financiar</strong></div>
+      <div class="copilot-side-card__header"><strong>{{ 'copilot.financialContextHeader' | translate }}</strong></div>
       @if (lastResponse(); as ctx) {
         <div class="copilot-context-grid">
           <div class="copilot-context-tile">
             <app-icon name="wallet" [size]="16" />
             <div>
-              <span>Sold disponibil</span>
+              <span>{{ 'copilot.availableBalance' | translate }}</span>
               <strong>{{ ctx.analysis.current_balance_minor | money: 'RON' }}</strong>
             </div>
           </div>
           <div class="copilot-context-tile">
             <app-icon name="calendar" [size]="16" />
             <div>
-              <span>Plăți rămase</span>
+              <span>{{ 'copilot.remainingPayments' | translate }}</span>
               <strong>{{ ctx.recurring_payments.remaining_minor | money: 'RON' }}</strong>
             </div>
           </div>
           <div class="copilot-context-tile">
             <app-icon name="shield" [size]="16" />
             <div>
-              <span>Buffer recomandat</span>
+              <span>{{ 'copilot.recommendedBuffer' | translate }}</span>
               <strong>{{ ctx.analysis.recommended_buffer_minor | money: 'RON' }}</strong>
             </div>
           </div>
           <div class="copilot-context-tile">
             <app-icon name="flash" [size]="16" />
             <div>
-              <span>Sold estimat final lună</span>
+              <span>{{ 'copilot.estimatedEndOfMonthBalance' | translate }}</span>
               <strong>{{ ctx.financial_summary.estimated_end_balance_minor | money: 'RON' }}</strong>
             </div>
           </div>
@@ -260,19 +260,19 @@
       } @else {
         <div class="copilot-context-empty">
           <span><app-icon name="sparkles" [size]="20" /></span>
-          <strong>Contextul apare după prima întrebare</strong>
-          <p>Aici vei vedea soldul, plățile și estimarea pentru finalul lunii.</p>
+          <strong>{{ 'copilot.contextEmptyTitle' | translate }}</strong>
+          <p>{{ 'copilot.contextEmptyDescription' | translate }}</p>
         </div>
       }
     </div>
 
     <div class="copilot-side-card">
-      <div class="copilot-side-card__header"><strong>Agentul folosit</strong></div>
+      <div class="copilot-side-card__header"><strong>{{ 'copilot.agentUsedHeader' | translate }}</strong></div>
       <div class="copilot-agent">
         <span class="copilot-agent__icon"><app-icon name="copilot" [size]="16" /></span>
         <div>
-          <strong>Spending + Forecast Agent</strong>
-          <p>Analizează cheltuielile curente, proiectează soldul de final de lună și evaluează dacă îți permiți o sumă — cu date reale din contul tău, prin GPT-5-mini.</p>
+          <strong>{{ 'copilot.agentName' | translate }}</strong>
+          <p>{{ 'copilot.agentDescription' | translate }}</p>
         </div>
       </div>
     </div>

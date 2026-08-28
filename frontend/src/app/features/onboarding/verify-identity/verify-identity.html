@@ -34,7 +34,7 @@
           <p class="identity-slot__label"><app-icon name="cards" [size]="15" /> {{ 'auth.verifyIdentity.idLabel' | translate }}</p>
 
           @if (idDocumentPreviewUrl()) {
-            <img class="identity-slot__preview" [src]="idDocumentPreviewUrl()" alt="Previzualizare buletin" />
+            <img class="identity-slot__preview" [src]="idDocumentPreviewUrl()" [alt]="'auth.verifyIdentity.idPreviewAlt' | translate" />
             <label class="identity-slot__action">
               {{ 'auth.verifyIdentity.changePhoto' | translate }}
               <input type="file" accept="image/*" (change)="onIdDocumentSelected($event)" hidden />
@@ -52,7 +52,7 @@
           <p class="identity-slot__label"><app-icon name="camera" [size]="15" /> {{ 'auth.verifyIdentity.selfieLabel' | translate }}</p>
 
           @if (selfiePreviewUrl()) {
-            <img class="identity-slot__preview" [src]="selfiePreviewUrl()" alt="Previzualizare selfie" />
+            <img class="identity-slot__preview" [src]="selfiePreviewUrl()" [alt]="'auth.verifyIdentity.selfiePreviewAlt' | translate" />
             <button type="button" class="identity-slot__action" (click)="retakePhoto()">{{ 'auth.verifyIdentity.retake' | translate }}</button>
           } @else if (cameraActive()) {
             <div class="identity-camera">

@@ -118,6 +118,8 @@ export const AUTH_I18N: Record<string, TranslationEntry> = {
     en: 'Upload your ID, then take a selfie — we compare them automatically.',
   },
   'auth.verifyIdentity.idLabel': { ro: 'Buletin', en: 'ID card' },
+  'auth.verifyIdentity.idPreviewAlt': { ro: 'Previzualizare buletin', en: 'ID card preview' },
+  'auth.verifyIdentity.selfiePreviewAlt': { ro: 'Previzualizare selfie', en: 'Selfie preview' },
   'auth.verifyIdentity.changePhoto': { ro: 'Schimbă poza', en: 'Change photo' },
   'auth.verifyIdentity.uploadId': { ro: 'Încarcă poza buletinului', en: 'Upload your ID photo' },
   'auth.verifyIdentity.selfieLabel': { ro: 'Selfie', en: 'Selfie' },

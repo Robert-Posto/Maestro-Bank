@@ -1,18 +1,18 @@
-<app-page-header title="Blocklist beneficiari" subtitle="IBAN-uri refuzate direct la transfer, înainte de orice scoring — vezi BEN-04.">
+<app-page-header [title]="'staffBlocklist.title' | translate" [subtitle]="'staffBlocklist.subtitle' | translate">
   <app-action-button variant="secondary" (pressed)="load()">
-    <app-icon name="reload" [size]="16" /> Reîmprospătează
+    <app-icon name="reload" [size]="16" /> {{ 'common.refresh' | translate }}
   </app-action-button>
   <app-action-button variant="primary" (pressed)="openAdd()">
-    <app-icon name="plus" [size]="16" /> Adaugă IBAN
+    <app-icon name="plus" [size]="16" /> {{ 'staffBlocklist.addIban' | translate }}
   </app-action-button>
 </app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="4" [height]="64" [gap]="12" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca lista" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'staffBlocklist.loadErrorTitle' | translate" [description]="error()!" />
 } @else if (entries().length === 0) {
-  <app-empty-state icon="shield" title="Niciun beneficiar blocat" description="Adaugă un IBAN pentru a-l refuza direct la orice transfer, indiferent de scor." />
+  <app-empty-state icon="shield" [title]="'staffBlocklist.emptyTitle' | translate" [description]="'staffBlocklist.emptyDescription' | translate" />
 } @else {
   <div class="blocklist">
     @for (entry of entries(); track entry.id) {
@@ -33,7 +33,7 @@
         </div>
 
         <app-action-button variant="danger" (pressed)="askRemove(entry)">
-          <app-icon name="trash" [size]="15" /> Elimină
+          <app-icon name="trash" [size]="15" /> {{ 'staffBlocklist.remove' | translate }}
         </app-action-button>
       </div>
     }
@@ -41,22 +41,22 @@
 }
 
 @if (addOpen()) {
-  <app-modal title="Adaugă beneficiar pe blocklist" [maxWidth]="440" (closed)="closeAdd()">
+  <app-modal [title]="'staffBlocklist.addModalTitle' | translate" [maxWidth]="440" (closed)="closeAdd()">
     <form class="add-form" (ngSubmit)="submitAdd()">
       <label class="add-form__field">
-        <span>IBAN</span>
+        <span>{{ 'staffBlocklist.ibanLabel' | translate }}</span>
         <input type="text" name="iban" [ngModel]="ibanInput()" (ngModelChange)="ibanInput.set($event)" placeholder="RO49MAES1234567890123456" autocomplete="off" />
       </label>
       <label class="add-form__field">
-        <span>Motiv (opțional)</span>
-        <textarea name="reason" rows="3" [ngModel]="reasonInput()" (ngModelChange)="reasonInput.set($event)" placeholder="Ex: semnalat de intel extern, cont mulă cunoscut..."></textarea>
+        <span>{{ 'staffBlocklist.reasonLabel' | translate }}</span>
+        <textarea name="reason" rows="3" [ngModel]="reasonInput()" (ngModelChange)="reasonInput.set($event)" [placeholder]="'staffBlocklist.reasonPlaceholder' | translate"></textarea>
       </label>
       @if (addError()) {
         <p class="add-form__error">{{ addError() }}</p>
       }
       <div class="add-form__actions">
-        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeAdd()">Anulează</app-action-button>
-        <app-action-button type="submit" variant="primary" [loading]="saving()">Adaugă pe listă</app-action-button>
+        <app-action-button type="button" variant="ghost" [disabled]="saving()" (pressed)="closeAdd()">{{ 'common.cancel' | translate }}</app-action-button>
+        <app-action-button type="submit" variant="primary" [loading]="saving()">{{ 'staffBlocklist.addToList' | translate }}</app-action-button>
       </div>
     </form>
   </app-modal>
@@ -64,9 +64,9 @@
 
 @if (pendingRemoval(); as entry) {
   <app-confirm-dialog
-    title="Elimini beneficiarul de pe listă?"
-    [message]="'Transferurile către ' + entry.iban + ' vor fi din nou permise (supuse scoring-ului normal, ca orice alt beneficiar).'"
-    confirmLabel="Elimină"
+    [title]="'staffBlocklist.removeConfirmTitle' | translate"
+    [message]="('staffBlocklist.removeConfirmMessage' | translate).replace('{iban}', entry.iban)"
+    [confirmLabel]="'staffBlocklist.remove' | translate"
     [danger]="true"
     [loading]="removing()"
     (confirmed)="confirmRemove()"

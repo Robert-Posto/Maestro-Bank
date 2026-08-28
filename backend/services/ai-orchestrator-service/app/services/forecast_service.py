@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from app.i18n import current_language
 from app.services.affordability_service import recommended_buffer_minor
 
 # Împărțirea cheltuielilor variabile proiectate (rămase de cheltuit până la
@@ -40,6 +41,17 @@ _CATEGORY_LABELS_RO = {
     "other": "alte cheltuieli",
 }
 
+_CATEGORY_LABELS_EN = {
+    "groceries": "groceries",
+    "shopping": "shopping",
+    "transport": "transport",
+    "bills": "bills",
+    "restaurants": "restaurants",
+    "entertainment": "entertainment",
+    "subscriptions": "subscriptions",
+    "other": "other spending",
+}
+
 
 def top_discretionary_category(spending_summary: dict) -> tuple[str, int] | None:
     """Categoria discreționară cu cea mai mare cheltuială ÎNREGISTRATĂ deja
@@ -53,7 +65,8 @@ def top_discretionary_category(spending_summary: dict) -> tuple[str, int] | None
     if not discretionary:
         return None
     top = max(discretionary, key=lambda c: c["amount_minor"])
-    label = _CATEGORY_LABELS_RO.get(top["category"], top["category"])
+    labels = _CATEGORY_LABELS_EN if current_language() == "en" else _CATEGORY_LABELS_RO
+    label = labels.get(top["category"], top["category"])
     return label, top["amount_minor"]
 
 

@@ -3,18 +3,17 @@ import { FormsModule } from '@angular/forms';
 
 import { AiCopilotService, ChatHistoryMessage, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { Icon } from '../../shared/components/icon/icon';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { extractErrorMessage } from '../../shared/error-utils';
 
-const SUGGESTED_QUESTIONS = [
-  'Îmi permit un city break de 2.000 lei luna asta?',
-  'Cât am cheltuit luna asta?',
-  'Cu cât estimezi că rămân la finalul lunii?',
-  'Pe ce categorie cheltuiesc cel mai mult?',
-];
+/** Chei i18n (nu text direct) — vezi `suggestedQuestions` mai jos, un
+ * `computed` care le traduce după limba activă (mirror pe support.ts::faqItems). */
+const SUGGESTED_QUESTION_KEYS = ['copilot.suggestedQ1', 'copilot.suggestedQ2', 'copilot.suggestedQ3', 'copilot.suggestedQ4'];
 
 type PendingActionState = 'pending' | 'confirming' | 'done' | 'cancelled' | 'error';
 
@@ -47,16 +46,17 @@ function formatChatTime(date: Date): string {
 @Component({
   selector: 'app-copilot',
   standalone: true,
-  imports: [FormsModule, PageHeader, Icon, MoneyPipe, MarkdownLitePipe],
+  imports: [FormsModule, PageHeader, Icon, MoneyPipe, MarkdownLitePipe, TranslatePipe],
   templateUrl: './copilot.html',
   styleUrl: './copilot.css',
 })
 export class Copilot implements OnDestroy {
   private readonly copilotApi = inject(AiCopilotService);
   protected readonly speech = inject(SpeechService);
+  private readonly language = inject(LanguageService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
-  protected readonly suggestedQuestions = SUGGESTED_QUESTIONS;
+  protected readonly suggestedQuestions = computed(() => SUGGESTED_QUESTION_KEYS.map((k) => this.language.t(k)));
   protected readonly chatInput = signal('');
   protected readonly sending = signal(false);
   /** Adevărat doar dacă răspunsul curent durează mai mult decât normal
@@ -157,7 +157,7 @@ export class Copilot implements OnDestroy {
       },
       error: (err) => {
         this.stopSending();
-        const errorText = extractErrorMessage(err, 'Nu am putut obține un răspuns acum. Te rugăm să încerci din nou.');
+        const errorText = extractErrorMessage(err, this.language.t('copilot.errorFallback'));
         this.pushMessage({ id: Date.now(), role: 'assistant', text: '', time: formatChatTime(new Date()), errorText });
       },
     });
@@ -193,7 +193,7 @@ export class Copilot implements OnDestroy {
         this.updateActionState(message.id, result.success ? 'done' : 'error', result.message);
       },
       error: (err) => {
-        const errorText = extractErrorMessage(err, 'Nu am putut duce acțiunea la capăt. Încearcă din nou.');
+        const errorText = extractErrorMessage(err, this.language.t('copilot.actionErrorFallback'));
         this.updateActionState(message.id, 'error', errorText);
       },
     });

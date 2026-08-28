@@ -1,15 +1,15 @@
-<app-page-header title="Rețineri de fraudă" subtitle="Transferuri suspecte, oprite pentru revizuire manuală — sună clientul înainte de a decide.">
+<app-page-header [title]="'staffHolds.title' | translate" [subtitle]="'staffHolds.subtitle' | translate">
   <app-action-button variant="secondary" (pressed)="load()">
-    <app-icon name="reload" [size]="16" /> Actualizează
+    <app-icon name="reload" [size]="16" /> {{ 'staffHolds.refresh' | translate }}
   </app-action-button>
 </app-page-header>
 
 @if (loading()) {
   <app-loading-skeleton [rows]="4" [height]="72" [gap]="14" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca reținerile" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'staffHolds.loadErrorTitle' | translate" [description]="error()!" />
 } @else if (holds().length === 0) {
-  <app-empty-state icon="shield" title="Nicio reținere activă" description="Toate transferurile semnalate au fost deja rezolvate." />
+  <app-empty-state icon="shield" [title]="'staffHolds.emptyTitle' | translate" [description]="'staffHolds.emptyDescription' | translate" />
 } @else {
   <div class="holds-list">
     @for (hold of holds(); track hold.id) {
@@ -24,7 +24,7 @@
                   <app-icon name="phone" [size]="13" /> {{ hold.customer!.phone_number }}
                 </a>
               } @else {
-                <span class="hold-card__phone hold-card__phone--missing">Fără telefon în evidență</span>
+                <span class="hold-card__phone hold-card__phone--missing">{{ 'staffHolds.noPhoneOnFile' | translate }}</span>
               }
             </div>
           </div>
@@ -40,7 +40,7 @@
           </div>
 
           <div class="hold-card__risk">
-            <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
+            <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="('staffHolds.score' | translate) + ' ' + (hold.score ?? '—')" />
             <div class="hold-card__rules">
               @for (ruleId of hold.fired_rule_ids; track ruleId) {
                 <span class="hold-card__rule-tag" [attr.data-tooltip]="ruleDescription(ruleId)">{{ ruleId }}</span>
@@ -51,25 +51,25 @@
           <div class="hold-card__meta">
             <span>{{ minutesAgo(hold.created_at) }}</span>
             @if (hold.hold_expires_at) {
-              <span class="hold-card__expiry">expiră {{ hold.hold_expires_at | date: 'dd MMM, HH:mm' }}</span>
+              <span class="hold-card__expiry">{{ 'staffHolds.expiresAt' | translate }} {{ hold.hold_expires_at | date: 'dd MMM, HH:mm' }}</span>
             }
           </div>
         </div>
 
         <div class="hold-card__actions">
           <app-action-button variant="ghost" (pressed)="openAnalysis(hold)">
-            <app-icon name="sparkles" [size]="15" /> Analiză AI
+            <app-icon name="sparkles" [size]="15" /> {{ 'staffHolds.aiAnalysis' | translate }}
           </app-action-button>
           @if (hold.user_id) {
             <app-action-button variant="ghost" (pressed)="viewCustomer(hold)">
-              <app-icon name="profile" [size]="15" /> Vezi contul clientului
+              <app-icon name="profile" [size]="15" /> {{ 'staffHolds.viewCustomerAccount' | translate }}
             </app-action-button>
           }
           <app-action-button variant="danger" (pressed)="askReject(hold)">
-            <app-icon name="close" [size]="15" /> Respinge
+            <app-icon name="close" [size]="15" /> {{ 'staffHolds.reject' | translate }}
           </app-action-button>
           <app-action-button variant="primary" (pressed)="askApprove(hold)">
-            <app-icon name="check" [size]="15" /> Aprobă
+            <app-icon name="check" [size]="15" /> {{ 'staffHolds.approve' | translate }}
           </app-action-button>
         </div>
       </div>
@@ -79,13 +79,13 @@
 
 @if (pendingAction(); as action) {
   <app-confirm-dialog
-    [title]="action.kind === 'approve' ? 'Aprobi transferul?' : 'Respingi transferul?'"
+    [title]="action.kind === 'approve' ? ('staffHolds.approveTitle' | translate) : ('staffHolds.rejectTitle' | translate)"
     [message]="
       action.kind === 'approve'
-        ? 'Fondurile vor fi eliberate imediat către beneficiar (' + (action.hold.to_name || action.hold.to_iban) + '). Ai confirmat identitatea/intenția clientului la telefon?'
-        : 'Fondurile vor reveni imediat în contul clientului. Beneficiarul (' + (action.hold.to_name || action.hold.to_iban) + ') NU va primi banii.'
+        ? ('staffHolds.approveMessage' | translate).replace('{recipient}', action.hold.to_name || action.hold.to_iban)
+        : ('staffHolds.rejectMessage' | translate).replace('{recipient}', action.hold.to_name || action.hold.to_iban)
     "
-    [confirmLabel]="action.kind === 'approve' ? 'Aprobă' : 'Respinge'"
+    [confirmLabel]="action.kind === 'approve' ? ('staffHolds.approve' | translate) : ('staffHolds.reject' | translate)"
     [danger]="action.kind === 'reject'"
     [loading]="resolving()"
     (confirmed)="confirmAction()"
@@ -94,10 +94,10 @@
 }
 
 @if (analysisTarget(); as hold) {
-  <app-modal title="Analiză Financial Guardian" [maxWidth]="520" (closed)="closeAnalysis()">
+  <app-modal [title]="'staffHolds.guardianAnalysisTitle' | translate" [maxWidth]="520" (closed)="closeAnalysis()">
     <div class="analysis">
       <div class="analysis__header">
-        <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="'Scor ' + (hold.score ?? '—')" />
+        <app-status-badge status="score" [toneOverride]="scoreTone(hold.score)" [labelOverride]="('staffHolds.score' | translate) + ' ' + (hold.score ?? '—')" />
         <div class="analysis__rules">
           @for (ruleId of hold.fired_rule_ids; track ruleId) {
             <span class="hold-card__rule-tag" [attr.data-tooltip]="ruleDescription(ruleId)">{{ ruleId }}</span>
@@ -107,10 +107,10 @@
       @if (hold.guardian_staff_explanation) {
         <p class="analysis__text">{{ hold.guardian_staff_explanation }}</p>
       } @else {
-        <p class="analysis__text analysis__text--pending">Analiza se generează încă — reîmprospătează pagina peste câteva secunde.</p>
+        <p class="analysis__text analysis__text--pending">{{ 'staffHolds.explanationPending' | translate }}</p>
       }
       <p class="analysis__disclaimer">
-        <app-icon name="sparkles" [size]="13" /> Generat automat de Financial Guardian, pe baza regulilor determinist declanșate mai sus — informativ, nu înlocuiește verificarea telefonică a clientului.
+        <app-icon name="sparkles" [size]="13" /> {{ 'staffHolds.guardianDisclaimer' | translate }}
       </p>
     </div>
   </app-modal>

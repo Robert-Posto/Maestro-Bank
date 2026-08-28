@@ -31,6 +31,7 @@ from app.database import get_database
 from app.fraud.audit import record_blocklist_rejection
 from app.fraud.service import evaluate_and_record_transfer_risk, record_completed_transfer_for_profile
 from app.guardian import service as guardian_service
+from app.i18n import translate
 from app.money import format_minor_amount
 from app.models import (
     PaymentRequestCreate,
@@ -49,12 +50,12 @@ async def _get_account_by_user(user_id: str) -> dict:
         try:
             response = await client.get(f"{settings.accounts_service_url}/internal/accounts/by-user/{user_id}")
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")) from exc
 
     if response.status_code == 404:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu există un cont pentru utilizatorul curent.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("noAccountForUser"))
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
     return response.json()
 
 
@@ -64,12 +65,12 @@ async def _get_account_by_iban(iban: str) -> dict | None:
         try:
             response = await client.get(f"{settings.accounts_service_url}/internal/accounts/by-iban/{iban}")
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")) from exc
 
     if response.status_code == 404:
         return None
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
     return response.json()
 
 
@@ -105,14 +106,16 @@ async def _apply_transfer(from_account_id: str, to_account_id: str, amount_minor
                 },
             )
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")) from exc
 
     if response.status_code == 409:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient sau cont inactiv.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=translate("insufficientBalanceOrInactiveAccount")
+        )
     if response.status_code != 200:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Eroare la aplicarea transferului în accounts-service.",
+            detail=translate("transferApplyError"),
         )
     return response.json()
 
@@ -233,16 +236,16 @@ async def create_transfer(
 
     # 3. cont sursă activ
     if source["status"] != "active":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul sursă nu este activ.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("sourceAccountNotActive"))
 
     # 4. IBAN destinație există
     destination = await _get_account_by_iban(payload.to_iban)
     if destination is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contul destinație nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("destinationAccountNotFound"))
 
     # 5. cont destinație activ
     if destination["status"] != "active":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul destinație nu este activ.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("destinationAccountNotActive"))
 
     # 5.5. beneficiar pe blocklist (BEN-04) — SINGURA regulă din catalog
     # care NU trece prin scoring (vezi app/blocklist.py) — verificată aici,
@@ -254,16 +257,16 @@ async def create_transfer(
 
     # 7. monedă compatibilă
     if source["currency"] != destination["currency"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Monedele conturilor sursă și destinație diferă.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("currencyMismatch"))
 
     # 8. sold suficient (verificare rapidă — garanția REALĂ, atomică, vine
     # din accounts-service la pasul de aplicare a transferului, mai jos)
     if source["balance_minor"] < payload.amount_minor:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("insufficientBalance"))
 
     # 9. nu permite transfer către același cont
     if source["id"] == destination["id"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu poți transfera către același cont.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("sameAccountTransfer"))
 
     # "Payment confirmation" (Security settings, Cardul meu) — verificăm
     # ÎNAINTE de orice altceva costisitor (rezolvare nume, screening, motor
@@ -279,11 +282,14 @@ async def create_transfer(
         if payload.card_pin is None:
             raise HTTPException(
                 status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                detail=f"Transferurile peste {format_minor_amount(_PAYMENT_CONFIRMATION_THRESHOLD_MINOR)} "
-                f"{source['currency']} necesită confirmare cu PIN-ul cardului.",
+                detail=translate(
+                    "paymentConfirmationRequired",
+                    threshold=format_minor_amount(_PAYMENT_CONFIRMATION_THRESHOLD_MINOR),
+                    currency=source["currency"],
+                ),
             )
         if not await _verify_card_pin(source_card_settings["payment_confirmation_card_id"], payload.card_pin):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="PIN incorect.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("incorrectPin"))
 
     # 10. descriere limitată rezonabil — garantat de validarea Pydantic (max_length=140)
 
@@ -337,7 +343,7 @@ async def create_transfer(
             insert_result.inserted_id,
             destination["iban"],
         )
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acest beneficiar este pe lista de blocare a băncii.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("beneficiaryBlocklisted"))
 
     # Scor fraud + audit. Când `fraud_shadow_mode` e activ (Faza 1), banda
     # întoarsă e ÎNTOTDEAUNA None — create_transfer nu are cum să ramifice
@@ -415,8 +421,12 @@ async def create_transfer(
         await _notify_user(
             user_id,
             "transfer_hold",
-            f"Transferul de {format_minor_amount(payload.amount_minor)} {source['currency']} către "
-            f"{payload.to_iban} este în verificare de securitate — vei fi anunțat imediat ce e rezolvat.",
+            translate(
+                "transferHoldNotification",
+                amount=format_minor_amount(payload.amount_minor),
+                currency=source["currency"],
+                iban=payload.to_iban,
+            ),
         )
     else:
         # NU returnăm "completed" înainte ca accounts-service să fi confirmat.
@@ -430,7 +440,12 @@ async def create_transfer(
             await _notify_user(
                 user_id,
                 "transfer",
-                f"Transfer de {format_minor_amount(payload.amount_minor)} {source['currency']} către {payload.to_iban} — reușit.",
+                translate(
+                    "transferSuccessNotification",
+                    amount=format_minor_amount(payload.amount_minor),
+                    currency=source["currency"],
+                    iban=payload.to_iban,
+                ),
             )
 
         # Destinatarul primea bani fără NICIO notificare — doar expeditorul
@@ -443,7 +458,12 @@ async def create_transfer(
                 await _notify_user(
                     destination["user_id"],
                     "transfer_received",
-                    f"Ai primit {format_minor_amount(payload.amount_minor)} {source['currency']} de la {from_name or source['iban']}.",
+                    translate(
+                        "transferReceivedNotification",
+                        amount=format_minor_amount(payload.amount_minor),
+                        currency=source["currency"],
+                        name=from_name or source["iban"],
+                    ),
                 )
 
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
@@ -484,18 +504,18 @@ async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(transaction_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionNotFound")) from exc
 
     db = get_database()
     transaction = await db.transactions.find_one({"_id": object_id})
     if transaction is None or transaction["from_account_id"] != source["id"]:
         # 404, nu 403 — nu confirmăm existența unei tranzacții a altcuiva.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionNotFound"))
 
     updated_doc = await holds.cancel_hold(transaction_id)
     logger.info("transactions-service: hold anulat de client (tx_id=%s)", transaction_id)
     await _notify_user(
-        user_id, "transfer_hold_cancelled", "Ai anulat transferul reținut — fondurile au revenit în cont."
+        user_id, "transfer_hold_cancelled", translate("transferHoldCancelledNotification")
     )
     return to_transaction_view(updated_doc, viewer_account_id=source["id"])
 
@@ -559,14 +579,16 @@ async def cancel_scheduled_transfer(schedule_id: str, user_id: str) -> None:
     try:
         object_id = ObjectId(schedule_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de transfer programat invalid.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidScheduledTransferId")
+        ) from exc
 
     result = await db.scheduled_transfers.update_one(
         {"_id": object_id, "user_id": user_id, "active": True},
         {"$set": {"active": False}},
     )
     if result.matched_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transferul programat nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("scheduledTransferNotFound"))
 
 
 async def run_due_scheduled_transfers() -> None:
@@ -652,7 +674,7 @@ async def create_payment_request(user_id: str, payload: PaymentRequestCreate) ->
     db = get_database()
     source = await _get_account_by_user(user_id)
     if source["status"] != "active":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contul tău nu este activ.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("yourAccountNotActive"))
 
     # Același screening determinist ca la un transfer (vezi
     # content_screening.py) — dar aici BLOCĂM crearea, nu doar avertizăm
@@ -662,7 +684,7 @@ async def create_payment_request(user_id: str, payload: PaymentRequestCreate) ->
     if content_screening.screen_description(payload.description):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Descrierea conține termeni asociați cu activități ilegale/violente — reformuleaz-o ca să poți crea cererea.",
+            detail=translate("paymentRequestDescriptionFlagged"),
         )
 
     requester_name = await _get_user_name(user_id)
@@ -703,10 +725,10 @@ async def _get_payment_request_doc(request_id: str) -> dict:
     try:
         object_id = ObjectId(request_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("paymentRequestNotFound")) from exc
     doc = await db.payment_requests.find_one({"_id": object_id})
     if doc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("paymentRequestNotFound"))
     return doc
 
 
@@ -726,9 +748,9 @@ async def pay_payment_request(
     now = datetime.now(timezone.utc)
 
     if _payment_request_effective_status(doc, now) != "open":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("paymentRequestNotActive"))
     if doc["requester_user_id"] == user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu poți plăti propria cerere de plată.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("cannotPayOwnRequest"))
 
     # Claim atomic ÎNAINTE de a muta bani — altfel două plăți concurente pe
     # ACEEAȘI cerere ar putea trece amândouă prin create_transfer (double-
@@ -740,7 +762,7 @@ async def pay_payment_request(
     )
     if claimed is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată tocmai a fost plătită sau anulată."
+            status_code=status.HTTP_409_CONFLICT, detail=translate("paymentRequestJustClaimed")
         )
 
     try:
@@ -778,18 +800,18 @@ async def cancel_payment_request(request_id: str, user_id: str) -> dict:
     doc = await _get_payment_request_doc(request_id)
     if doc["requester_user_id"] != user_id:
         # 404, nu 403 — nu confirmăm existența unei cereri a altcuiva.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cerere de plată inexistentă.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("paymentRequestNotFound"))
 
     now = datetime.now(timezone.utc)
     if _payment_request_effective_status(doc, now) != "open":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("paymentRequestNotActive"))
 
     db = get_database()
     result = await db.payment_requests.update_one(
         {"_id": doc["_id"], "status": "open"}, {"$set": {"status": "cancelled"}}
     )
     if result.modified_count == 0:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această cerere de plată nu mai este activă.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("paymentRequestNotActive"))
 
     doc["status"] = "cancelled"
     logger.info("transactions-service: cerere de plată anulată (id=%s)", doc["_id"])
@@ -935,11 +957,11 @@ async def _get_account_by_id(account_id: str, user_id: str) -> dict:
         try:
             response = await client.get(f"{settings.accounts_service_url}/internal/accounts/{account_id}/for-user/{user_id}")
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")) from exc
     if response.status_code == 404:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("accountNotFound"))
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
     return response.json()
 
 
@@ -983,7 +1005,7 @@ async def generate_account_statement(
     reconstruct_statement_balances.
     """
     if date_from > date_to:
-        raise HTTPException(status_code=400, detail="Data de start trebuie să fie înaintea datei de final.")
+        raise HTTPException(status_code=400, detail=translate("startDateBeforeEndDate"))
 
     # Normalizare la naive-UTC — Motor întoarce created_at fără tzinfo chiar
     # dacă a fost scris tz-aware (același gotcha ca în
@@ -1087,11 +1109,11 @@ async def _set_transaction_flag(transaction_id: str, user_id: str, field: str, v
     try:
         object_id = ObjectId(transaction_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de tranzacție invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidTransactionId")) from exc
 
     doc = await db.transactions.find_one({"_id": object_id})
     if doc is None or source["id"] not in (doc["from_account_id"], doc["to_account_id"]):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionDoesNotExist"))
 
     await db.transactions.update_one({"_id": object_id}, {"$set": {field: value}})
     updated = await db.transactions.find_one({"_id": object_id})
@@ -1105,12 +1127,12 @@ async def get_transaction_for_user(transaction_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(transaction_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de tranzacție invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidTransactionId")) from exc
 
     doc = await db.transactions.find_one({"_id": object_id})
     if doc is None or source["id"] not in (doc["from_account_id"], doc["to_account_id"]):
         # Nu dezvăluim că tranzacția există dar nu-i aparține — 404 în ambele cazuri.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionDoesNotExist"))
 
     # Destinatarul (fără să fie și expeditorul — vezi _build_filter_query
     # pentru motiv) n-are voie să vadă tranzacția înainte să chiar ajungă
@@ -1118,7 +1140,7 @@ async def get_transaction_for_user(transaction_id: str, user_id: str) -> dict:
     # existat o încercare.
     is_receiver_only = doc["to_account_id"] == source["id"] and doc["from_account_id"] != source["id"]
     if is_receiver_only and doc["status"] != "completed":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacția nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionDoesNotExist"))
 
     return to_transaction_view(doc, viewer_account_id=source["id"])
 

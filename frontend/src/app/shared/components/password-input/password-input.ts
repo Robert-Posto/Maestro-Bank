@@ -1,5 +1,6 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 
+import { LanguageService } from '../../../services/language.service';
 import { Icon } from '../icon/icon';
 
 /**
@@ -28,7 +29,7 @@ import { Icon } from '../icon/icon';
       <button
         type="button"
         class="password-input__toggle"
-        [attr.aria-label]="visible() ? 'Ascunde parola' : 'Arată parola'"
+        [attr.aria-label]="language.t(visible() ? 'common.hidePassword' : 'common.showPassword')"
         (click)="visible.set(!visible())"
       >
         <app-icon [name]="visible() ? 'eye-off' : 'eye'" [size]="16" />
@@ -89,6 +90,8 @@ import { Icon } from '../icon/icon';
   ],
 })
 export class PasswordInput {
+  protected readonly language = inject(LanguageService);
+
   readonly value = input('');
   readonly name = input('');
   readonly placeholder = input('');

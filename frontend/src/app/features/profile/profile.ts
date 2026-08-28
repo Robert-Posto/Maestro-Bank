@@ -6,6 +6,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 import { AuthService } from '../../services/auth.service';
 import { DocumentSummary, DocumentView, DocumentsService } from '../../services/documents.service';
+import { LanguageService } from '../../services/language.service';
 import { PasskeyCredential, WebauthnService } from '../../services/webauthn.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -19,6 +20,7 @@ import { StatusBadge, BadgeTone } from '../../shared/components/status-badge/sta
 import { decodeJwtPayload } from '../../shared/jwt-utils';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 /** Profil & Securitate — vezi task-ul MaestroBank, secțiunea 21. */
 @Component({
@@ -36,6 +38,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
     Modal,
     PasswordInput,
     StatusBadge,
+    TranslatePipe,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
@@ -47,6 +50,7 @@ export class Profile implements OnInit, OnDestroy {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
 
   protected readonly currentUser = this.auth.currentUser;
 
@@ -68,7 +72,7 @@ export class Profile implements OnInit, OnDestroy {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      this.toast.error('Alege un fișier imagine (JPEG, PNG etc.).');
+      this.toast.error(this.language.t('profile.chooseImageFile'));
       return;
     }
 
@@ -78,17 +82,17 @@ export class Profile implements OnInit, OnDestroy {
         this.auth.updateProfilePicture(dataUri).subscribe({
           next: () => {
             this.profilePictureBusy.set(false);
-            this.toast.success('Poza de profil a fost actualizată.');
+            this.toast.success(this.language.t('profile.pictureUpdatedToast'));
           },
           error: (err) => {
             this.profilePictureBusy.set(false);
-            this.toast.error(extractErrorMessage(err, 'Nu am putut salva poza de profil.'));
+            this.toast.error(extractErrorMessage(err, this.language.t('profile.savePictureError')));
           },
         }),
       )
       .catch(() => {
         this.profilePictureBusy.set(false);
-        this.toast.error('Nu am putut procesa imaginea — încearcă alt fișier.');
+        this.toast.error(this.language.t('profile.processImageErrorFile'));
       });
   }
 
@@ -121,7 +125,7 @@ export class Profile implements OnInit, OnDestroy {
       this.cameraStream.set(this.mediaStream);
       this.cameraActive.set(true);
     } catch {
-      this.cameraError.set('Nu am putut accesa camera. Verifică permisiunile browserului.');
+      this.cameraError.set(this.language.t('profile.cameraAccessError'));
     }
   }
 
@@ -178,17 +182,17 @@ export class Profile implements OnInit, OnDestroy {
             this.profilePictureBusy.set(false);
             this.capturedFile = null;
             this.capturedPreviewUrl.set(null);
-            this.toast.success('Poza de profil a fost actualizată.');
+            this.toast.success(this.language.t('profile.pictureUpdatedToast'));
           },
           error: (err) => {
             this.profilePictureBusy.set(false);
-            this.toast.error(extractErrorMessage(err, 'Nu am putut salva poza de profil.'));
+            this.toast.error(extractErrorMessage(err, this.language.t('profile.savePictureError')));
           },
         }),
       )
       .catch(() => {
         this.profilePictureBusy.set(false);
-        this.toast.error('Nu am putut procesa imaginea — încearcă din nou.');
+        this.toast.error(this.language.t('profile.processImageErrorRetry'));
       });
   }
 
@@ -197,11 +201,11 @@ export class Profile implements OnInit, OnDestroy {
     this.auth.updateProfilePicture(null).subscribe({
       next: () => {
         this.profilePictureBusy.set(false);
-        this.toast.success('Poza de profil a fost ștearsă.');
+        this.toast.success(this.language.t('profile.pictureRemovedToast'));
       },
       error: (err) => {
         this.profilePictureBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge poza de profil.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('profile.removePictureError')));
       },
     });
   }
@@ -288,11 +292,11 @@ export class Profile implements OnInit, OnDestroy {
     this.enrollingPasskey.set(true);
     try {
       await this.webauthn.registerPasskey();
-      this.toast.success('Passkey adăugat.');
+      this.toast.success(this.language.t('profile.passkeyAddedToast'));
       this.loadPasskeys();
     } catch (err) {
       if ((err as { name?: string })?.name !== 'NotAllowedError') {
-        this.toast.error(extractErrorMessage(err, 'Nu am putut adăuga passkey-ul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('profile.addPasskeyError')));
       }
     } finally {
       this.enrollingPasskey.set(false);
@@ -309,11 +313,11 @@ export class Profile implements OnInit, OnDestroy {
         this.passkeys.update((list) => list.filter((p) => p.id !== target.id));
         this.revokingPasskey.set(false);
         this.pendingRevoke.set(null);
-        this.toast.success('Passkey revocat.');
+        this.toast.success(this.language.t('profile.passkeyRevokedToast'));
       },
       error: (err) => {
         this.revokingPasskey.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut revoca passkey-ul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('profile.revokePasskeyError')));
       },
     });
   }
@@ -363,9 +367,9 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   protected documentStatusLabel(status: DocumentSummary['status']): string {
-    if (status === 'signed') return 'Semnat';
-    if (status === 'cancelled') return 'Anulat';
-    return 'În așteptare';
+    if (status === 'signed') return this.language.t('profile.docStatusSigned');
+    if (status === 'cancelled') return this.language.t('profile.docStatusCancelled');
+    return this.language.t('profile.pending');
   }
 
   protected openDocument(doc: DocumentSummary): void {
@@ -378,7 +382,7 @@ export class Profile implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.viewModalBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut deschide documentul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('profile.openDocumentError')));
       },
     });
   }
@@ -399,13 +403,13 @@ export class Profile implements OnInit, OnDestroy {
     }
     this.viewTarget.set(null);
     this.signPassword.set('');
-    this.toast.success('Documentul a fost semnat.');
+    this.toast.success(this.language.t('profile.documentSignedToast'));
   }
 
   protected submitSignWithPassword(): void {
     const target = this.viewTarget();
     if (!target || !this.signPassword()) {
-      this.toast.error('Introdu parola contului.');
+      this.toast.error(this.language.t('profile.enterAccountPassword'));
       return;
     }
 
@@ -414,7 +418,7 @@ export class Profile implements OnInit, OnDestroy {
       next: () => this.applySignSuccess(() => this.signBusy.set(false)),
       error: (err) => {
         this.signBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Parolă incorectă.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('profile.incorrectPassword')));
       },
     });
   }
@@ -430,7 +434,7 @@ export class Profile implements OnInit, OnDestroy {
         next: () => this.applySignSuccess(() => this.signBiometricBusy.set(false)),
         error: (err) => {
           this.signBiometricBusy.set(false);
-          this.toast.error(extractErrorMessage(err, 'Confirmarea biometrică a eșuat — poți folosi parola.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('profile.biometricSignFailed')));
         },
       });
     } catch (err) {
@@ -438,7 +442,7 @@ export class Profile implements OnInit, OnDestroy {
       // Userul a anulat prompt-ul biometric (NotAllowedError) — nu e o
       // eroare de afișat, câmpul parolei rămâne oricum disponibil mai jos.
       if ((err as { name?: string })?.name !== 'NotAllowedError') {
-        this.toast.error('Confirmarea biometrică nu a funcționat — poți folosi parola.');
+        this.toast.error(this.language.t('profile.biometricNotWorking'));
       }
     }
   }
@@ -448,11 +452,11 @@ export class Profile implements OnInit, OnDestroy {
     this.passwordSuccess.set(false);
 
     if (!this.currentPassword() || !this.newPassword() || !this.confirmPassword()) {
-      this.passwordError.set('Completează toate câmpurile.');
+      this.passwordError.set(this.language.t('profile.fillAllFields'));
       return;
     }
     if (this.newPassword() !== this.confirmPassword()) {
-      this.passwordError.set('Parola nouă și confirmarea nu coincid.');
+      this.passwordError.set(this.language.t('profile.passwordMismatch'));
       return;
     }
 
@@ -464,11 +468,11 @@ export class Profile implements OnInit, OnDestroy {
         this.currentPassword.set('');
         this.newPassword.set('');
         this.confirmPassword.set('');
-        this.toast.success('Parola a fost schimbată cu succes.');
+        this.toast.success(this.language.t('profile.passwordChangedToast'));
       },
       error: (err) => {
         this.changingPassword.set(false);
-        this.passwordError.set(extractErrorMessage(err, 'Schimbarea parolei a eșuat.'));
+        this.passwordError.set(extractErrorMessage(err, this.language.t('profile.changePasswordError')));
       },
     });
   }

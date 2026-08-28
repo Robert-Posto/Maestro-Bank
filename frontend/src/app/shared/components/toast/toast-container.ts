@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 
+import { LanguageService } from '../../../services/language.service';
 import { ToastService } from './toast.service';
 
 @Component({
@@ -10,7 +11,12 @@ import { ToastService } from './toast.service';
       @for (toast of toasts(); track toast.id) {
         <div class="toast" [class]="'toast--' + toast.kind">
           <span class="toast__text">{{ toast.text }}</span>
-          <button type="button" class="toast__close" (click)="toastService.dismiss(toast.id)" aria-label="Închide">
+          <button
+            type="button"
+            class="toast__close"
+            (click)="toastService.dismiss(toast.id)"
+            [attr.aria-label]="language.t('common.close')"
+          >
             ×
           </button>
         </div>
@@ -83,5 +89,6 @@ import { ToastService } from './toast.service';
 })
 export class ToastContainer {
   protected readonly toastService = inject(ToastService);
+  protected readonly language = inject(LanguageService);
   protected readonly toasts = this.toastService.toasts;
 }

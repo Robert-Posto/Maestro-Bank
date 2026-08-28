@@ -29,6 +29,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 from app.database import get_database
 from app.fraud.service import record_completed_transfer_for_profile
+from app.i18n import translate
 
 logger = logging.getLogger("transactions-service")
 
@@ -39,7 +40,7 @@ def _to_object_id(transaction_id: str) -> ObjectId:
     try:
         return ObjectId(transaction_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionNotFound")) from exc
 
 
 async def _resolve_holding_account_id() -> str:
@@ -47,10 +48,12 @@ async def _resolve_holding_account_id() -> str:
         try:
             response = await client.get(f"{settings.accounts_service_url}/internal/accounts/fraud-holding-account")
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
+            ) from exc
     if response.status_code != 200:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la rezolvarea contului de reținere."
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("holdingAccountResolutionError")
         )
     return response.json()["account_id"]
 
@@ -67,12 +70,14 @@ async def _apply_ledger_transfer(from_account_id: str, to_account_id: str, amoun
                 json={"from_account_id": from_account_id, "to_account_id": to_account_id, "amount_minor": amount_minor},
             )
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
+            ) from exc
     if response.status_code == 200:
         return True
     if response.status_code == 409:
         return False
-    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la aplicarea mutării de fonduri.")
+    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("fundsMovementError"))
 
 
 async def ensure_hold_indexes() -> None:
@@ -93,7 +98,9 @@ async def create_hold(*, transaction_id: ObjectId, source_account_id: str, amoun
     holding_account_id = await _resolve_holding_account_id()
     debited = await _apply_ledger_transfer(source_account_id, holding_account_id, amount_minor)
     if not debited:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient sau cont sursă inactiv.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=translate("insufficientBalanceOrInactiveSourceAccount")
+        )
 
     db = get_database()
     expires_at = evaluated_at + timedelta(hours=settings.hold_ttl_hours)
@@ -136,9 +143,9 @@ async def resolve_hold(transaction_id_str: str, *, resolution: str, resolved_by:
     if claim is None:
         existing = await db.transactions.find_one({"_id": object_id})
         if existing is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tranzacție inexistentă.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("transactionNotFound"))
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Această reținere nu (mai) este în așteptare."
+            status_code=status.HTTP_409_CONFLICT, detail=translate("holdNoLongerPending")
         )
 
     holding_account_id = claim["hold"]["holding_account_id"]
@@ -164,7 +171,7 @@ async def resolve_hold(transaction_id_str: str, *, resolution: str, resolved_by:
                 amount_minor,
             )
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la rezolvarea reținerii — contactează suportul."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("holdResolutionError")
             )
         final_resolution = "expired"
 

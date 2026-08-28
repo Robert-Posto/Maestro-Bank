@@ -20,6 +20,7 @@ from pymongo import ReturnDocument
 from app import pin as pin_module
 from app.config import settings
 from app.database import get_database
+from app.i18n import translate
 from app.iban_service import generate_unique_demo_iban
 from app.money import format_minor_amount
 from app.models import (
@@ -130,7 +131,7 @@ async def get_account_for_user(user_id: str) -> dict:
     if account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Nu există niciun cont pentru acest utilizator.",
+            detail=translate("noAccountForUser"),
         )
     return account
 
@@ -287,14 +288,14 @@ async def create_additional_account(
         preposition = "în" if account_type in _CURRENCY_ACCOUNT_TYPES else "de"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ai deja un cont {preposition} {label}.",
+            detail=translate("alreadyHaveAccountType", preposition=preposition, label=label),
         )
 
     total = await db.accounts.count_documents({"user_id": user_id})
     if total >= _MAX_ACCOUNTS_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ai atins numărul maxim de conturi ({_MAX_ACCOUNTS_PER_USER}).",
+            detail=translate("maxAccountsReached", max_accounts=_MAX_ACCOUNTS_PER_USER),
         )
 
     iban = await generate_unique_demo_iban(db)
@@ -336,22 +337,22 @@ async def delete_account(user_id: str, account_id: str) -> None:
     try:
         object_id = ObjectId(account_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidAccountId")) from exc
 
     account = await db.accounts.find_one({"_id": object_id})
     if account is None or account["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("accountNotFound"))
 
     if account.get("account_type", "current") == "current":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Contul curent nu poate fi șters.",
+            detail=translate("currentAccountCannotBeDeleted"),
         )
 
     if account["balance_minor"] != 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Golește mai întâi contul (transferă soldul rămas) înainte să-l ștergi.",
+            detail=translate("emptyAccountBeforeDelete"),
         )
 
     await db.accounts.delete_one({"_id": object_id})
@@ -375,11 +376,11 @@ async def _get_card_for_user(card_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(card_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de card invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidCardId")) from exc
 
     card = await db.cards.find_one({"_id": object_id})
     if card is None or card["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cardul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("cardNotFound"))
     return card
 
 
@@ -393,7 +394,7 @@ async def _set_card_frozen(card_id: str, user_id: str, is_frozen: bool) -> dict:
 
 async def freeze_card(card_id: str, user_id: str) -> dict:
     card = await _set_card_frozen(card_id, user_id, True)
-    await _notify_user(user_id, "card", f"Cardul terminat în {card['last_four']} a fost blocat.")
+    await _notify_user(user_id, "card", translate("cardBlockedNotification", last_four=card["last_four"]))
     return card
 
 
@@ -438,7 +439,7 @@ async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
     if existing_count >= _MAX_CARDS_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ai atins numărul maxim de carduri ({_MAX_CARDS_PER_USER}).",
+            detail=translate("maxCardsReached", max_cards=_MAX_CARDS_PER_USER),
         )
 
     if payload.type == "physical":
@@ -449,8 +450,10 @@ async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
         if debit_result.modified_count != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Sold insuficient pentru taxa de emitere a cardului fizic "
-                f"({format_minor_amount(_PHYSICAL_CARD_FEE_MINOR)} RON).",
+                detail=translate(
+                    "insufficientBalancePhysicalCardFee",
+                    fee=format_minor_amount(_PHYSICAL_CARD_FEE_MINOR),
+                ),
             )
 
     expiry_month, expiry_year = _demo_expiry()
@@ -526,7 +529,7 @@ async def _verify_webauthn_with_auth_service(user_id: str, card_id: str, challen
         logger.error("accounts-service: verificarea passkey-ului a eșuat (user_id=%s): %s", user_id, exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nu am putut verifica passkey-ul — serviciul de autentificare este indisponibil.",
+            detail=translate("passkeyVerificationUnavailable"),
         ) from exc
 
     return bool(response.json().get("valid", False))
@@ -552,12 +555,12 @@ async def reveal_card(card_id: str, user_id: str, payload: CardRevealRequest) ->
         # totuși lipsește (ex. serviciul nu a apucat încă să pornească
         # migrarea), tratăm ca PIN incorect, nu ca eroare de server.
         ok = pin_hash is not None and pin_module.verify_pin(payload.pin, pin_hash)
-        error_detail = "PIN incorect."
+        error_detail = translate("incorrectPin")
     else:
         ok = await _verify_webauthn_with_auth_service(
             user_id, card_id, payload.webauthn_challenge_id, payload.webauthn_assertion
         )
-        error_detail = "Confirmarea biometrică a eșuat."
+        error_detail = translate("biometricConfirmationFailed")
 
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_detail)
@@ -579,12 +582,12 @@ async def change_card_pin(card_id: str, user_id: str, payload: CardPinChangeRequ
     if payload.current_pin is not None:
         pin_hash = card.get("pin_hash")
         ok = pin_hash is not None and pin_module.verify_pin(payload.current_pin, pin_hash)
-        error_detail = "PIN curent incorect."
+        error_detail = translate("incorrectCurrentPin")
     else:
         ok = await _verify_webauthn_with_auth_service(
             user_id, card_id, payload.webauthn_challenge_id, payload.webauthn_assertion
         )
-        error_detail = "Confirmarea biometrică a eșuat."
+        error_detail = translate("biometricConfirmationFailed")
 
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_detail)
@@ -681,11 +684,11 @@ async def _get_pocket_for_user(pocket_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(pocket_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de obiectiv invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidPocketId")) from exc
 
     pocket = await db.pockets.find_one({"_id": object_id})
     if pocket is None or pocket["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obiectivul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("pocketNotFound"))
     return pocket
 
 
@@ -714,7 +717,7 @@ async def deposit_to_pocket(pocket_id: str, user_id: str, amount_minor: int) -> 
     if already_allocated + amount_minor > account["balance_minor"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Suma depășește soldul disponibil (neluat deja de alte obiective).",
+            detail=translate("amountExceedsAvailableBalance"),
         )
 
     await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": amount_minor}})
@@ -726,7 +729,7 @@ async def withdraw_from_pocket(pocket_id: str, user_id: str, amount_minor: int) 
     pocket = await _get_pocket_for_user(pocket_id, user_id)
 
     if amount_minor > pocket["saved_minor"]:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nu poți retrage mai mult decât ai economisit.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("cannotWithdrawMoreThanSaved"))
 
     await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": -amount_minor}})
     return await db.pockets.find_one({"_id": pocket["_id"]})
@@ -738,7 +741,7 @@ async def delete_pocket(pocket_id: str, user_id: str) -> None:
     if pocket["saved_minor"] > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Retrage banii economisiți înainte să ștergi obiectivul.",
+            detail=translate("withdrawSavingsBeforeDelete"),
         )
     await db.pockets.delete_one({"_id": pocket["_id"]})
 
@@ -777,11 +780,11 @@ async def delete_beneficiary(beneficiary_id: str, user_id: str) -> None:
     try:
         object_id = ObjectId(beneficiary_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de beneficiar invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidBeneficiaryId")) from exc
 
     result = await db.beneficiaries.delete_one({"_id": object_id, "user_id": user_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Beneficiarul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("beneficiaryNotFound"))
 
 
 async def add_demo_funds(user_id: str, amount_minor: int) -> AccountPublicOut:
@@ -807,13 +810,13 @@ async def get_account_by_id_for_user(account_id: str, user_id: str) -> AccountPu
     try:
         object_id = ObjectId(account_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidAccountId")) from exc
 
     account = await db.accounts.find_one({"_id": object_id})
     # Cont inexistent SAU aparținând altui user -> același 404, ca să nu
     # dezvăluim că un cont există dar nu-i aparține celui care întreabă.
     if account is None or account["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("accountNotFound"))
 
     return to_public_account(account)
 
@@ -830,7 +833,7 @@ async def provision_account(user_id: str) -> tuple[dict, dict]:
 
     existing_account = await db.accounts.find_one({"user_id": user_id})
     if existing_account is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Userul are deja un cont provizionat.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("userAlreadyProvisioned"))
 
     iban = await generate_unique_demo_iban(db)
     now = datetime.now(timezone.utc)
@@ -894,7 +897,7 @@ async def get_account_by_user(user_id: str) -> InternalAccountView:
     db = get_database()
     account = await db.accounts.find_one({"user_id": user_id, "account_type": "current"})
     if account is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu există cont pentru acest user_id.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("noAccountForUserId"))
     return _to_internal_view(account)
 
 
@@ -912,7 +915,7 @@ async def debit_account(account_id: str, amount_minor: int) -> InternalBalanceOu
     try:
         oid = ObjectId(account_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidAccountId")) from exc
 
     result = await db.accounts.find_one_and_update(
         {"_id": oid, "status": "active", "balance_minor": {"$gte": amount_minor}},
@@ -921,7 +924,7 @@ async def debit_account(account_id: str, amount_minor: int) -> InternalBalanceOu
     )
     if result is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient sau cont inactiv/inexistent."
+            status_code=status.HTTP_409_CONFLICT, detail=translate("insufficientBalanceOrInactiveAccount")
         )
     return InternalBalanceOut(balance_minor=result["balance_minor"])
 
@@ -932,7 +935,7 @@ async def credit_account(account_id: str, amount_minor: int) -> InternalBalanceO
     try:
         oid = ObjectId(account_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidAccountId")) from exc
 
     result = await db.accounts.find_one_and_update(
         {"_id": oid, "status": "active"},
@@ -940,7 +943,7 @@ async def credit_account(account_id: str, amount_minor: int) -> InternalBalanceO
         return_document=ReturnDocument.AFTER,
     )
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent sau inactiv.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("accountNotFoundOrInactive"))
     return InternalBalanceOut(balance_minor=result["balance_minor"])
 
 
@@ -953,7 +956,7 @@ async def get_account_by_user_and_type(user_id: str, account_type: str) -> Inter
     account = await db.accounts.find_one({"user_id": user_id, "account_type": account_type})
     if account is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Nu ai un cont de tipul '{account_type}'."
+            status_code=status.HTTP_404_NOT_FOUND, detail=translate("noAccountOfType", account_type=account_type)
         )
     return _to_internal_view(account)
 
@@ -963,7 +966,7 @@ async def get_account_by_iban(iban: str) -> InternalAccountView:
     db = get_database()
     account = await db.accounts.find_one({"iban": iban.strip().upper()})
     if account is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu există niciun cont cu acest IBAN.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("noAccountForIban"))
     return _to_internal_view(account)
 
 
@@ -998,7 +1001,7 @@ async def apply_internal_transfer(from_account_id: str, to_account_id: str, amou
         from_id = ObjectId(from_account_id)
         to_id = ObjectId(to_account_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de cont invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidAccountId")) from exc
 
     debit_result = await db.accounts.update_one(
         {"_id": from_id, "status": "active", "balance_minor": {"$gte": amount_minor}},
@@ -1007,7 +1010,7 @@ async def apply_internal_transfer(from_account_id: str, to_account_id: str, amou
     if debit_result.modified_count != 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Sold insuficient sau cont sursă inactiv/inexistent.",
+            detail=translate("insufficientBalanceOrInactiveSourceAccount"),
         )
 
     credit_result = await db.accounts.update_one(
@@ -1025,7 +1028,7 @@ async def apply_internal_transfer(from_account_id: str, to_account_id: str, amou
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Cont destinație inactiv sau inexistent — transfer anulat.",
+            detail=translate("destinationAccountInactiveTransferCancelled"),
         )
 
     from_account = await db.accounts.find_one({"_id": from_id})
@@ -1063,13 +1066,13 @@ async def apply_internal_exchange(
     if from_account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nu ai un cont de tipul '{from_account_type}'.",
+            detail=translate("noAccountOfType", account_type=from_account_type),
         )
     to_account = await db.accounts.find_one({"user_id": user_id, "account_type": to_account_type})
     if to_account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Nu ai încă un cont pentru moneda asta — deschide unul din pagina Conturi înainte de a schimba valută.",
+            detail=translate("noCurrencyAccountYet"),
         )
 
     debit_result = await db.accounts.update_one(
@@ -1079,7 +1082,7 @@ async def apply_internal_exchange(
     if debit_result.modified_count != 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Sold insuficient sau cont sursă inactiv.",
+            detail=translate("insufficientBalanceSourceInactiveExchange"),
         )
 
     credit_result = await db.accounts.update_one(
@@ -1097,7 +1100,7 @@ async def apply_internal_exchange(
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Cont destinație inactiv — schimb anulat.",
+            detail=translate("destinationAccountInactiveExchangeCancelled"),
         )
 
     from_doc = await db.accounts.find_one({"_id": from_account["_id"]})

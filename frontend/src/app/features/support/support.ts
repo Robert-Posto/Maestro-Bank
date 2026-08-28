@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -11,7 +11,8 @@ import {
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
-import { ACCOUNT_TYPE_CATALOG } from '../../shared/account-types';
+import { LanguageService } from '../../services/language.service';
+import { ACCOUNT_TYPE_CATALOG, accountTypeLabel as accountTypeLabelFor } from '../../shared/account-types';
 import { SUPPORT_CHAT_STORAGE_KEY } from '../../core/storage-keys';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -23,6 +24,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 /** Statusul unui card, exact cum îl întoarce accounts-service (CardOut) — vezi
  * app/tools/support_cards_tools.py::get_card_status din ai-orchestrator-service. */
@@ -61,11 +63,13 @@ interface ChatContext {
   tickets?: SupportTicket[];
 }
 
-const FAQ_ITEMS = [
-  { q: 'Cum blochez temporar cardul?', a: 'Din pagina Carduri, secțiunea Control card, activează "Blocare temporară card".' },
-  { q: 'Cum fac un transfer?', a: 'Din Plăți & Transferuri, completează IBAN-ul destinație și suma, apoi confirmă.' },
-  { q: 'De ce nu apare o tranzacție?', a: 'Tranzacțiile apar imediat după procesare. Reîmprospătează pagina Tranzacții.' },
-  { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
+/** Chei i18n (nu text direct) — vezi `faqItems` mai jos, un `computed` care
+ * le traduce după limba activă (mirror pe budgets.ts::categoryOptions). */
+const FAQ_KEYS: { qKey: string; aKey: string }[] = [
+  { qKey: 'support.faqCardFreezeQ', aKey: 'support.faqCardFreezeA' },
+  { qKey: 'support.faqTransferQ', aKey: 'support.faqTransferA' },
+  { qKey: 'support.faqTransactionQ', aKey: 'support.faqTransactionA' },
+  { qKey: 'support.faqExchangeQ', aKey: 'support.faqExchangeA' },
 ];
 
 interface ChatMessage {
@@ -131,7 +135,7 @@ function persistMessages(messages: ChatMessage[]): void {
 @Component({
   selector: 'app-support',
   standalone: true,
-  imports: [FormsModule, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow],
+  imports: [FormsModule, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow, TranslatePipe],
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
@@ -142,9 +146,10 @@ export class Support implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
 
-  protected readonly faqItems = FAQ_ITEMS;
+  protected readonly faqItems = computed(() => FAQ_KEYS.map((k) => ({ q: this.language.t(k.qKey), a: this.language.t(k.aKey) })));
 
   protected readonly modalOpen = signal(false);
   protected readonly saving = signal(false);
@@ -295,7 +300,7 @@ export class Support implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.stopTyping();
-        this.toast.error(extractErrorMessage(err, 'Chat-ul de suport nu a putut răspunde. Încearcă din nou.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('support.chatError')));
       },
     });
   }
@@ -310,23 +315,23 @@ export class Support implements OnInit, OnDestroy {
    * catalogul din pagina Conturi (shared/account-types.ts), ca eticheta din
    * chat să fie mereu identică cu ce vede userul acolo, niciodată inventată. */
   protected accountTypeLabel(type: AccountType | undefined): string {
-    return type ? ACCOUNT_TYPE_CATALOG[type].label : 'Cont';
+    return type ? accountTypeLabelFor(ACCOUNT_TYPE_CATALOG[type], this.language.language()) : this.language.t('support.genericAccount');
   }
 
   /** Transformă flag-urile booleene ale unui card într-o listă afișabilă,
    * ca template-ul să nu itereze direct pe cheile obiectului. */
   protected cardFeatures(card: ChatCardContext): { label: string; enabled: boolean }[] {
     return [
-      { label: 'Plăți online', enabled: card.online_payments_enabled },
-      { label: 'Contactless', enabled: card.contactless_enabled },
-      { label: 'Retrageri ATM', enabled: card.atm_withdrawals_enabled },
-      { label: 'Plăți internaționale', enabled: card.international_payments_enabled },
+      { label: this.language.t('support.onlinePayments'), enabled: card.online_payments_enabled },
+      { label: this.language.t('support.contactless'), enabled: card.contactless_enabled },
+      { label: this.language.t('support.atmWithdrawals'), enabled: card.atm_withdrawals_enabled },
+      { label: this.language.t('support.internationalPayments'), enabled: card.international_payments_enabled },
     ];
   }
 
   protected submitTicket(): void {
     if (!this.subject().trim() || !this.message().trim()) {
-      this.toast.error('Completează subiectul și mesajul.');
+      this.toast.error(this.language.t('support.fillSubjectAndMessage'));
       return;
     }
     this.saving.set(true);
@@ -336,11 +341,11 @@ export class Support implements OnInit, OnDestroy {
         next: () => {
           this.saving.set(false);
           this.modalOpen.set(false);
-          this.toast.success('Tichet de suport trimis.');
+          this.toast.success(this.language.t('support.ticketSubmitted'));
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut trimite tichetul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('support.submitTicketError')));
         },
       });
   }

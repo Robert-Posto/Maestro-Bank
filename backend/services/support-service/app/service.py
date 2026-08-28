@@ -15,6 +15,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.database import get_database
+from app.i18n import translate
 from app.models import DocumentCreate, DocumentSignRequest, NotificationCreate, TicketCreate
 
 logger = logging.getLogger("support-service")
@@ -48,12 +49,12 @@ async def get_ticket_for_user(ticket_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(ticket_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de tichet invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidTicketId")) from exc
 
     doc = await db.tickets.find_one({"_id": object_id})
     if doc is None or doc["user_id"] != user_id:
         # Nu dezvăluim că tichetul există dar nu-i aparține — 404 în ambele cazuri.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tichetul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("ticketNotFound"))
     return doc
 
 
@@ -98,13 +99,13 @@ async def delete_notification(notification_id: str, user_id: str) -> None:
     try:
         object_id = ObjectId(notification_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de notificare invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidNotificationId")) from exc
 
     result = await db.notifications.delete_one({"_id": object_id, "user_id": user_id})
     if result.deleted_count == 0:
         # Nu dezvăluim că notificarea există dar aparține altcuiva — 404 în
         # ambele cazuri, la fel ca la tichete (vezi get_ticket_for_user).
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notificarea nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("notificationNotFound"))
 
 
 async def ensure_document_indexes() -> None:
@@ -136,7 +137,7 @@ async def search_customers(query: str) -> list[dict]:
         logger.error("support-service: căutarea de clienți a eșuat: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nu am putut căuta clienți — serviciul de autentificare este indisponibil.",
+            detail=translate("customerSearchFailed"),
         ) from exc
     return response.json()
 
@@ -148,13 +149,13 @@ async def _resolve_customer_name(user_id: str) -> str:
     except httpx.HTTPError as exc:
         logger.error("support-service: auth-service indisponibil la rezolvarea clientului: %s", exc)
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Serviciul de autentificare este indisponibil."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=translate("authServiceUnavailable")
         ) from exc
 
     if response.status_code == status.HTTP_404_NOT_FOUND:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Clientul nu există.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("customerNotFound"))
     if response.status_code != status.HTTP_200_OK:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de client invalid.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidCustomerId"))
 
     contact = response.json()
     return f"{contact['first_name']} {contact['last_name']}"
@@ -188,7 +189,9 @@ async def create_document(payload: DocumentCreate, staff_user_id: str) -> dict:
 
     await create_notification(
         NotificationCreate(
-            user_id=payload.user_id, kind="document_sign", text=f"Ai un document nou de semnat: {payload.title}"
+            user_id=payload.user_id,
+            kind="document_sign",
+            text=translate("newDocumentToSign", title=payload.title),
         )
     )
 
@@ -206,13 +209,13 @@ async def get_document_for_user(document_id: str, user_id: str) -> dict:
     try:
         object_id = ObjectId(document_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de document invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidDocumentId")) from exc
 
     doc = await db.documents.find_one({"_id": object_id})
     if doc is None or doc["user_id"] != user_id:
         # Nu dezvăluim că documentul există dar aparține altcuiva — 404 în
         # ambele cazuri, la fel ca la tichete/notificări.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documentul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("documentNotFound"))
     return doc
 
 
@@ -227,7 +230,7 @@ async def _verify_password_with_auth_service(user_id: str, password: str) -> boo
     except httpx.HTTPError as exc:
         logger.error("support-service: verificarea parolei a eșuat (user_id=%s): %s", user_id, exc)
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Serviciul de autentificare este indisponibil."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=translate("authServiceUnavailable")
         ) from exc
     return bool(response.json().get("valid", False))
 
@@ -255,7 +258,7 @@ async def _verify_webauthn_with_auth_service(user_id: str, document_id: str, cha
         logger.error("support-service: verificarea passkey-ului a eșuat (user_id=%s): %s", user_id, exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nu am putut verifica passkey-ul — serviciul de autentificare este indisponibil.",
+            detail=translate("passkeyVerificationFailed"),
         ) from exc
     return bool(response.json().get("valid", False))
 
@@ -277,19 +280,19 @@ async def sign_document(document_id: str, user_id: str, payload: DocumentSignReq
     document = await get_document_for_user(document_id, user_id)
     if document["status"] != "pending":
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Documentul nu mai poate fi semnat (deja semnat sau anulat)."
+            status_code=status.HTTP_409_CONFLICT, detail=translate("documentCannotBeSigned")
         )
 
     if payload.password is not None:
         ok = await _verify_password_with_auth_service(user_id, payload.password)
         sign_method = "password"
-        error_detail = "Parolă incorectă."
+        error_detail = translate("incorrectPassword")
     else:
         ok = await _verify_webauthn_with_auth_service(
             user_id, document_id, payload.webauthn_challenge_id, payload.webauthn_assertion
         )
         sign_method = "webauthn"
-        error_detail = "Confirmarea biometrică a eșuat."
+        error_detail = translate("biometricConfirmationFailed")
 
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_detail)
@@ -317,13 +320,13 @@ async def cancel_document(document_id: str, staff_user_id: str) -> None:
     try:
         object_id = ObjectId(document_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de document invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidDocumentId")) from exc
 
     doc = await db.documents.find_one({"_id": object_id})
     if doc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documentul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("documentNotFound"))
     if doc["status"] != "pending":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Doar documentele în așteptare pot fi anulate.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("documentsOnlyPendingCanBeCancelled"))
 
     await db.documents.update_one({"_id": object_id}, {"$set": {"status": "cancelled"}})
     logger.info("support-service: document anulat (id=%s, staff_user_id=%s)", document_id, staff_user_id)

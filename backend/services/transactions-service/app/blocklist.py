@@ -21,6 +21,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.database import get_database
+from app.i18n import translate
 
 
 async def ensure_blocklist_indexes() -> None:
@@ -65,8 +66,8 @@ async def remove_from_blocklist(entry_id: str) -> None:
     try:
         object_id = ObjectId(entry_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidId")) from exc
 
     result = await db.beneficiary_blocklist.delete_one({"_id": object_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Intrarea nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("entryNotFound"))

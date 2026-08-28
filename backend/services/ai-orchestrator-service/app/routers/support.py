@@ -13,6 +13,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from openai import APIError
 
+from app.i18n import translate
 from app.models.support import ChatRequest, ChatResponse
 from app.security import CurrentAuthorization
 from app.services import support_service
@@ -37,5 +38,5 @@ async def chat(payload: ChatRequest, authorization: str = CurrentAuthorization) 
         logger.error("Azure OpenAI a răspuns cu eroare: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Azure OpenAI a răspuns cu eroare ({type(exc).__name__}). Verifică endpoint/deployment/cheia din .env.",
+            detail=translate("azureError", error_type=type(exc).__name__),
         ) from exc

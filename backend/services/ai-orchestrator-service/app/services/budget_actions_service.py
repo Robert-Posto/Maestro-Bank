@@ -15,6 +15,7 @@ app/routers/spending_forecast.py::confirm_action).
 
 from __future__ import annotations
 
+from app.i18n import pick
 from app.services.affordability_service import format_ron
 from app.tools import budgets_tools
 from app.tools.errors import ToolError
@@ -73,7 +74,11 @@ def propose_create(category: str, limit_minor: int, name: str | None, existing_b
 
     budget_name = (name or normalized_category).strip().capitalize()
     payload = {"name": budget_name, "category": normalized_category, "limit_minor": limit_minor, "period": "monthly"}
-    summary = f"Creez bugetul „{budget_name}” — {format_ron(limit_minor)} / lună (categorie: {normalized_category})."
+    limit_text = format_ron(limit_minor)
+    summary = pick(
+        f"Creez bugetul „{budget_name}” — {limit_text} / lună (categorie: {normalized_category}).",
+        f'I\'ll create the "{budget_name}" budget — {limit_text} / month (category: {normalized_category}).',
+    )
     return {"type": "create_budget", "summary": summary, "payload": payload}
 
 
@@ -88,9 +93,11 @@ def propose_update(target: str, new_limit_minor: int, existing_budgets: list[dic
         raise ToolError("Noua limită trebuie să fie un număr pozitiv.")
 
     payload = {"budget_id": budget["id"], "limit_minor": new_limit_minor}
-    summary = (
-        f"Modific bugetul „{budget['name']}” la {format_ron(new_limit_minor)} / lună "
-        f"(era {format_ron(budget['limit_minor'])})."
+    new_text = format_ron(new_limit_minor)
+    old_text = format_ron(budget["limit_minor"])
+    summary = pick(
+        f"Modific bugetul „{budget['name']}” la {new_text} / lună (era {old_text}).",
+        f'I\'ll change the "{budget["name"]}" budget to {new_text} / month (was {old_text}).',
     )
     return {"type": "update_budget", "summary": summary, "payload": payload}
 
@@ -104,7 +111,11 @@ def propose_delete(target: str, existing_budgets: list[dict]) -> dict:
         )
 
     payload = {"budget_id": budget["id"]}
-    summary = f"Șterg bugetul „{budget['name']}” ({format_ron(budget['limit_minor'])} / lună)."
+    limit_text = format_ron(budget["limit_minor"])
+    summary = pick(
+        f"Șterg bugetul „{budget['name']}” ({limit_text} / lună).",
+        f'I\'ll delete the "{budget["name"]}" budget ({limit_text} / month).',
+    )
     return {"type": "delete_budget", "summary": summary, "payload": payload}
 
 
@@ -123,7 +134,11 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
             {"name": name, "category": category, "limit_minor": limit_minor, "period": payload.get("period", "monthly")},
             authorization_header,
         )
-        return {"success": True, "message": f"Bugetul „{budget['name']}” a fost creat.", "budget": budget}
+        return {
+            "success": True,
+            "message": pick(f"Bugetul „{budget['name']}” a fost creat.", f'The "{budget["name"]}" budget was created.'),
+            "budget": budget,
+        }
 
     if action_type == "update_budget":
         budget_id = payload.get("budget_id")
@@ -133,13 +148,19 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
         if not fields:
             raise ToolError("Nu există nimic de modificat.")
         budget = await budgets_tools.update_budget(budget_id, fields, authorization_header)
-        return {"success": True, "message": f"Bugetul „{budget['name']}” a fost actualizat.", "budget": budget}
+        return {
+            "success": True,
+            "message": pick(
+                f"Bugetul „{budget['name']}” a fost actualizat.", f'The "{budget["name"]}" budget was updated.'
+            ),
+            "budget": budget,
+        }
 
     if action_type == "delete_budget":
         budget_id = payload.get("budget_id")
         if not budget_id:
             raise ToolError("Lipsește identificatorul bugetului de șters.")
         await budgets_tools.delete_budget(budget_id, authorization_header)
-        return {"success": True, "message": "Bugetul a fost șters.", "budget": None}
+        return {"success": True, "message": pick("Bugetul a fost șters.", "The budget was deleted."), "budget": None}
 
     raise ToolError(f"Tip de acțiune necunoscut: {action_type}")

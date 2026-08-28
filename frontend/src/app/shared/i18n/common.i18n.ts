@@ -37,4 +37,6 @@ export const COMMON_I18N: Record<string, TranslationEntry> = {
   'common.nothingToShow': { ro: 'Nimic de afișat încă', en: 'Nothing to show yet' },
   'common.choose': { ro: 'Alege', en: 'Choose' },
   'common.lei': { ro: 'lei', en: 'RON' },
+  'common.showPassword': { ro: 'Arată parola', en: 'Show password' },
+  'common.hidePassword': { ro: 'Ascunde parola', en: 'Hide password' },
 };
