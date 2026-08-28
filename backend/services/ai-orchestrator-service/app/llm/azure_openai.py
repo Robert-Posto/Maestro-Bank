@@ -82,6 +82,7 @@ def _get_embedding_client() -> AsyncAzureOpenAI | AsyncOpenAI:
 async def chat_completion(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    tool_choice: Any = None,
 ) -> Any:
     """Un singur apel de chat completion (cu/fără tool calling).
 
@@ -90,13 +91,19 @@ async def chat_completion(
     tool_calls de executat). NU logăm niciodată conținutul mesajelor (pot
     conține date financiare ale userului) — doar metadate (nr. mesaje,
     nr. tool-uri disponibile, durata).
+
+    `tool_choice`: implicit "auto" cât timp există `tools` (comportamentul
+    de dinainte, neschimbat pentru agenții existenți) — dar apelantul poate
+    forța un tool anume (ex. `{"type": "function", "function": {"name": "x"}}`),
+    util pentru un apel cu UN SINGUR tool unde răspunsul TREBUIE să fie
+    structurat, nu text liber (vezi app/services/intent_router.py).
     """
     client = _get_chat_client()
     response = await client.chat.completions.create(
         model=settings.azure_openai_deployment,
         messages=messages,
         tools=tools,
-        tool_choice="auto" if tools else None,
+        tool_choice=tool_choice if tool_choice is not None else ("auto" if tools else None),
     )
     return response.choices[0].message
 

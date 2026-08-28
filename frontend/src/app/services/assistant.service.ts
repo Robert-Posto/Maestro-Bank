@@ -10,12 +10,15 @@ export interface ClassifyResultView {
 }
 
 /**
- * Orchestrator SUBȚIRE — clasifică o întrebare nouă (determinist, pe
- * cuvinte-cheie, vezi backend/services/ai-orchestrator-service/app/services/
- * intent_router.py) și spune cărei pagini îi aparține (MaestroAgent sau
- * Support), ca userul să nu mai aleagă manual. NU rulează el conversația —
- * doar clasifică o dată, la început; pagina țintă preia mesajul și
- * continuă exact ca și cum userul ar fi scris direct acolo.
+ * Orchestrator SUBȚIRE — clasifică o întrebare nouă (cuvinte-cheie +
+ * fallback LLM pentru formulări fără cuvânt-cheie clar, vezi backend/
+ * services/ai-orchestrator-service/app/services/intent_router.py) și spune
+ * cărei pagini îi aparține (MaestroAgent sau Support), ca userul să nu mai
+ * aleagă manual. NU rulează el conversația — doar clasifică; pagina țintă
+ * preia mesajul și continuă exact ca și cum userul ar fi scris direct
+ * acolo. Apelat la FIECARE mesaj nou din support.ts::askAgent (nu doar
+ * primul al unei conversații), ca un schimb de subiect în mijlocul unei
+ * conversații să redirecționeze automat, nu doar la pornirea uneia noi.
  */
 @Injectable({ providedIn: 'root' })
 export class AssistantService {

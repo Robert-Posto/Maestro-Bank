@@ -59,8 +59,8 @@ const NAV_GROUPS: NavGroup[] = [
       // O SINGURĂ intrare vizibilă (nu mai există pagină separată de
       // "orchestrator" — userul a cerut explicit s-o eliminăm, era
       // redundantă). Ajunge pe pagina Support (deja cel mai larg domeniu,
-      // catch-all), care clasifică EA ÎNSĂȘI primul mesaj al unei
-      // conversații noi (vezi support.ts::askAgent) — dacă ține de fapt de
+      // catch-all), care clasifică EA ÎNSĂȘI fiecare mesaj nou (nu doar
+      // primul — vezi support.ts::askAgent) — dacă ține de fapt de
       // buget/prognoză, te trimite automat spre MaestroAgent, cu întrebarea
       // deja pusă (query param "q", citit în copilot.ts::ngOnInit).
       // MaestroAgent (/app/copilot) rămâne o rută validă, funcțională, doar

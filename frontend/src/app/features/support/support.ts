@@ -377,20 +377,39 @@ export class Support implements OnInit, OnDestroy {
     if (!text || this.supportTyping()) return;
 
     // Support e singura intrare vizibilă în sidebar acum ("Asistent") — la
-    // PRIMUL mesaj al unei conversații noi (nu la fiecare tur), verificăm
+    // FIECARE mesaj nou (nu doar primul al unei conversații noi), verificăm
     // dacă întrebarea ține de fapt de MaestroAgent (buget/prognoză/
-    // economii/abonamente, vezi intent_router.py din backend) și, dacă da,
-    // trimitem userul direct acolo, cu întrebarea deja "pusă" (query param
-    // "q", citit în Copilot::ngOnInit) — nu o retastează. Turele următoare
-    // din ACEEAȘI conversație nu se reclasifică — rămân aici, cu Support.
-    if (!this.activeConversationId() && !this.pendingAction()) {
+    // economii/abonamente — vezi intent_router.py din backend, acum
+    // clasificare hibridă: cuvinte-cheie + fallback LLM, nu doar regex) și,
+    // dacă da, trimitem userul direct acolo, cu întrebarea deja "pusă"
+    // (query param "q", citit în Copilot::ngOnInit) — nu o retastează.
+    // Excepție: un mesaj care confirmă o acțiune în curs (pendingAction, ex.
+    // "da" pentru crearea unui tichet) NU se reclasifică niciodată — nu e o
+    // întrebare nouă, e un răspuns la ceva deja pus.
+    if (!this.pendingAction()) {
+      // Feedback imediat la apăsarea Trimite — clasificarea poate însemna
+      // acum un apel LLM (nu mai e mereu instantă, ca înainte cu doar
+      // regex), deci pornim indicatorul de "typing" din start, ca userul să
+      // nu creadă că n-a mers click-ul. Dezactivează și inputul (vezi
+      // [disabled]="supportTyping()" în support.html), care previne un al
+      // doilea Trimite în timp ce se decide agentul.
+      this.supportTyping.set(true);
+
       this.assistant.classify(text).subscribe({
         next: (result) => {
           if (result.agent === 'spending_forecast') {
+            this.supportTyping.set(false);
             this.toast.info(this.language.t('support.redirectedToMaestroAgent'));
             this.router.navigate([result.route], { queryParams: { q: text } });
           } else {
-            this.toast.info(this.language.t('support.redirectedToSupport'));
+            // Toast-ul "te-am direcționat către Support" are sens DOAR la
+            // primul mesaj al unei conversații noi — arată identitatea
+            // agentului o singură dată. La turele următoare (deja pe
+            // Support), reclasificarea confirmă doar că rămâi aici — un
+            // toast la fiecare mesaj ar deveni spam, nu informație utilă.
+            if (!this.activeConversationId()) {
+              this.toast.info(this.language.t('support.redirectedToSupport'));
+            }
             this.sendToSupportAgent(text);
           }
         },
