@@ -38,6 +38,7 @@ SERVICES: dict[str, dict[str, str | float]] = {
     "deposits": {"base_url": settings.deposits_service_url, "internal_prefix": "/deposits"},
     "investments": {"base_url": settings.investments_service_url, "internal_prefix": "/investments"},
     "points": {"base_url": settings.points_service_url, "internal_prefix": "/points"},
+    "loans": {"base_url": settings.loans_service_url, "internal_prefix": "/loans"},
     # timeout mai mare decât restul — DeepFace (VGG-Face + detector
     # retinaface, alese pentru acuratețe pe poze reale de buletin, nu
     # pentru viteză — vezi verification-service/app/config.py) rulează pe
@@ -83,6 +84,7 @@ def _is_protected(service: str, path: str) -> bool:
       - investments: TOT e protejat (portofoliul unui user e personal);
       - points: TOT e protejat (soldul/istoricul de puncte al unui user e
         personal);
+      - loans: TOT e protejat (creditele unui user sunt personale);
       - verification: TOT e protejat (identitatea userului curent);
       - ai: TOT e protejat (identitatea userului vine STRICT din JWT — nici
         Spending + Forecast, nici Support Agent nu acceptă user_id
@@ -111,6 +113,7 @@ def _is_protected(service: str, path: str) -> bool:
         "deposits",
         "investments",
         "points",
+        "loans",
         "verification",
         "ai",
     ):

@@ -226,6 +226,12 @@ import { Component, input } from '@angular/core';
           <rect x="3" y="7" width="18" height="13" rx="2" />
           <circle cx="16.5" cy="13.5" r="1.3" fill="currentColor" stroke="none" />
         }
+        @case ('banknote') {
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M6 12h.01" />
+          <path d="M18 12h.01" />
+        }
         @case ('gift') {
           <polyline points="20 12 20 22 4 22 4 12" />
           <rect x="2" y="7" width="20" height="5" />

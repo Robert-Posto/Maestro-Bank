@@ -23,6 +23,10 @@ const NOTIFICATION_ROUTES: Record<NotificationKind, string[]> = {
   document_sign: ['/app/profile'],
   reward_redeemed: ['/app/points'],
   raffle_win: ['/app/points'],
+  loan_approved: ['/app/loans'],
+  loan_payment: ['/app/loans'],
+  loan_payment_missed: ['/app/loans'],
+  loan_paid_off: ['/app/loans'],
 };
 
 /** Tipuri care au un `referenceId` = id de tranzacție (vezi

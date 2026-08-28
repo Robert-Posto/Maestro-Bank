@@ -1,0 +1,139 @@
+<app-page-header title="Credite" subtitle="Credit personal, cu dobândă MaestroBank și rată automată lunară din contul curent.">
+  <app-action-button (pressed)="openApplyModal()">Cerere credit nou</app-action-button>
+</app-page-header>
+
+<section class="loans-section">
+  <h2>Dobânzi</h2>
+  @if (ratesLoading()) {
+    <app-loading-skeleton [rows]="1" [height]="70" />
+  } @else {
+    <div class="rates-row">
+      @for (rate of rates(); track rate.term_months) {
+        <div class="rate-chip">
+          <span class="rate-chip__term">{{ rate.term_months }} luni</span>
+          <span class="rate-chip__rate">{{ rate.rate_percent_annual }}%/an</span>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<section class="loans-section">
+  <h2>Creditele tale</h2>
+  @if (loansLoading()) {
+    <app-loading-skeleton [rows]="2" [height]="120" />
+  } @else if (loans().length === 0) {
+    <app-empty-state icon="wallet" title="Niciun credit încă" description="Fă o cerere de credit ca să vezi aici scadențarul." />
+  } @else {
+    <div class="loans-list">
+      @for (loan of loans(); track loan.id) {
+        <div class="loan-card">
+          <div class="loan-card__top">
+            <div>
+              <p class="loan-card__amount">{{ loan.principal_minor | money: 'RON' }}</p>
+              <p class="loan-card__meta">{{ loan.term_months }} luni · {{ loan.rate_percent_annual }}%/an</p>
+            </div>
+            <app-status-badge [status]="loan.status" />
+          </div>
+
+          <div class="loan-card__bar">
+            <div class="loan-card__bar-fill" [style.width.%]="loanProgressPercent(loan)"></div>
+          </div>
+          <p class="loan-card__progress-label">{{ loan.payments_made }} din {{ loan.term_months }} rate plătite</p>
+
+          <div class="loan-card__stats">
+            <div>
+              <span class="loan-card__stat-label">Rată lunară</span>
+              <strong>{{ loan.monthly_installment_minor | money: 'RON' }}</strong>
+            </div>
+            <div>
+              <span class="loan-card__stat-label">Rest de plată</span>
+              <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong>
+            </div>
+            @if (loan.status === 'active' && daysUntilDue(loan) !== null) {
+              <div>
+                <span class="loan-card__stat-label">Următoarea rată</span>
+                <strong>peste {{ daysUntilDue(loan) }} zile</strong>
+              </div>
+            }
+          </div>
+
+          <div class="loan-card__actions">
+            <app-action-button variant="ghost" (pressed)="openPayments(loan)">Istoric plăți</app-action-button>
+            @if (loan.status === 'active') {
+              <app-action-button variant="secondary" (pressed)="requestPayoff(loan)">Plată anticipată</app-action-button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+@if (applyModalOpen()) {
+  <app-modal title="Cerere credit nou" (closed)="closeApplyModal()">
+    <div class="loan-form">
+      <label>
+        <span>Sumă (RON)</span>
+        <input type="number" min="1000" max="50000" step="100" [ngModel]="newLoanAmountRon()" (ngModelChange)="newLoanAmountRon.set($event)" />
+      </label>
+      <p class="loan-form__hint">Între 1.000 și 50.000 RON.</p>
+
+      <label>
+        <span>Termen</span>
+        <app-select
+          [options]="termOptions.map(t => ({ value: t.toString(), label: t + ' luni (' + (rateFor(t) ?? '—') + '%/an)' }))"
+          [value]="newLoanTerm().toString()"
+          (changed)="newLoanTerm.set($any(+$event))"
+        />
+      </label>
+
+      <app-action-button [fullWidth]="true" [loading]="applying()" (pressed)="submitApply()">Trimite cererea</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (payoffTarget(); as loan) {
+  <app-modal title="Plată anticipată" (closed)="cancelPayoff()">
+    <p class="payoff-confirm__text">
+      Achiți acum <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong> (restul de principal, fără dobândă
+      suplimentară) și creditul se închide. Confirmi?
+    </p>
+    <app-action-button [fullWidth]="true" [loading]="payingOff()" (pressed)="confirmPayoff()">Confirmă plata</app-action-button>
+  </app-modal>
+}
+
+@if (paymentsModalLoan(); as loan) {
+  <app-modal title="Istoric plăți" [maxWidth]="600" (closed)="closePayments()">
+    @if (paymentsLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="50" />
+    } @else if (payments().length === 0) {
+      <app-empty-state icon="wallet" title="Nicio plată încă" description="Prima rată apare aici după ce se debitează automat." />
+    } @else {
+      <div class="payments-table-wrap">
+        <table class="payments-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Sumă</th>
+              <th>Dobândă</th>
+              <th>Principal</th>
+              <th>Rest</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (payment of payments(); track payment.id) {
+              <tr>
+                <td>{{ payment.paid_at | date: 'dd MMM yyyy' }}</td>
+                <td>{{ payment.amount_minor | money: 'RON' }}</td>
+                <td>{{ payment.interest_portion_minor | money: 'RON' }}</td>
+                <td>{{ payment.principal_portion_minor | money: 'RON' }}</td>
+                <td>{{ payment.outstanding_after_minor | money: 'RON' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </app-modal>
+}

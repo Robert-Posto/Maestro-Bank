@@ -37,6 +37,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Schimb valutar', route: '/app/exchange', icon: 'exchange' },
       { label: 'Investiții', route: '/app/investments', icon: 'trending-up' },
       { label: 'Puncte & Recompense', route: '/app/points', icon: 'gift' },
+      { label: 'Credite', route: '/app/loans', icon: 'banknote' },
     ],
   },
   {

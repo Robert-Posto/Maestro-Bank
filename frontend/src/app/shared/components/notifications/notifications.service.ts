@@ -13,7 +13,11 @@ export type NotificationKind =
   | 'system'
   | 'document_sign'
   | 'reward_redeemed'
-  | 'raffle_win';
+  | 'raffle_win'
+  | 'loan_approved'
+  | 'loan_payment'
+  | 'loan_payment_missed'
+  | 'loan_paid_off';
 
 export interface AppNotification {
   id: string;
