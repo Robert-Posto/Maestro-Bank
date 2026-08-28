@@ -376,6 +376,16 @@ export class Support implements OnInit, OnDestroy {
   private askAgent(text: string): void {
     if (!text || this.supportTyping()) return;
 
+    // Bula userului apare INSTANT, indiferent de ce urmează — clasificarea
+    // de mai jos poate însemna acum un apel LLM (nu mai e mereu instantă,
+    // ca înainte cu doar regex), deci FĂRĂ asta userul ar vedea ecranul
+    // "înghețat" un moment, fără nicio confirmare că mesajul chiar a
+    // plecat (bug raportat: "nu-mi apare imediat mesajul meu pe interfață").
+    this.chatMessages.update((messages) => [
+      ...messages,
+      { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
+    ]);
+
     // Support e singura intrare vizibilă în sidebar acum ("Asistent") — la
     // FIECARE mesaj nou (nu doar primul al unei conversații noi), verificăm
     // dacă întrebarea ține de fapt de MaestroAgent (buget/prognoză/
@@ -387,12 +397,9 @@ export class Support implements OnInit, OnDestroy {
     // "da" pentru crearea unui tichet) NU se reclasifică niciodată — nu e o
     // întrebare nouă, e un răspuns la ceva deja pus.
     if (!this.pendingAction()) {
-      // Feedback imediat la apăsarea Trimite — clasificarea poate însemna
-      // acum un apel LLM (nu mai e mereu instantă, ca înainte cu doar
-      // regex), deci pornim indicatorul de "typing" din start, ca userul să
-      // nu creadă că n-a mers click-ul. Dezactivează și inputul (vezi
-      // [disabled]="supportTyping()" în support.html), care previne un al
-      // doilea Trimite în timp ce se decide agentul.
+      // Dezactivează inputul (vezi [disabled]="supportTyping()" în
+      // support.html) cât timp se decide agentul — previne un al doilea
+      // Trimite în timp ce clasificarea e în curs.
       this.supportTyping.set(true);
 
       this.assistant.classify(text).subscribe({
@@ -410,27 +417,34 @@ export class Support implements OnInit, OnDestroy {
             if (!this.activeConversationId()) {
               this.toast.info(this.language.t('support.redirectedToSupport'));
             }
-            this.sendToSupportAgent(text);
+            this.sendToSupportAgent(text, true);
           }
         },
         // Clasificarea eșuată (ex. serviciul indisponibil) NU trebuie să
         // blocheze conversația — Support e deja domeniul implicit/catch-all.
-        error: () => this.sendToSupportAgent(text),
+        error: () => this.sendToSupportAgent(text, true),
       });
       return;
     }
 
-    this.sendToSupportAgent(text);
+    this.sendToSupportAgent(text, true);
   }
 
-  private sendToSupportAgent(text: string): void {
+  /** `userBubbleAlreadyShown` — adevărat când askAgent a afișat deja bula
+   * userului (cazul normal, vezi mai sus); fals DOAR când sendToSupportAgent
+   * ar fi apelat direct, din afara askAgent (nu mai există azi un astfel de
+   * apelant, dar parametrul rămâne explicit, nu implicit, ca să nu se piardă
+   * din vedere dacă apare unul nou). */
+  private sendToSupportAgent(text: string, userBubbleAlreadyShown = false): void {
     const pending = this.pendingAction();
     this.pendingAction.set(null);
 
-    this.chatMessages.update((messages) => [
-      ...messages,
-      { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
-    ]);
+    if (!userBubbleAlreadyShown) {
+      this.chatMessages.update((messages) => [
+        ...messages,
+        { id: Date.now(), role: 'user', text, time: formatChatTime(new Date()) },
+      ]);
+    }
     this.supportTyping.set(true);
     this.supportTypingSlow.set(false);
     // Majoritatea răspunsurilor vin în 10-20s (tool-calling GPT-5-mini) —
