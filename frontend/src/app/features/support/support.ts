@@ -464,19 +464,42 @@ export class Support implements OnInit, OnDestroy {
       // Trimite în timp ce clasificarea e în curs.
       this.supportTyping.set(true);
 
-      this.assistant.classify(text).subscribe({
+      // Care agent a răspuns ULTIMUL, înainte de acest mesaj — determină
+      // dacă mai are voie fallback-ul LLM (vezi mai jos) și ce facem cu un
+      // rezultat "support" ambiguu.
+      const previousAgent = this.lastAnsweringAgent();
+
+      // FĂRĂ context anterior (primul mesaj real al conversației) —
+      // clasificarea hibridă completă (cuvinte-cheie + LLM) are sens, e
+      // singura șansă să prindă o formulare fără cuvânt-cheie exact.
+      //
+      // CU un agent deja angajat — fallback-ul LLM e STATELESS (vezi
+      // AssistantService.classify), nu vede istoricul conversației, deci
+      // ar clasifica greșit un follow-up ambiguu ("Ce buffer?", fără
+      // niciun cuvânt-cheie de buget) ca fiind Support, deși ține clar de
+      // continuarea discuției cu MaestroAgent — exact bug-ul raportat de
+      // user. Cu allowLlmFallback=false, doar o potrivire CLARĂ de
+      // cuvinte-cheie mai poate schimba agentul; un "support" fără
+      // cuvânt-cheie e tratat ca "fără semnal", nu ca o decizie fermă —
+      // rămânem pe agentul deja angajat (vezi mai jos).
+      const allowLlmFallback = previousAgent === undefined;
+
+      this.assistant.classify(text, allowLlmFallback).subscribe({
         next: (result) => {
           if (result.agent === 'spending_forecast') {
-            // Toast-ul are sens DOAR la PRIMA implicare a AGENTULUI ĂSTUIA
-            // în conversație — verificăm `maestroConversationId` (populat
-            // abia după primul răspuns real de-al lui, vezi askMaestroAgent),
-            // NU `chatMessages().length` (deja nenul aici, bula userului a
-            // fost pusă mai sus) și NICI starea lui Support — dacă
-            // MaestroAgent preia pentru prima oară o conversație pornită
-            // deja cu Support, tot merită anunțat, nu doar la mesajul 1.
+            // Semnal de încredere (cuvânt-cheie clar SAU LLM la primul
+            // mesaj) — mereu tratat ca o schimbare reală de agent.
             if (!this.maestroConversationId()) {
               this.toast.info(this.language.t('support.answeredByMaestroAgent'));
             }
+            this.askMaestroAgent(text, true);
+          } else if (previousAgent === 'maestro') {
+            // "support" AICI nu e o decizie fermă (allowLlmFallback era
+            // false, deci acest rezultat vine STRICT din calea rapidă,
+            // fără cuvânt-cheie de buget găsit) — nu înseamnă "userul vrea
+            // clar Support", doar "nimic clar de buget în mesajul ăsta".
+            // Rămânem pe MaestroAgent, ca discuția să nu-și piardă
+            // contextul la un follow-up firesc.
             this.askMaestroAgent(text, true);
           } else {
             if (!this.activeConversationId()) {
@@ -486,8 +509,9 @@ export class Support implements OnInit, OnDestroy {
           }
         },
         // Clasificarea eșuată (ex. serviciul indisponibil) NU trebuie să
-        // blocheze conversația — Support e deja domeniul implicit/catch-all.
-        error: () => this.sendToSupportAgent(text, true),
+        // blocheze conversația — rămânem pe agentul deja angajat, dacă
+        // există unul, altfel Support (domeniul implicit/catch-all).
+        error: () => (previousAgent === 'maestro' ? this.askMaestroAgent(text, true) : this.sendToSupportAgent(text, true)),
       });
       return;
     }

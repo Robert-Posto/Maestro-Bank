@@ -95,6 +95,34 @@ async def test_classify_intent_falls_back_to_support_when_llm_unavailable(monkey
     assert await classify_intent("Ce mai știi despre bani?") == "support"
 
 
+# --- classify_intent — allow_llm_fallback=False (mesaj care CONTINUĂ o -------------
+# --- conversație deja angajată — vezi bug-ul raportat: "Ce buffer?" ---------------
+
+
+async def test_classify_intent_without_llm_fallback_never_calls_llm(monkeypatch):
+    """Un follow-up ambiguu, fără niciun cuvânt-cheie de buget ("Ce buffer?"
+    — exact mesajul din bug-ul raportat) NU trebuie să declanșeze niciun
+    apel LLM când allow_llm_fallback=False — apelantul (frontend-ul)
+    tratează "support" aici ca "fără semnal", nu ca o decizie fermă."""
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("LLM-ul nu trebuia apelat cu allow_llm_fallback=False")
+
+    monkeypatch.setattr("app.services.intent_router.chat_completion", fail_if_called)
+    assert await classify_intent("Ce buffer?", allow_llm_fallback=False) == "support"
+
+
+async def test_classify_intent_without_llm_fallback_still_uses_fast_path(monkeypatch):
+    """Un mesaj cu un cuvânt-cheie clar tot declanșează spending_forecast,
+    chiar și cu allow_llm_fallback=False — calea rapidă nu depinde de LLM."""
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("LLM-ul nu trebuia apelat pentru un mesaj cu cuvânt-cheie clar")
+
+    monkeypatch.setattr("app.services.intent_router.chat_completion", fail_if_called)
+    assert await classify_intent("Ce buget mai am?", allow_llm_fallback=False) == "spending_forecast"
+
+
 # --- Endpoint HTTP -----------------------------------------------------------------
 
 
@@ -129,3 +157,22 @@ async def test_classify_endpoint_routes_account_question_to_support(
 async def test_classify_endpoint_rejects_empty_message(client: AsyncClient, support_auth_header: dict[str, str]):
     response = await client.post("/assistant/classify", json={"message": ""}, headers=support_auth_header)
     assert response.status_code == 422
+
+
+async def test_classify_endpoint_respects_allow_llm_fallback_false(
+    client: AsyncClient, support_auth_header: dict[str, str], monkeypatch
+):
+    """"Ce buffer?" prin endpoint-ul real, cu allow_llm_fallback=False —
+    trebuie să întoarcă "support" FĂRĂ niciun apel LLM (vezi bug-ul raportat)."""
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("LLM-ul nu trebuia apelat cu allow_llm_fallback=False")
+
+    monkeypatch.setattr("app.services.intent_router.chat_completion", fail_if_called)
+    response = await client.post(
+        "/assistant/classify",
+        json={"message": "Ce buffer?", "allow_llm_fallback": False},
+        headers=support_auth_header,
+    )
+    assert response.status_code == 200
+    assert response.json()["agent"] == "support"

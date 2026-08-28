@@ -36,5 +36,5 @@ _ROUTES: dict[str, str] = {
 
 @router.post("/classify", response_model=ClassifyResponse)
 async def classify_route(payload: ClassifyRequest, user_id: str = CurrentUserId):
-    agent = await classify_intent(payload.message)
+    agent = await classify_intent(payload.message, allow_llm_fallback=payload.allow_llm_fallback)
     return ClassifyResponse(agent=agent, route=_ROUTES[agent])

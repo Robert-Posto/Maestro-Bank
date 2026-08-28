@@ -143,11 +143,22 @@ async def _classify_by_llm(message: str) -> AgentName:
     return "support"
 
 
-async def classify_intent(message: str) -> AgentName:
+async def classify_intent(message: str, *, allow_llm_fallback: bool = True) -> AgentName:
     """"spending_forecast" dacă mesajul ține clar de buget/cheltuieli/
     economii/prognoză, altfel "support" (domeniul implicit, catch-all).
-    Vezi docstring-ul modulului pentru calea rapidă vs. LLM."""
+    Vezi docstring-ul modulului pentru calea rapidă vs. LLM.
+
+    `allow_llm_fallback=False` — pentru un mesaj care CONTINUĂ o
+    conversație deja angajată cu un agent (vezi app/models/assistant.py::
+    ClassifyRequest.allow_llm_fallback pentru raționamentul complet): fără
+    o potrivire clară de cuvinte-cheie, întoarce direct "support" (fără
+    apel LLM), NU o presupunere despre domeniu — apelantul (frontend-ul)
+    tratează acest "support" ca "fără semnal clar de schimbare", nu ca o
+    decizie fermă, și rămâne pe agentul deja angajat dacă rezultatul nu
+    e "spending_forecast"."""
     fast = _classify_by_keywords(message)
     if fast is not None:
         return fast
+    if not allow_llm_fallback:
+        return "support"
     return await _classify_by_llm(message)
