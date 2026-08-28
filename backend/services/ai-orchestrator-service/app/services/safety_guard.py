@@ -70,16 +70,25 @@ _SHORT_CODE = re.compile(r"\b\d{3,6}\b")
 _DIGIT_GROUP = re.compile(r"\d(?:[ \-]?\d){12,18}")
 
 
-def detect_sensitive_data(text: str) -> bool:
+def detect_sensitive_data(text: str, *, include_pan_check: bool = True) -> bool:
     """True dacă `text` conține (probabil) un PIN, un CVV sau un număr
     complet de card. Vezi docstring-ul modulului pentru raționamentul din
-    spatele fiecărui tip de verificare."""
+    spatele fiecărui tip de verificare.
+
+    `include_pan_check=False` dezactivează DOAR verificarea de "13-19 cifre
+    la rând" (număr de card) — folosit de `redact_if_sensitive` mai jos, pe
+    răspunsul GENERAT de agent, unde acel tipar dă fals-pozitiv sigur pe un
+    IBAN MaestroBank normal (format RO + 2 cifre + MAES + 16 cifre — partea
+    numerică, luată singură, are exact 16 cifre, direct în intervalul
+    13-19). Verificarea rămâne completă (inclusiv PAN) pe INPUT-ul userului,
+    unde riscul e real — un user chiar poate tasta un număr de card real."""
     normalized = _normalize(text)
 
-    for match in _DIGIT_GROUP.finditer(normalized):
-        digits = re.sub(r"\D", "", match.group())
-        if 13 <= len(digits) <= 19:
-            return True
+    if include_pan_check:
+        for match in _DIGIT_GROUP.finditer(normalized):
+            digits = re.sub(r"\D", "", match.group())
+            if 13 <= len(digits) <= 19:
+                return True
 
     if _PIN_KEYWORD.search(normalized) and _SHORT_CODE.search(normalized):
         return True
@@ -140,7 +149,15 @@ def redact_if_sensitive(answer: str) -> str:
     card, îl înlocuim în întregime cu un mesaj determinist — NU încercăm să
     "reparăm" doar fragmentul (ar putea rămâne context suficient să fie tot
     problematic), preferăm un răspuns clar, sigur, chiar dacă mai puțin
-    specific decât originalul."""
-    if detect_sensitive_data(answer):
+    specific decât originalul.
+
+    `include_pan_check=False` — niciun tool nu întoarce vreodată un PAN real
+    (vezi docstring-ul modulului), deci modelul structural nu poate leaka
+    unul; verificarea de "13-19 cifre" pe TEXTUL LUI GENERAT dădea fals-
+    pozitiv sigur ori de câte ori includea un IBAN normal (ex. "RO68MAES
+    9589684861247903" — partea numerică are exact 16 cifre), înlocuind un
+    răspuns corect, nesensibil, cu avertismentul — bug real, raportat de
+    user ca "răspuns ciudat" la o simplă întrebare de sold."""
+    if detect_sensitive_data(answer, include_pan_check=False):
         return translate("sensitiveDataWarning")
     return answer
