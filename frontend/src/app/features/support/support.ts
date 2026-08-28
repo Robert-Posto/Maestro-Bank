@@ -15,7 +15,8 @@ import { AssistantService } from '../../services/assistant.service';
 import { SupportService, SupportTicket, TicketCategory } from '../../services/support.service';
 import { AccountType } from '../../services/banking.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
-import { ACCOUNT_TYPE_CATALOG } from '../../shared/account-types';
+import { LanguageService } from '../../services/language.service';
+import { ACCOUNT_TYPE_CATALOG, accountTypeLabel as accountTypeLabelFor } from '../../shared/account-types';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
@@ -26,6 +27,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 /** Statusul unui card, exact cum îl întoarce accounts-service (CardOut) — vezi
  * app/tools/support_cards_tools.py::get_card_status din ai-orchestrator-service. */
@@ -64,30 +66,26 @@ interface ChatContext {
   tickets?: SupportTicket[];
 }
 
-const FAQ_ITEMS = [
-  { q: 'Cum blochez temporar cardul?', a: 'Din pagina Carduri, secțiunea Control card, activează "Blocare temporară card".' },
-  { q: 'Cum fac un transfer?', a: 'Din Plăți & Transferuri, completează IBAN-ul destinație și suma, apoi confirmă.' },
-  { q: 'De ce nu apare o tranzacție?', a: 'Tranzacțiile apar imediat după procesare. Reîmprospătează pagina Tranzacții.' },
-  { q: 'Cursul valutar e real?', a: 'Nu — Schimb valutar folosește un motor demo, marcat explicit ca simulare.' },
-  // Astea două țin de fapt de MaestroAgent (buget/prognoză), nu de Support
-  // — apar aici intenționat, ca userul să vadă din prima că poate întreba
-  // orice, indiferent de agent, și e redirecționat automat (vezi askAgent
-  // mai jos, care clasifică primul mesaj al unei conversații noi).
-  { q: 'Îmi permit o vacanță de 2.000 lei luna asta?', a: 'Îți spune MaestroAgent, din prognoza ta reală de cheltuieli.' },
-  { q: 'Cât am cheltuit luna asta?', a: 'Îți spune MaestroAgent, din analiza ta reală de cheltuieli.' },
+/** Chei i18n (nu text direct) — vezi `faqItems` mai jos, un `computed` care
+ * le traduce după limba activă (mirror pe budgets.ts::categoryOptions).
+ * Ultimele două țin de fapt de MaestroAgent (buget/prognoză), nu de Support
+ * — apar aici intenționat, ca userul să vadă din prima că poate întreba
+ * orice și e redirecționat automat (vezi askAgent, care clasifică primul
+ * mesaj al unei conversații noi). */
+const FAQ_KEYS: { qKey: string; aKey: string }[] = [
+  { qKey: 'support.faqCardFreezeQ', aKey: 'support.faqCardFreezeA' },
+  { qKey: 'support.faqTransferQ', aKey: 'support.faqTransferA' },
+  { qKey: 'support.faqTransactionQ', aKey: 'support.faqTransactionA' },
+  { qKey: 'support.faqExchangeQ', aKey: 'support.faqExchangeA' },
+  { qKey: 'support.faqAffordQ', aKey: 'support.faqAffordA' },
+  { qKey: 'support.faqSpentQ', aKey: 'support.faqSpentA' },
 ];
 
 /** Cuvinte care se rotesc cât timp agentul lucrează — vezi
- * copilot.ts::THINKING_WORDS, același concept (jocuri de cuvinte, stil
- * Claude), listă proprie pentru Support Agent. */
-const THINKING_WORDS = [
-  'Maestroing',
-  'Detectivind',
-  'Răscolind',
-  'Percolând',
-  'Investigând',
-  'Chibzuind',
-];
+ * copilot.ts, același concept (jocuri de cuvinte, stil Claude), set pe
+ * limbă (vezi `thinkingWords()`). */
+const THINKING_WORDS_RO = ['Maestroing', 'Detectivind', 'Răscolind', 'Percolând', 'Investigând', 'Chibzuind'];
+const THINKING_WORDS_EN = ['Maestroing', 'Sleuthing', 'Digging', 'Percolating', 'Investigating', 'Mulling'];
 
 interface ChatMessage {
   id: number;
@@ -119,7 +117,7 @@ function formatChatTime(date: Date): string {
 @Component({
   selector: 'app-support',
   standalone: true,
-  imports: [FormsModule, DatePipe, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow],
+  imports: [FormsModule, DatePipe, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow, TranslatePipe],
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
@@ -131,10 +129,11 @@ export class Support implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
   private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
-  protected readonly faqItems = FAQ_ITEMS;
+  protected readonly faqItems = computed(() => FAQ_KEYS.map((k) => ({ q: this.language.t(k.qKey), a: this.language.t(k.aKey) })));
 
   protected readonly modalOpen = signal(false);
   protected readonly saving = signal(false);
@@ -148,9 +147,14 @@ export class Support implements OnInit, OnDestroy {
    * (vezi timeout-ul de pe backend, app/llm/azure_openai.py) — ca userul
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly supportTypingSlow = signal(false);
-  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
+  protected readonly thinkingWord = signal(THINKING_WORDS_RO[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
   private thinkingWordTimer?: ReturnType<typeof setInterval>;
+
+  /** Setul de cuvinte "gândește" pentru limba activă. */
+  private thinkingWords(): string[] {
+    return this.language.language() === 'en' ? THINKING_WORDS_EN : THINKING_WORDS_RO;
+  }
   private readonly pendingAction = signal<AiPendingAction | null>(null);
   /** Gol doar la prima vizită/conversație nouă — caz în care arată ecranul
    * de bun-venit cu sugestii, nu un mesaj seedat static (ca MaestroAssistent
@@ -164,8 +168,8 @@ export class Support implements OnInit, OnDestroy {
    * Copilot::activeConversationTitle, același comportament. */
   protected readonly activeConversationTitle = computed(() => {
     const id = this.activeConversationId();
-    if (!id) return 'Conversație nouă';
-    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+    if (!id) return this.language.t('support.newConversation');
+    return this.conversations().find((c) => c.id === id)?.title ?? this.language.t('support.newConversation');
   });
 
   /** Adevărat doar după ce a existat DEJA cel puțin un tur — orice
@@ -182,12 +186,14 @@ export class Support implements OnInit, OnDestroy {
    * support.html pentru săgeata REALĂ, ca iconiță, din bara de
    * identitate a chat-ului, care nu poate exista aici, PageHeader
    * acceptă doar string). */
-  protected readonly pageTitle = computed(() => (this.isConfirmedSupport() ? 'Asistent → Support Agent' : 'Asistent'));
+  protected readonly pageTitle = computed(() =>
+    this.isConfirmedSupport() ? this.language.t('support.breadcrumbTitle') : this.language.t('nav.assistant'),
+  );
 
   protected readonly identitySubtitle = computed(() =>
     this.isConfirmedSupport()
-      ? 'Cont, card, tranzacții și tichete'
-      : 'Întreabă orice — te ajutăm sau te trimitem la agentul potrivit',
+      ? this.language.t('support.identitySubtitle')
+      : this.language.t('support.identitySubtitleGeneric'),
   );
   protected readonly identityIcon = computed(() => (this.isConfirmedSupport() ? 'support' : 'sparkles'));
 
@@ -278,7 +284,7 @@ export class Support implements OnInit, OnDestroy {
           }),
         );
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut încărca conversația.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('support.loadConversationError'))),
     });
   }
 
@@ -289,7 +295,7 @@ export class Support implements OnInit, OnDestroy {
         this.conversations.update((list) => list.filter((c) => c.id !== id));
         if (this.activeConversationId() === id) this.startNewConversation();
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut șterge conversația.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('support.deleteConversationError'))),
     });
   }
 
@@ -365,10 +371,10 @@ export class Support implements OnInit, OnDestroy {
       this.assistant.classify(text).subscribe({
         next: (result) => {
           if (result.agent === 'spending_forecast') {
-            this.toast.info('Te-am direcționat către MaestroAgent — întrebarea ta ține de buget/prognoză.');
+            this.toast.info(this.language.t('support.redirectedToMaestroAgent'));
             this.router.navigate([result.route], { queryParams: { q: text } });
           } else {
-            this.toast.info('Te-am direcționat către Support — întrebarea ta ține de cont/card/tranzacții.');
+            this.toast.info(this.language.t('support.redirectedToSupport'));
             this.sendToSupportAgent(text);
           }
         },
@@ -423,7 +429,7 @@ export class Support implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.stopTyping();
-        this.toast.error(extractErrorMessage(err, 'Chat-ul de suport nu a putut răspunde. Încearcă din nou.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('support.chatError')));
       },
     });
   }
@@ -437,10 +443,11 @@ export class Support implements OnInit, OnDestroy {
 
   /** Vezi Copilot::startThinkingWords, același comportament. */
   private startThinkingWords(): void {
-    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    const words = this.thinkingWords();
+    this.thinkingWord.set(words[Math.floor(Math.random() * words.length)]);
     this.thinkingWordTimer = setInterval(() => {
       this.thinkingWord.update((current) => {
-        const options = THINKING_WORDS.filter((w) => w !== current);
+        const options = this.thinkingWords().filter((w) => w !== current);
         return options[Math.floor(Math.random() * options.length)];
       });
     }, 1800);
@@ -450,23 +457,23 @@ export class Support implements OnInit, OnDestroy {
    * catalogul din pagina Conturi (shared/account-types.ts), ca eticheta din
    * chat să fie mereu identică cu ce vede userul acolo, niciodată inventată. */
   protected accountTypeLabel(type: AccountType | undefined): string {
-    return type ? ACCOUNT_TYPE_CATALOG[type].label : 'Cont';
+    return type ? accountTypeLabelFor(ACCOUNT_TYPE_CATALOG[type], this.language.language()) : this.language.t('support.genericAccount');
   }
 
   /** Transformă flag-urile booleene ale unui card într-o listă afișabilă,
    * ca template-ul să nu itereze direct pe cheile obiectului. */
   protected cardFeatures(card: ChatCardContext): { label: string; enabled: boolean }[] {
     return [
-      { label: 'Plăți online', enabled: card.online_payments_enabled },
-      { label: 'Contactless', enabled: card.contactless_enabled },
-      { label: 'Retrageri ATM', enabled: card.atm_withdrawals_enabled },
-      { label: 'Plăți internaționale', enabled: card.international_payments_enabled },
+      { label: this.language.t('support.onlinePayments'), enabled: card.online_payments_enabled },
+      { label: this.language.t('support.contactless'), enabled: card.contactless_enabled },
+      { label: this.language.t('support.atmWithdrawals'), enabled: card.atm_withdrawals_enabled },
+      { label: this.language.t('support.internationalPayments'), enabled: card.international_payments_enabled },
     ];
   }
 
   protected submitTicket(): void {
     if (!this.subject().trim() || !this.message().trim()) {
-      this.toast.error('Completează subiectul și mesajul.');
+      this.toast.error(this.language.t('support.fillSubjectAndMessage'));
       return;
     }
     this.saving.set(true);
@@ -476,11 +483,11 @@ export class Support implements OnInit, OnDestroy {
         next: () => {
           this.saving.set(false);
           this.modalOpen.set(false);
-          this.toast.success('Tichet de suport trimis.');
+          this.toast.success(this.language.t('support.ticketSubmitted'));
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut trimite tichetul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('support.submitTicketError')));
         },
       });
   }

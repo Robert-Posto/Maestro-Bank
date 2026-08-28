@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { DatePipe, LowerCasePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { AccountType, AccountView, BankingService, CreatableAccountType, PocketView } from '../../services/banking.service';
@@ -12,7 +12,8 @@ import {
   DepositView,
 } from '../../services/deposits.service';
 import { TransactionsService } from '../../services/transactions.service';
-import { ACCOUNT_TYPE_CATALOG, CREATABLE_ACCOUNT_TYPES } from '../../shared/account-types';
+import { LanguageService } from '../../services/language.service';
+import { ACCOUNT_TYPE_CATALOG, CREATABLE_ACCOUNT_TYPES, accountTypeLabel } from '../../shared/account-types';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
@@ -26,6 +27,7 @@ import { AccountCreateEvent, AccountTypeCarousel } from '../../shared/components
 import { Select } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 type Tab = 'accounts' | 'pockets' | 'deposits';
 
@@ -54,11 +56,11 @@ type Tab = 'accounts' | 'pockets' | 'deposits';
     MoneyPipe,
     DatePipe,
     FormsModule,
-    LowerCasePipe,
     Modal,
     ConfirmDialog,
     AccountTypeCarousel,
     Select,
+    TranslatePipe,
   ],
   templateUrl: './accounts.html',
   styleUrl: './accounts.css',
@@ -69,6 +71,7 @@ export class Accounts implements OnInit {
   private readonly transactionsApi = inject(TransactionsService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly catalog = ACCOUNT_TYPE_CATALOG;
   /** "current" + toate tipurile creabile — vezi accounts-service::_MAX_ACCOUNTS_PER_USER (aceeași sursă de adevăr). */
@@ -151,6 +154,18 @@ export class Accounts implements OnInit {
   protected readonly depositTermOptions: DepositTermMonths[] = [3, 6, 12, 24];
   protected readonly depositCurrencyOptions: DepositCurrency[] = ['RON', 'EUR', 'USD', 'GBP'];
 
+  /** Opțiunile select-ului de termen, cu eticheta tradusă ("X luni (Y%/an)")
+   * — recalculată când moneda aleasă sau limba se schimbă. */
+  protected readonly depositTermSelectOptions = computed(() => {
+    const currency = this.newDepositCurrency();
+    const monthsWord = this.language.t('accounts.months');
+    const perYearWord = this.language.t('accounts.perYear');
+    return this.depositTermOptions.map((t) => ({
+      value: t.toString(),
+      label: `${t} ${monthsWord} (${this.rateFor(currency, t) ?? '—'}%/${perYearWord})`,
+    }));
+  });
+
   ngOnInit(): void {
     this.load();
     this.loadPockets();
@@ -166,7 +181,7 @@ export class Accounts implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Nu am putut încărca conturile.');
+        this.error.set(this.language.t('accounts.loadError'));
         this.loading.set(false);
       },
     });
@@ -193,7 +208,7 @@ export class Accounts implements OnInit {
     const name = this.newPocketName().trim();
     const targetMinor = Math.round(this.newPocketTargetRon() * 100);
     if (!name || targetMinor <= 0) {
-      this.toast.error('Completează un nume și o sumă țintă validă.');
+      this.toast.error(this.language.t('accounts.fillNameAndTarget'));
       return;
     }
 
@@ -203,11 +218,11 @@ export class Accounts implements OnInit {
         this.pockets.update((list) => [...list, pocket]);
         this.creatingPocket.set(false);
         this.pocketCreateModalOpen.set(false);
-        this.toast.success(`Obiectiv "${pocket.name}" creat.`);
+        this.toast.success(this.language.t('accounts.goalCreated').replace('{name}', pocket.name));
       },
       error: (err) => {
         this.creatingPocket.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut crea obiectivul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('accounts.createGoalError')));
       },
     });
   }
@@ -228,11 +243,11 @@ export class Accounts implements OnInit {
         this.pockets.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
         this.depositBusy.set(false);
         this.depositModalPocket.set(null);
-        this.toast.success('Sumă alocată obiectivului.');
+        this.toast.success(this.language.t('accounts.amountAllocated'));
       },
       error: (err) => {
         this.depositBusy.set(false);
-        this.toast.error(extractErrorMessage(err, 'Depunerea a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('accounts.depositFailed')));
       },
     });
   }
@@ -242,9 +257,9 @@ export class Accounts implements OnInit {
     this.banking.withdrawFromPocket(pocket.id, pocket.saved_minor).subscribe({
       next: (updated) => {
         this.pockets.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
-        this.toast.success('Suma a fost eliberată înapoi în contul curent.');
+        this.toast.success(this.language.t('accounts.amountReleased'));
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Retragerea a eșuat.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('accounts.withdrawalFailed'))),
     });
   }
 
@@ -252,16 +267,16 @@ export class Accounts implements OnInit {
     this.banking.deletePocket(pocket.id).subscribe({
       next: () => {
         this.pockets.update((list) => list.filter((p) => p.id !== pocket.id));
-        this.toast.success('Obiectiv șters.');
+        this.toast.success(this.language.t('accounts.goalDeleted'));
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Ștergerea a eșuat.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('accounts.deletionFailed'))),
     });
   }
 
   protected copyIban(account: AccountView): void {
     navigator.clipboard?.writeText(account.iban).then(() => {
       this.copiedId.set(account.id);
-      this.toast.success('IBAN copiat în clipboard.');
+      this.toast.success(this.language.t('accounts.ibanCopied'));
       setTimeout(() => this.copiedId.set(null), 2000);
     });
   }
@@ -292,17 +307,23 @@ export class Accounts implements OnInit {
         this.accounts.update((list) => [...list, account]);
         this.creatingType.set(null);
         this.createModalOpen.set(false);
-        this.toast.success(`${this.catalog[accountType].label} deschis cu succes.`);
+        const label = accountTypeLabel(this.catalog[accountType], this.language.language());
+        this.toast.success(this.language.t('accounts.accountOpenedSuccessfully').replace('{type}', label));
       },
       error: (err) => {
         this.creatingType.set(null);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut deschide contul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('accounts.openAccountError')));
       },
     });
   }
 
   protected canDelete(account: AccountView): boolean {
     return account.account_type !== 'current';
+  }
+
+  /** Eticheta localizată a tipului de cont (RO/EN) — mirror pe categoryLabel(value, language). */
+  protected accountTypeLabelFor(type: AccountType): string {
+    return accountTypeLabel(this.catalog[type], this.language.language());
   }
 
   private loadTermDeposits(): void {
@@ -343,7 +364,7 @@ export class Accounts implements OnInit {
   protected createTermDeposit(): void {
     const amountMinor = Math.round(this.newDepositAmount() * 100);
     if (amountMinor <= 0) {
-      this.toast.error('Introdu o sumă validă.');
+      this.toast.error(this.language.t('accounts.enterValidAmount'));
       return;
     }
 
@@ -355,11 +376,11 @@ export class Accounts implements OnInit {
           this.termDeposits.update((list) => [deposit, ...list]);
           this.creatingTermDeposit.set(false);
           this.depositCreateModalOpen.set(false);
-          this.toast.success('Depozit deschis cu succes.');
+          this.toast.success(this.language.t('accounts.depositOpenedSuccessfully'));
         },
         error: (err) => {
           this.creatingTermDeposit.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut deschide depozitul.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('accounts.openDepositError')));
         },
       });
   }
@@ -378,11 +399,11 @@ export class Accounts implements OnInit {
         this.termDeposits.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
         this.liquidatingDeposit.set(false);
         this.pendingLiquidateDeposit.set(null);
-        this.toast.success('Depozit lichidat — suma a revenit în cont.');
+        this.toast.success(this.language.t('accounts.depositLiquidated'));
       },
       error: (err) => {
         this.liquidatingDeposit.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut lichida depozitul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('accounts.liquidateDepositError')));
       },
     });
   }
@@ -402,7 +423,7 @@ export class Accounts implements OnInit {
   protected requestDelete(account: AccountView): void {
     if (!this.canDelete(account)) return;
     if (account.balance_minor > 0) {
-      this.toast.error('Golește mai întâi contul — transferă soldul rămas către alt cont al tău, prin Transferuri.');
+      this.toast.error(this.language.t('accounts.emptyAccountFirst'));
       return;
     }
     this.pendingDeleteAccount.set(account);
@@ -425,7 +446,7 @@ export class Accounts implements OnInit {
     const to = this.statementTo();
     if (!account || !from || !to) return;
     if (from > to) {
-      this.toast.error('Data de start trebuie să fie înaintea datei de final.');
+      this.toast.error(this.language.t('accounts.startBeforeEndDate'));
       return;
     }
 
@@ -442,11 +463,11 @@ export class Accounts implements OnInit {
           anchor.click();
           URL.revokeObjectURL(url);
           this.statementAccount.set(null);
-          this.toast.success('Extras de cont generat.');
+          this.toast.success(this.language.t('accounts.statementGenerated'));
         },
         error: (err) => {
           this.generatingStatement.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut genera extrasul de cont.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('accounts.generateStatementError')));
         },
       });
   }
@@ -469,12 +490,13 @@ export class Accounts implements OnInit {
         this.accounts.update((list) => list.filter((a) => a.id !== account.id));
         this.deleting.set(false);
         this.pendingDeleteAccount.set(null);
-        this.toast.success(`${this.catalog[account.account_type].label} șters.`);
+        const label = accountTypeLabel(this.catalog[account.account_type], this.language.language());
+        this.toast.success(this.language.t('accounts.accountDeleted').replace('{type}', label));
       },
       error: (err) => {
         this.deleting.set(false);
         this.pendingDeleteAccount.set(null);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut șterge contul.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('accounts.deleteAccountError')));
       },
     });
   }

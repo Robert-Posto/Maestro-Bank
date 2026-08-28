@@ -4,6 +4,7 @@ import { provideRouter, withInMemoryScrolling } from '@angular/router';
 
 import { authInterceptor } from './core/auth.interceptor';
 import { errorInterceptor } from './core/error.interceptor';
+import { languageInterceptor } from './core/language.interceptor';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -14,6 +15,6 @@ export const appConfig: ApplicationConfig = {
     // la secțiunea vizată (vezi Topbar::openNotification), nu doar să
     // schimbe URL-ul.
     provideRouter(routes, withInMemoryScrolling({ anchorScrolling: 'enabled' })),
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, languageInterceptor, errorInterceptor])),
   ],
 };

@@ -1,67 +1,56 @@
+<app-auth-language-toggle />
 <div class="auth-screen">
   <main class="auth-layout">
     <aside class="auth-visual" aria-hidden="true">
       <div class="auth-brand">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
       <div class="auth-visual__content">
-        <p class="auth-visual__eyebrow">Banking simplificat</p>
-        <h2 class="auth-visual__title">Finanțele tale, într-un singur loc.</h2>
-        <p class="auth-visual__text">Conturi, plăți și informații utile, într-o experiență sigură și ușor de folosit.</p>
+        <p class="auth-visual__eyebrow">{{ 'auth.login.eyebrow' | translate }}</p>
+        <h2 class="auth-visual__title">{{ 'auth.login.title' | translate }}</h2>
+        <p class="auth-visual__text">{{ 'auth.login.text' | translate }}</p>
       </div>
 
-      <p class="auth-visual__security">Conexiune securizată și date protejate</p>
+      <p class="auth-visual__security">{{ 'auth.login.security' | translate }}</p>
     </aside>
 
     <section class="auth-card">
       <div class="auth-brand auth-brand--mobile">
-        <p class="auth-brand__name">MaestroBank</p>
-        <p class="auth-brand__tagline">maestrul tău în banking</p>
+        <p class="auth-brand__name">{{ 'auth.brand.name' | translate }}</p>
+        <p class="auth-brand__tagline">{{ 'auth.brand.tagline' | translate }}</p>
       </div>
 
-    <h1 class="auth-title">Autentificare</h1>
-    <p class="auth-subtitle">Accesează contul tău MaestroBank.</p>
+    <h1 class="auth-title">{{ 'auth.login.title2' | translate }}</h1>
+    <p class="auth-subtitle">{{ 'auth.login.subtitle' | translate }}</p>
 
     @if (sessionExpired) {
-      <p class="auth-notice">Sesiunea a expirat. Te rugăm să te autentifici din nou.</p>
+      <p class="auth-notice">{{ 'auth.login.sessionExpired' | translate }}</p>
     }
 
     <form class="auth-form" (ngSubmit)="submit()">
       <label class="auth-field">
-        <span>Email</span>
+        <span>{{ 'common.email' | translate }}</span>
         <input
           type="email"
           autocomplete="email"
           [ngModel]="email()"
           (ngModelChange)="email.set($event)"
           name="email"
-          placeholder="nume@exemplu.com"
+          [placeholder]="'auth.login.emailPlaceholder' | translate"
         />
       </label>
 
       <label class="auth-field">
-        <span>Parolă</span>
-        <div class="auth-field__control">
-          <input
-            [type]="passwordVisible() ? 'text' : 'password'"
-            autocomplete="current-password"
-            [ngModel]="password()"
-            (ngModelChange)="password.set($event)"
-            name="password"
-            placeholder="••••••••"
-          />
-          <button
-            type="button"
-            class="auth-field__reveal"
-            [attr.aria-label]="passwordVisible() ? 'Ascunde parola' : 'Arată parola'"
-            [attr.aria-pressed]="passwordVisible()"
-            (click)="togglePasswordVisibility()"
-          >
-            <app-icon [name]="passwordVisible() ? 'eye-off' : 'eye'" [size]="18" />
-          </button>
-        </div>
+        <span>{{ 'common.password' | translate }}</span>
+        <app-password-input
+          [value]="password()"
+          (valueChange)="password.set($event)"
+          name="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+        />
       </label>
 
       @if (error()) {
@@ -69,19 +58,21 @@
       }
 
       <button type="submit" class="auth-submit" [disabled]="isSubmitting()">
-        {{ isSubmitting() ? 'Se autentifică...' : 'Autentifică-te' }}
+        {{ (isSubmitting() ? 'auth.login.submitting' : 'auth.login.submit') | translate }}
       </button>
     </form>
 
     @if (passkeySupported) {
-      <div class="auth-divider"><span>sau</span></div>
+      <div class="auth-divider"><span>{{ 'auth.login.or' | translate }}</span></div>
       <button type="button" class="auth-passkey" [disabled]="passkeyBusy()" (click)="loginWithPasskey()">
         <app-icon name="fingerprint" [size]="18" />
-        {{ passkeyBusy() ? 'Se confirmă...' : 'Autentificare cu passkey' }}
+        {{ (passkeyBusy() ? 'auth.login.passkeyBusy' : 'auth.login.passkey') | translate }}
       </button>
     }
 
-    <p class="auth-switch">Nu ai cont? <a routerLink="/register">Creează unul</a></p>
+    <p class="auth-switch">
+      {{ 'auth.login.noAccount' | translate }} <a routerLink="/register">{{ 'auth.login.createOne' | translate }}</a>
+    </p>
     </section>
   </main>
 </div>

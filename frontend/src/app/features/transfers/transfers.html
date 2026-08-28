@@ -1,11 +1,11 @@
-<app-page-header title="Plăți & Transferuri" subtitle="Trimite bani către un IBAN, în câțiva pași." />
+<app-page-header [title]="'transfers.title' | translate" [subtitle]="'transfers.subtitle' | translate" />
 
 <div class="transfers-tabs">
   <button type="button" [class.transfers-tab--active]="mainTab() === 'new'" (click)="mainTab.set('new')">
-    <app-icon name="transfer" [size]="15" /> Transfer nou
+    <app-icon name="transfer" [size]="15" /> {{ 'transfers.tabNew' | translate }}
   </button>
   <button type="button" [class.transfers-tab--active]="mainTab() === 'scheduled'" (click)="mainTab.set('scheduled')">
-    <app-icon name="calendar" [size]="15" /> Programate
+    <app-icon name="calendar" [size]="15" /> {{ 'transfers.tabScheduled' | translate }}
     @if (scheduledTransfers().length > 0) {
       <span class="transfers-tabs__count">{{ scheduledTransfers().length }}</span>
     }
@@ -13,12 +13,12 @@
 </div>
 
 @if (mainTab() === 'new') {
-<div class="transfer-mode-toggle" role="tablist" aria-label="Trimite sau solicită bani">
+<div class="transfer-mode-toggle" role="tablist" [attr.aria-label]="'transfers.modeToggleAriaLabel' | translate">
   <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'send'" (click)="sendMode.set('send')">
-    <app-icon name="transfer" [size]="14" /> Trimit
+    <app-icon name="transfer" [size]="14" /> {{ 'transfers.modeSend' | translate }}
   </button>
   <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'request'" (click)="sendMode.set('request')">
-    <app-icon name="send" [size]="14" /> Solicit
+    <app-icon name="send" [size]="14" /> {{ 'transfers.modeRequest' | translate }}
   </button>
 </div>
 
@@ -26,17 +26,17 @@
 <ol class="transfer-stepper">
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'form'" [class.transfer-stepper__step--done]="step() !== 'form'">
     <span class="transfer-stepper__dot">@if (step() !== 'form') {<app-icon name="check" [size]="12" />} @else {1}</span>
-    Detalii
+    {{ 'transfers.stepDetails' | translate }}
   </li>
   <li class="transfer-stepper__rule" [class.transfer-stepper__rule--done]="step() !== 'form'"></li>
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'review'" [class.transfer-stepper__step--done]="step() === 'success'">
     <span class="transfer-stepper__dot">@if (step() === 'success') {<app-icon name="check" [size]="12" />} @else {2}</span>
-    Verificare
+    {{ 'transfers.stepReview' | translate }}
   </li>
   <li class="transfer-stepper__rule" [class.transfer-stepper__rule--done]="step() === 'success'"></li>
   <li class="transfer-stepper__step" [class.transfer-stepper__step--active]="step() === 'success'">
     <span class="transfer-stepper__dot">3</span>
-    Confirmare
+    {{ 'transfers.stepConfirm' | translate }}
   </li>
 </ol>
 
@@ -44,19 +44,19 @@
   <div class="transfer-wrap">
     <form class="transfer-card" (ngSubmit)="goToReview()">
       <label class="transfer-field">
-        <span>Din cont</span>
+        <span>{{ 'transfers.fromAccount' | translate }}</span>
         <div class="transfer-source">
           <span class="transfer-source__badge"><app-icon name="wallet" [size]="16" /></span>
           <div class="transfer-source__info">
             <p class="transfer-source__iban">{{ account()?.iban ?? '—' }}</p>
-            <p class="transfer-source__balance">Sold disponibil: {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</p>
+            <p class="transfer-source__balance">{{ 'transfers.availableBalance' | translate }} {{ account()?.balance_minor ?? 0 | money: account()?.currency }}</p>
           </div>
         </div>
       </label>
 
       @if (beneficiaries().length > 0) {
         <div class="transfer-field">
-          <span>Beneficiari recenți</span>
+          <span>{{ 'transfers.recentBeneficiaries' | translate }}</span>
           <div class="transfer-beneficiaries">
             @for (b of beneficiaries(); track b.id) {
               <button type="button" class="transfer-beneficiary-chip" [class.transfer-beneficiary-chip--active]="toIban() === b.iban" (click)="selectBeneficiary(b)">
@@ -69,7 +69,7 @@
       }
 
       <label class="transfer-field">
-        <span>IBAN destinație</span>
+        <span>{{ 'transfers.destinationIban' | translate }}</span>
         <div class="transfer-input-line">
           <app-icon name="building" [size]="16" />
           <input
@@ -84,7 +84,7 @@
       </label>
 
       <label class="transfer-field transfer-field--amount">
-        <span>Sumă</span>
+        <span>{{ 'common.amount' | translate }}</span>
         <div class="transfer-input-line transfer-input-line--amount">
           <input type="number" min="0.01" step="0.01" placeholder="0.00" [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="amount" />
           <span class="transfer-input-line__currency">{{ account()?.currency ?? 'RON' }}</span>
@@ -93,13 +93,13 @@
 
       <div class="transfer-row">
         <label class="transfer-field">
-          <span>Descriere</span>
-          <input type="text" placeholder="Ex: Chirie august" [ngModel]="description()" (ngModelChange)="description.set($event)" name="description" maxlength="140" />
+          <span>{{ 'common.description' | translate }}</span>
+          <input type="text" [placeholder]="'transfers.descriptionPlaceholder' | translate" [ngModel]="description()" (ngModelChange)="description.set($event)" name="description" maxlength="140" />
         </label>
 
         <label class="transfer-field">
-          <span>Categorie</span>
-          <app-select [options]="categoryOptions" [value]="category()" (changed)="category.set($event)" />
+          <span>{{ 'common.category' | translate }}</span>
+          <app-select [options]="categoryOptions()" [value]="category()" (changed)="category.set($event)" />
         </label>
       </div>
 
@@ -110,13 +110,13 @@
       <label class="transfer-checkbox">
         <input type="checkbox" [ngModel]="saveAsBeneficiary()" (ngModelChange)="saveAsBeneficiary.set($event)" name="saveBeneficiary" />
         <span class="transfer-checkbox__box"><app-icon name="check" [size]="11" /></span>
-        <span>Salvează ca beneficiar</span>
+        <span>{{ 'transfers.saveAsBeneficiary' | translate }}</span>
       </label>
 
       @if (saveAsBeneficiary()) {
         <label class="transfer-field">
-          <span>Nume beneficiar</span>
-          <input type="text" placeholder="Ex: Ana Popescu" [ngModel]="saveBeneficiaryName()" (ngModelChange)="saveBeneficiaryName.set($event)" name="beneficiaryName" />
+          <span>{{ 'transfers.beneficiaryName' | translate }}</span>
+          <input type="text" [placeholder]="'transfers.beneficiaryNamePlaceholder' | translate" [ngModel]="saveBeneficiaryName()" (ngModelChange)="saveBeneficiaryName.set($event)" name="beneficiaryName" />
         </label>
       }
 
@@ -125,16 +125,16 @@
       }
 
       <p class="transfer-safety-note">
-        <app-icon name="shield" [size]="14" /> Verificăm IBAN-ul destinație automat — poți renunța oricând până la confirmare.
+        <app-icon name="shield" [size]="14" /> {{ 'transfers.safetyNoteForm' | translate }}
       </p>
 
-      <app-action-button type="submit" [fullWidth]="true">Continuă <app-icon name="chevron-right" [size]="16" /></app-action-button>
+      <app-action-button type="submit" [fullWidth]="true">{{ 'common.next' | translate }} <app-icon name="chevron-right" [size]="16" /></app-action-button>
     </form>
   </div>
 } @else if (step() === 'review') {
   <div class="transfer-wrap">
     <div class="transfer-card transfer-card--review">
-      <h2 class="transfer-review-title">Verifică transferul</h2>
+      <h2 class="transfer-review-title">{{ 'transfers.reviewTitle' | translate }}</h2>
 
       <div class="transfer-review-amount">{{ amountMinor() | money: account()?.currency }}</div>
 
@@ -142,7 +142,7 @@
         <div class="transfer-review-route__party">
           <span class="transfer-review-route__avatar"><app-icon name="wallet" [size]="16" /></span>
           <div>
-            <span class="transfer-review-route__label">Din cont</span>
+            <span class="transfer-review-route__label">{{ 'transfers.fromAccount' | translate }}</span>
             <span class="transfer-review-route__value">{{ account()?.iban }}</span>
           </div>
         </div>
@@ -150,7 +150,7 @@
         <div class="transfer-review-route__party">
           <span class="transfer-review-route__avatar transfer-review-route__avatar--dest"><app-icon name="building" [size]="16" /></span>
           <div>
-            <span class="transfer-review-route__label">Către</span>
+            <span class="transfer-review-route__label">{{ 'transfers.toLabel' | translate }}</span>
             <span class="transfer-review-route__value">{{ toIban() }}</span>
           </div>
         </div>
@@ -158,12 +158,12 @@
 
       <dl class="transfer-review-grid">
         <div>
-          <dt>Descriere</dt>
+          <dt>{{ 'common.description' | translate }}</dt>
           <dd>{{ description() || '—' }}</dd>
         </div>
         <div>
-          <dt>Categorie</dt>
-          <dd>{{ categoryLabel(category()) }}</dd>
+          <dt>{{ 'common.category' | translate }}</dt>
+          <dd>{{ categoryLabel(category(), language.language()) }}</dd>
         </div>
       </dl>
 
@@ -177,7 +177,7 @@
              Rămânem pe review, nu refacem tot formularul. -->
         <p class="transfer-content-warning"><app-icon name="shield" [size]="15" /> {{ cardPinRequiredMessage() }}</p>
         <label class="transfer-field">
-          <span>PIN card</span>
+          <span>{{ 'transfers.cardPinLabel' | translate }}</span>
           <input
             type="password"
             inputmode="numeric"
@@ -190,13 +190,13 @@
           />
         </label>
         <div class="transfer-review-actions">
-          <app-action-button variant="secondary" (pressed)="backToForm()">Înapoi</app-action-button>
-          <app-action-button [loading]="cardPinBusy()" (pressed)="submitCardPinConfirmation()">Confirmă cu PIN</app-action-button>
+          <app-action-button variant="secondary" (pressed)="backToForm()">{{ 'common.back' | translate }}</app-action-button>
+          <app-action-button [loading]="cardPinBusy()" (pressed)="submitCardPinConfirmation()">{{ 'transfers.confirmWithPin' | translate }}</app-action-button>
         </div>
       } @else {
         <div class="transfer-review-actions">
-          <app-action-button variant="secondary" (pressed)="backToForm()">Înapoi</app-action-button>
-          <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">Confirmă transferul</app-action-button>
+          <app-action-button variant="secondary" (pressed)="backToForm()">{{ 'common.back' | translate }}</app-action-button>
+          <app-action-button [loading]="submitting()" (pressed)="confirmTransfer()">{{ 'transfers.confirmTransfer' | translate }}</app-action-button>
         </div>
       }
     </div>
@@ -207,10 +207,10 @@
       <div class="transfer-success__icon">
         <app-icon name="check" [size]="28" />
       </div>
-      <h2>Transfer reușit</h2>
+      <h2>{{ 'transfers.successTitle' | translate }}</h2>
       <p class="transfer-success__amount">{{ tx.amount_minor | money: tx.currency }}</p>
       <p class="transfer-success__meta">
-        către {{ tx.counterparty_name || tx.counterparty_iban }}
+        {{ 'transfers.toPrefix' | translate }} {{ tx.counterparty_name || tx.counterparty_iban }}
         @if (tx.counterparty_name) {
           <span class="transfer-success__iban">{{ tx.counterparty_iban }}</span>
         }
@@ -219,8 +219,8 @@
         <p class="transfer-content-warning"><app-icon name="info" [size]="15" /> {{ tx.content_warning }}</p>
       }
       <div class="transfer-success__actions">
-        <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">Fă un nou transfer</app-action-button>
-        <a routerLink="/app/transactions" class="transfer-success__link">Vezi în tranzacții ›</a>
+        <app-action-button [fullWidth]="true" (pressed)="startNewTransfer()">{{ 'transfers.newTransfer' | translate }}</app-action-button>
+        <a routerLink="/app/transactions" class="transfer-success__link">{{ 'transfers.viewInTransactions' | translate }} ›</a>
       </div>
     </div>
   </div>
@@ -228,13 +228,13 @@
 } @else {
   <div class="transfer-wrap">
     <form class="transfer-card" (ngSubmit)="createPaymentRequest()">
-      <h2 class="requests-form__title">Solicită o plată</h2>
+      <h2 class="requests-form__title">{{ 'transfers.requestTitle' | translate }}</h2>
       <p class="requests-form__subtitle">
-        Generează un link (cu cod QR) pe care îl trimiți oricui — plătește direct din contul lui MaestroBank, ca la Revolut.
+        {{ 'transfers.requestSubtitle' | translate }}
       </p>
 
       <label class="transfer-field transfer-field--amount">
-        <span>Sumă</span>
+        <span>{{ 'common.amount' | translate }}</span>
         <div class="transfer-input-line transfer-input-line--amount">
           <input
             type="number"
@@ -250,10 +250,10 @@
       </label>
 
       <label class="transfer-field">
-        <span>Descriere (opțional)</span>
+        <span>{{ 'transfers.descriptionOptional' | translate }}</span>
         <input
           type="text"
-          placeholder="Ex: Cina de aseară"
+          [placeholder]="'transfers.requestDescriptionPlaceholder' | translate"
           [ngModel]="requestDescription()"
           (ngModelChange)="requestDescription.set($event)"
           name="requestDescription"
@@ -270,7 +270,7 @@
       }
 
       <p class="transfer-safety-note">
-        <app-icon name="shield" [size]="14" /> Tu stabilești suma fixă — cel care primește link-ul n-o poate modifica, iar link-ul expiră automat după 7 zile.
+        <app-icon name="shield" [size]="14" /> {{ 'transfers.safetyNoteRequest' | translate }}
       </p>
 
       <app-action-button
@@ -279,44 +279,44 @@
         [loading]="requestCreating()"
         [disabled]="!!requestDescriptionWarning()"
       >
-        <app-icon name="send" [size]="16" /> Generează link de plată
+        <app-icon name="send" [size]="16" /> {{ 'transfers.generatePaymentLink' | translate }}
       </app-action-button>
     </form>
   </div>
 
   <div class="requests-list-section">
-    <h2 class="requests-list-section__title">Cererile mele</h2>
+    <h2 class="requests-list-section__title">{{ 'transfers.myRequests' | translate }}</h2>
     @if (!paymentRequestsLoading() && paymentRequests().length === 0) {
       <app-empty-state
         icon="send"
-        title="Nicio cerere de plată"
-        description="Creează una mai sus ca să primești bani rapid de la altcineva."
+        [title]="'transfers.noRequestsTitle' | translate"
+        [description]="'transfers.noRequestsDescription' | translate"
       />
     } @else if (paymentRequests().length > 0) {
       <div class="scheduled-list">
         @for (request of paymentRequests(); track request.id) {
           <div class="scheduled-row requests-row">
             <div class="scheduled-row__info">
-              <span class="scheduled-row__iban">{{ request.description || 'Fără descriere' }}</span>
-              <span class="scheduled-row__desc">Creată {{ request.created_at | date: 'dd MMM yyyy' }}</span>
+              <span class="scheduled-row__iban">{{ request.description || ('transfers.noDescription' | translate) }}</span>
+              <span class="scheduled-row__desc">{{ 'transfers.createdPrefix' | translate }} {{ request.created_at | date: 'dd MMM yyyy' }}</span>
             </div>
             <span class="scheduled-row__amount">{{ request.amount_minor | money: request.currency }}</span>
             <span class="requests-row__status" [class]="'requests-row__status--' + request.status">
               {{ paymentRequestStatusLabel(request.status) }}
             </span>
             @if (request.status === 'paid') {
-              <span class="scheduled-row__next">Plătit de {{ request.paid_by_name || 'un user' }}</span>
+              <span class="scheduled-row__next">{{ 'transfers.paidByPrefix' | translate }} {{ request.paid_by_name || ('transfers.aUser' | translate) }}</span>
             } @else if (request.status === 'open') {
-              <span class="scheduled-row__next">Expiră {{ request.expires_at | date: 'dd MMM yyyy' }}</span>
+              <span class="scheduled-row__next">{{ 'transfers.expiresPrefix' | translate }} {{ request.expires_at | date: 'dd MMM yyyy' }}</span>
             } @else {
               <span class="scheduled-row__next"></span>
             }
             <div class="requests-row__actions">
               @if (request.status === 'open') {
-                <button type="button" class="scheduled-row__cancel" title="Distribuie link/QR" (click)="openShare(request)">
+                <button type="button" class="scheduled-row__cancel" [title]="'transfers.shareLinkTitle' | translate" (click)="openShare(request)">
                   <app-icon name="send" [size]="15" />
                 </button>
-                <button type="button" class="scheduled-row__cancel" title="Anulează" (click)="cancelPaymentRequest(request)">
+                <button type="button" class="scheduled-row__cancel" [title]="'common.cancel' | translate" (click)="cancelPaymentRequest(request)">
                   <app-icon name="trash" [size]="15" />
                 </button>
               }
@@ -333,20 +333,20 @@
 <section class="scheduled-section">
   <div class="scheduled-section__header">
     <div>
-      <h2>Transferuri programate</h2>
-      <p class="scheduled-section__subtitle">Automatizează plăți recurente — se execută singure, la data stabilită.</p>
+      <h2>{{ 'transfers.scheduledTitle' | translate }}</h2>
+      <p class="scheduled-section__subtitle">{{ 'transfers.scheduledSubtitle' | translate }}</p>
     </div>
     <app-action-button variant="secondary" (pressed)="openScheduleModal()">
       <app-icon name="plus" [size]="16" />
-      Transfer nou programat
+      {{ 'transfers.newScheduledTransfer' | translate }}
     </app-action-button>
   </div>
 
   @if (!scheduledLoading() && scheduledTransfers().length === 0) {
     <app-empty-state
       icon="calendar"
-      title="Niciun transfer programat"
-      description="Creează unul pentru chirie, abonamente sau orice plată recurentă."
+      [title]="'transfers.noScheduledTitle' | translate"
+      [description]="'transfers.noScheduledDescription' | translate"
     />
   } @else if (scheduledTransfers().length > 0) {
     <div class="scheduled-list">
@@ -360,7 +360,7 @@
           </div>
           <span class="scheduled-row__amount">{{ schedule.amount_minor | money: account()?.currency }}</span>
           <span class="scheduled-row__frequency">{{ frequencyLabel(schedule.frequency) }}</span>
-          <span class="scheduled-row__next">Următoarea: {{ schedule.next_run_at | date: 'dd MMM yyyy' }}</span>
+          <span class="scheduled-row__next">{{ 'transfers.nextRunPrefix' | translate }} {{ schedule.next_run_at | date: 'dd MMM yyyy' }}</span>
           <button type="button" class="scheduled-row__cancel" (click)="cancelSchedule(schedule)">
             <app-icon name="trash" [size]="15" />
           </button>
@@ -372,7 +372,7 @@
 }
 
 @if (shareRequest(); as shared) {
-  <app-modal title="Cerere de plată" (closed)="closeShare()">
+  <app-modal [title]="'transfers.paymentRequestModalTitle' | translate" (closed)="closeShare()">
     <div class="share-request">
       <p class="share-request__amount">{{ shared.amount_minor | money: shared.currency }}</p>
       @if (shared.description) {
@@ -381,7 +381,7 @@
 
       <div class="share-request__qr">
         @if (shareQrDataUrl(); as qr) {
-          <img [src]="qr" alt="Cod QR pentru plată" width="224" height="224" />
+          <img [src]="qr" [alt]="'transfers.qrAlt' | translate" width="224" height="224" />
         } @else {
           <div class="share-request__qr-placeholder"></div>
         }
@@ -389,23 +389,23 @@
 
       <div class="share-request__link">
         <input type="text" readonly [value]="paymentRequestLink(shared.id)" />
-        <button type="button" title="Copiază link-ul" (click)="copyPaymentLink(shared.id)">
+        <button type="button" [title]="'transfers.copyLinkTitle' | translate" (click)="copyPaymentLink(shared.id)">
           <app-icon name="copy" [size]="15" />
         </button>
       </div>
 
       <p class="share-request__hint">
-        Trimite link-ul sau codul QR persoanei care trebuie să-ți plătească — va avea nevoie de un cont MaestroBank ca să finalizeze plata.
+        {{ 'transfers.shareHint' | translate }}
       </p>
     </div>
   </app-modal>
 }
 
 @if (scheduleModalOpen()) {
-  <app-modal title="Transfer programat nou" (closed)="scheduleModalOpen.set(false)">
+  <app-modal [title]="'transfers.scheduleModalTitle' | translate" (closed)="scheduleModalOpen.set(false)">
     <div class="schedule-form">
       <label>
-        <span>IBAN destinație</span>
+        <span>{{ 'transfers.destinationIban' | translate }}</span>
         <input
           type="text"
           placeholder="RO49 MAES 1234 5678 9012 3456"
@@ -414,28 +414,28 @@
         />
       </label>
       <label>
-        <span>Sumă (lei)</span>
+        <span>{{ 'transfers.amountRon' | translate }}</span>
         <input type="number" min="0.01" step="0.01" [ngModel]="scheduleAmountRon()" (ngModelChange)="scheduleAmountRon.set($event)" />
       </label>
       <label>
-        <span>Descriere</span>
+        <span>{{ 'common.description' | translate }}</span>
         <input
           type="text"
-          placeholder="Ex: Chirie"
+          [placeholder]="'transfers.scheduleDescriptionPlaceholder' | translate"
           maxlength="140"
           [ngModel]="scheduleDescription()"
           (ngModelChange)="scheduleDescription.set($event)"
         />
       </label>
       <label>
-        <span>Frecvență</span>
+        <span>{{ 'transfers.frequency' | translate }}</span>
         <select [ngModel]="scheduleFrequency()" (ngModelChange)="scheduleFrequency.set($event)">
-          <option value="weekly">Săptămânal</option>
-          <option value="monthly">Lunar</option>
+          <option value="weekly">{{ 'common.weekly' | translate }}</option>
+          <option value="monthly">{{ 'common.monthly' | translate }}</option>
         </select>
       </label>
       <app-action-button [fullWidth]="true" [loading]="scheduleSaving()" (pressed)="saveSchedule()">
-        Creează transfer programat
+        {{ 'transfers.createScheduledTransfer' | translate }}
       </app-action-button>
     </div>
   </app-modal>

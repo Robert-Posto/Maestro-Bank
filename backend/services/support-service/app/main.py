@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import close_database_connection, ping_database
+from app.i18n import LanguageMiddleware
 from app.routers.documents import router as documents_router
 from app.routers.notifications import internal_router as notifications_internal_router
 from app.routers.notifications import router as notifications_router
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank Support Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 app.include_router(support_router)
 app.include_router(notifications_router)
 app.include_router(notifications_internal_router)

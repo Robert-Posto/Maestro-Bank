@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 
 import { API_BASE_URL } from '../../../core/api-config';
+import { LanguageService } from '../../../services/language.service';
 
 export type NotificationKind =
   | 'budget'
@@ -56,8 +57,24 @@ interface NotificationApiView {
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
   private readonly http = inject(HttpClient);
+  private readonly language = inject(LanguageService);
   private readonly _notifications = signal<AppNotification[]>([]);
   readonly notifications = this._notifications.asReadonly();
+
+  constructor() {
+    // Textul notificărilor e randat de support-service în limba cerută (header
+    // X-Language) — la comutarea limbii, reîncărcăm imediat ca lista deja
+    // afișată să se traducă, fără să aștepți următorul poll de 30s.
+    let first = true;
+    effect(() => {
+      this.language.language();
+      if (first) {
+        first = false;
+        return;
+      }
+      this.refresh();
+    });
+  }
 
   get unreadCount(): number {
     return this._notifications().filter((n) => !n.read).length;

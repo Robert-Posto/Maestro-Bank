@@ -1,6 +1,7 @@
 import { Component, input, output } from '@angular/core';
 
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 export interface AccountRowData {
   id: string;
@@ -15,12 +16,12 @@ export interface AccountRowData {
 @Component({
   selector: 'app-account-card',
   standalone: true,
-  imports: [MoneyPipe],
+  imports: [MoneyPipe, TranslatePipe],
   template: `
     <button type="button" class="account-row" (click)="opened.emit()">
       <span class="account-row__avatar">{{ account().currency }}</span>
       <span class="account-row__info">
-        <span class="account-row__name">{{ account().name }}</span>
+        <span class="account-row__name">{{ account().name | translate }}</span>
         <span class="account-row__iban">{{ account().iban }}</span>
       </span>
       <span class="account-row__balance">{{ account().balance_minor | money: account().currency }}</span>

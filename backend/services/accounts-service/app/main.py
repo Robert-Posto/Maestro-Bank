@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from app import service
 from app.database import close_database_connection, ping_database
+from app.i18n import LanguageMiddleware
 from app.routers.accounts import router as accounts_router
 from app.routers.beneficiaries import router as beneficiaries_router
 from app.routers.cards import router as cards_router
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank Accounts Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 
 
 @app.get("/health")

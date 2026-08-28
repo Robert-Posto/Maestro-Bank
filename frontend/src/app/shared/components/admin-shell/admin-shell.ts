@@ -3,7 +3,9 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 
 import { AuthService } from '../../../services/auth.service';
 import { IdleService } from '../../../services/idle.service';
+import { LanguageService } from '../../../services/language.service';
 import { Icon } from '../icon/icon';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { ToastContainer } from '../toast/toast-container';
 
 /**
@@ -17,7 +19,7 @@ import { ToastContainer } from '../toast/toast-container';
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, ToastContainer],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, TranslatePipe, ToastContainer],
   templateUrl: './admin-shell.html',
   styleUrl: './admin-shell.css',
 })
@@ -25,6 +27,7 @@ export class AdminShell implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly idle = inject(IdleService);
+  protected readonly languageService = inject(LanguageService);
 
   protected readonly staffName = this.auth.currentUser()?.first_name ?? 'Personal';
 

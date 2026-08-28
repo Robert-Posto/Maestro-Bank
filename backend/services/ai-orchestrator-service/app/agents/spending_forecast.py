@@ -29,6 +29,7 @@ import openai
 from fastapi import HTTPException, status
 
 from app.config import settings
+from app.i18n import pick, translate
 from app.llm.azure_openai import AzureOpenAINotConfigured, chat_completion
 from app.models.spending_forecast import (
     Analysis,
@@ -50,10 +51,6 @@ from app.tools.errors import ToolError
 from app.tools.registry import TOOL_SCHEMAS, ToolResultCache, ensure_core_data, execute_tool
 
 logger = logging.getLogger("ai-orchestrator-service.agent")
-
-_FALLBACK_ANSWER = (
-    "Nu am putut genera o explicație completă acum, dar mai jos ai situația ta financiară curentă."
-)
 
 # Serviciul e stateless între cereri HTTP (nu persistă nimic — vezi
 # task-ul, secțiunea 18: "NU implementa vector database/long-term memory
@@ -114,20 +111,39 @@ def _default_recommendation(snapshot: dict, spending_summary: dict) -> str:
     end_balance = snapshot["financial_summary"]["estimated_end_balance_minor"]
     buffer_minor = snapshot["analysis"]["recommended_buffer_minor"]
     top_category = forecast_service.top_discretionary_category(spending_summary)
+    end_balance_ron = affordability_service.format_ron(end_balance)
 
     if end_balance >= buffer_minor:
-        base = f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — peste bufferul de siguranță recomandat."
+        base = pick(
+            f"La ritmul actual de cheltuire, estimăm un sold de {end_balance_ron} la finalul lunii — peste bufferul de siguranță recomandat.",
+            f"At your current spending pace, we estimate a balance of {end_balance_ron} at month-end — above the recommended safety buffer.",
+        )
         if top_category:
             label, amount_minor = top_category
-            base += f" Cea mai mare cheltuială discreționară de până acum e pe {label} ({affordability_service.format_ron(amount_minor)}) — dacă vrei să economisești mai mult, e primul loc de unde ai putea reduce."
+            amount_ron = affordability_service.format_ron(amount_minor)
+            base += pick(
+                f" Cea mai mare cheltuială discreționară de până acum e pe {label} ({amount_ron}) — dacă vrei să economisești mai mult, e primul loc de unde ai putea reduce.",
+                f" Your largest discretionary spend so far is on {label} ({amount_ron}) — if you want to save more, that's the first place to cut.",
+            )
         return base
 
-    base = f"La ritmul actual de cheltuire, estimăm un sold de {affordability_service.format_ron(end_balance)} la finalul lunii — sub bufferul de siguranță recomandat de {affordability_service.format_ron(buffer_minor)}."
+    buffer_ron = affordability_service.format_ron(buffer_minor)
+    base = pick(
+        f"La ritmul actual de cheltuire, estimăm un sold de {end_balance_ron} la finalul lunii — sub bufferul de siguranță recomandat de {buffer_ron}.",
+        f"At your current spending pace, we estimate a balance of {end_balance_ron} at month-end — below the recommended safety buffer of {buffer_ron}.",
+    )
     if top_category:
         label, amount_minor = top_category
-        base += f" Cea mai mare cheltuială discreționară e pe {label} ({affordability_service.format_ron(amount_minor)}) — reducerea ei e cea mai rapidă cale să te apropii de buffer."
+        amount_ron = affordability_service.format_ron(amount_minor)
+        base += pick(
+            f" Cea mai mare cheltuială discreționară e pe {label} ({amount_ron}) — reducerea ei e cea mai rapidă cale să te apropii de buffer.",
+            f" Your largest discretionary spend is on {label} ({amount_ron}) — trimming it is the fastest way to get back to the buffer.",
+        )
     else:
-        base += " Merită să urmărești cheltuielile discreționare din restul lunii."
+        base += pick(
+            " Merită să urmărești cheltuielile discreționare din restul lunii.",
+            " It's worth keeping an eye on your discretionary spending for the rest of the month.",
+        )
     return base
 
 
@@ -145,17 +161,17 @@ async def handle_message(
     # sa roage sa reformulezez" / "nu ma lasa sa ii dau date personale").
     if moderation_service.contains_profanity(message):
         logger.info("agent: mesaj cu limbaj jignitor — răspuns determinist, fără apel GPT")
-        final_text = moderation_service.REPHRASE_REQUEST_ANSWER
+        final_text = translate("rephraseRequest")
         relevant_cards: list[str] = []
         rag_hits: list[tuple[Chunk, float]] = []
     elif safety_guard.detect_sensitive_data(message):
         logger.info("agent: mesaj cu date sensibile de card — răspuns determinist, fără apel GPT")
-        final_text = safety_guard.SENSITIVE_DATA_WARNING
+        final_text = translate("sensitiveDataWarning")
         relevant_cards = []
         rag_hits = []
     elif safety_guard.detect_prompt_extraction_attempt(message):
         logger.info("agent: încercare de extragere a promptului — răspuns determinist, fără apel GPT")
-        final_text = safety_guard.PROMPT_EXTRACTION_REFUSAL
+        final_text = translate("promptExtractionRefusal")
         relevant_cards = []
         rag_hits = []
     else:
@@ -222,17 +238,17 @@ async def handle_message(
         except AzureOpenAINotConfigured as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Asistentul AI nu este configurat momentan.",
+                detail=translate("assistantNotConfigured"),
             ) from exc
         except openai.OpenAIError as exc:
             logger.warning("agent: eroare Azure OpenAI: %s", exc)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Nu am putut contacta asistentul AI. Te rugăm să încerci din nou.",
+                detail=translate("assistantUnreachable"),
             ) from exc
 
         if final_text is None:
-            final_text = _FALLBACK_ANSWER
+            final_text = translate("forecastFallbackAnswer")
         # Apărare suplimentară — vezi safety_guard.py::redact_if_sensitive.
         # Nu ar trebui să se întâmple niciodată (niciun tool nu-i oferă
         # PIN/CVV/PAN), dar costă puțin să verificăm și ce a GENERAT GPT,

@@ -1,10 +1,12 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { categoryLabel } from '../../categories';
 import { transactionDisplayName } from '../../transaction-display';
 import { MerchantAvatar } from '../merchant-avatar/merchant-avatar';
+import { LanguageService } from '../../../services/language.service';
 
 export interface TransactionRowData {
   id: string;
@@ -23,7 +25,7 @@ export interface TransactionRowData {
 @Component({
   selector: 'app-transaction-row',
   standalone: true,
-  imports: [MoneyPipe, DatePipe, MerchantAvatar],
+  imports: [MoneyPipe, DatePipe, MerchantAvatar, TranslatePipe],
   template: `
     <button type="button" class="tx-row" (click)="opened.emit()">
       <app-merchant-avatar
@@ -38,7 +40,7 @@ export interface TransactionRowData {
       </span>
       <span class="tx-row__amount" [class.tx-row__amount--in]="transaction().direction === 'incoming'">
         {{ transaction().direction === 'incoming' ? '+' : '-' }}{{ transaction().amount_minor | money: transaction().currency : false }}
-        {{ transaction().currency === 'RON' ? 'lei' : transaction().currency }}
+        {{ transaction().currency === 'RON' ? ('common.lei' | translate) : transaction().currency }}
       </span>
     </button>
   `,
@@ -91,9 +93,11 @@ export interface TransactionRowData {
   ],
 })
 export class TransactionRow {
+  private readonly language = inject(LanguageService);
+
   readonly transaction = input.required<TransactionRowData>();
   readonly opened = output<void>();
 
   protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
-  protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));
+  protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category, this.language.language()));
 }

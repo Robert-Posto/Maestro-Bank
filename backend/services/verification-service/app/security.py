@@ -6,26 +6,27 @@ import jwt
 from fastapi import Depends, Header, HTTPException, status
 
 from app.config import settings
+from app.i18n import translate
 
 
 def _decode(token: str) -> dict:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid sau expirat.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenInvalidOrExpired")) from exc
 
 
 async def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Lipsește header-ul Authorization: Bearer <token>.",
+            detail=translate("missingAuthorizationHeader"),
         )
     token = authorization.split(" ", 1)[1]
     payload = _decode(token)
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenMissingSubject"))
     return user_id
 
 

@@ -25,7 +25,10 @@ AgentName = Literal["spending_forecast", "support"]
 # Fiecare tipar corespunde unui subiect pe care Support Agent ÎL
 # REDIRECȚIONEAZĂ deja explicit spre MaestroAgent (vezi support_prompt.py) —
 # lista de mai jos NU e o graniță nouă, doar automatizarea celei existente.
+# RO + EN, fiindcă userul poate scrie în oricare limbă (comutatorul de limbă
+# schimbă UI-ul, nu ce tastează userul).
 _SPENDING_FORECAST_PATTERNS = [
+    # RO
     r"\bbuget\w*",
     r"\bcheltui\w*",
     r"\beconomis\w*",
@@ -34,6 +37,15 @@ _SPENDING_FORECAST_PATTERNS = [
     r"\bprognoz\w*",
     r"\bforecast\w*",
     r"\babonament\w*",
+    # EN
+    r"\bbudget\w*",
+    r"\bspend\w*",
+    r"\bspent\b",
+    r"\bsav(?:e|ing)\w*",
+    r"\bcan i afford\b",
+    r"\bafford\w*",
+    r"\bsubscription\w*",
+    r"\bcash[- ]?flow\b",
 ]
 
 _SPENDING_FORECAST_REGEX = re.compile("|".join(_SPENDING_FORECAST_PATTERNS), re.IGNORECASE)

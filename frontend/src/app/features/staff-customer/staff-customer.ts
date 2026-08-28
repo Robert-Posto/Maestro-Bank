@@ -13,6 +13,8 @@ import { Icon } from '../../shared/components/icon/icon';
 import { AccountCard, AccountRowData } from '../../shared/components/account-card/account-card';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
 import { TransactionDetailsPanel, TransactionDetail } from '../../shared/components/transaction-details-panel/transaction-details-panel';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { LanguageService } from '../../services/language.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 /**
@@ -25,7 +27,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-staff-customer',
   standalone: true,
-  imports: [PageHeader, LoadingSkeleton, EmptyState, ActionButton, Icon, AccountCard, TransactionRow, TransactionDetailsPanel],
+  imports: [PageHeader, LoadingSkeleton, EmptyState, ActionButton, Icon, AccountCard, TransactionRow, TransactionDetailsPanel, TranslatePipe],
   templateUrl: './staff-customer.html',
   styleUrl: './staff-customer.css',
 })
@@ -33,6 +35,7 @@ export class StaffCustomer implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly staffApi = inject(StaffService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly userId = this.route.snapshot.paramMap.get('userId') ?? '';
 
@@ -59,7 +62,7 @@ export class StaffCustomer implements OnInit {
 
   ngOnInit(): void {
     if (!this.userId) {
-      this.error.set('Lipsește identificatorul clientului.');
+      this.error.set(this.language.t('staffCustomer.missingUserId'));
       this.loading.set(false);
       return;
     }
@@ -79,7 +82,7 @@ export class StaffCustomer implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(extractErrorMessage(err, 'Nu am putut încărca datele clientului.'));
+        this.error.set(extractErrorMessage(err, this.language.t('staffCustomer.loadError')));
         this.loading.set(false);
       },
     });

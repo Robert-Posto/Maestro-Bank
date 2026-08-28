@@ -3,14 +3,18 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
+import { LanguageService } from '../../../services/language.service';
 import { WebauthnService } from '../../../services/webauthn.service';
+import { AuthLanguageToggle } from '../../../shared/components/auth-language-toggle/auth-language-toggle';
 import { Icon } from '../../../shared/components/icon/icon';
+import { PasswordInput } from '../../../shared/components/password-input/password-input';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [FormsModule, RouterLink, Icon, PasswordInput, TranslatePipe, AuthLanguageToggle],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
@@ -19,6 +23,7 @@ export class Login {
   private readonly webauthn = inject(WebauthnService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly language = inject(LanguageService);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -53,7 +58,7 @@ export class Login {
   submit(): void {
     this.error.set(null);
     if (!this.email().trim() || !this.password()) {
-      this.error.set('Completează email-ul și parola.');
+      this.error.set(this.language.t('auth.login.fillBoth'));
       return;
     }
 
@@ -65,7 +70,7 @@ export class Login {
       },
       error: (err) => {
         this.isSubmitting.set(false);
-        this.error.set(extractErrorMessage(err, 'Autentificare eșuată. Verifică email-ul și parola.'));
+        this.error.set(extractErrorMessage(err, this.language.t('auth.login.failed')));
       },
     });
   }
@@ -73,7 +78,7 @@ export class Login {
   protected async loginWithPasskey(): Promise<void> {
     this.error.set(null);
     if (!this.email().trim()) {
-      this.error.set('Completează email-ul, apoi folosește passkey-ul.');
+      this.error.set(this.language.t('auth.login.fillEmailForPasskey'));
       return;
     }
 
@@ -87,7 +92,7 @@ export class Login {
       if ((err as { name?: string })?.name === 'NotAllowedError') {
         return; // userul a anulat prompt-ul biometric — nu e o eroare de afișat
       }
-      this.error.set(extractErrorMessage(err, 'Autentificarea cu passkey a eșuat. Poți folosi parola.'));
+      this.error.set(extractErrorMessage(err, this.language.t('auth.login.passkeyFailed')));
     }
   }
 }

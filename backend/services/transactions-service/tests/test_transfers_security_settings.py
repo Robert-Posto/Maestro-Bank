@@ -116,8 +116,10 @@ def mock_accounts(monkeypatch):
     async def fake_verify_card_pin(card_id: str, pin: str) -> bool:
         return card_id == CARD_ID and pin == "1234"
 
-    async def fake_notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
-        notifications.append((user_id, kind, text))
+    async def fake_notify_user(
+        user_id: str, kind: str, message_key: str, message_params: dict | None = None, reference_id: str | None = None
+    ) -> None:
+        notifications.append((user_id, kind, message_key))
 
     monkeypatch.setattr("app.service._get_account_by_user", fake_get_by_user)
     monkeypatch.setattr("app.service._get_account_by_iban", fake_get_by_iban)

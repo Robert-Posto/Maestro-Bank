@@ -15,6 +15,7 @@ from fastapi import HTTPException, status
 
 from app import blocklist
 from app.database import get_database
+from app.i18n import translate
 
 logger = logging.getLogger("transactions-service")
 
@@ -50,14 +51,14 @@ def _to_object_id(evaluation_id: str) -> ObjectId:
     try:
         return ObjectId(evaluation_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluare inexistentă.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("evaluationNotFound")) from exc
 
 
 async def get_evaluation(evaluation_id: str) -> dict:
     db = get_database()
     evaluation = await db.fraud_evaluations.find_one({"_id": _to_object_id(evaluation_id)})
     if evaluation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluare inexistentă.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("evaluationNotFound"))
     return evaluation
 
 
@@ -86,8 +87,8 @@ async def review_evaluation(
     if result.matched_count == 0:
         existing = await db.fraud_evaluations.find_one({"_id": object_id})
         if existing is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluare inexistentă.")
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Această evaluare a fost deja revizuită.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("evaluationNotFound"))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("evaluationAlreadyReviewed"))
 
     updated = await db.fraud_evaluations.find_one({"_id": object_id})
 

@@ -1,6 +1,8 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { NavigationCancel, NavigationEnd, NavigationError, NavigationStart, Router } from '@angular/router';
 
+import { LanguageService } from '../../../services/language.service';
+
 /**
  * Cât durează o navigare înainte s-o considerăm „lentă" și să merite un
  * indicator. Sub pragul ăsta tranziția se simte instantanee, iar un logo
@@ -45,7 +47,12 @@ const FADE_OUT_MS = 240;
   standalone: true,
   template: `
     @if (rendered()) {
-      <div class="route-loader" [class.route-loader--visible]="visible()" role="status" aria-label="Se încarcă">
+      <div
+        class="route-loader"
+        [class.route-loader--visible]="visible()"
+        role="status"
+        [attr.aria-label]="language.t('common.loading')"
+      >
         <span class="route-loader__halo"></span>
         <div class="route-loader__tile">
           <img class="route-loader__logo" src="logo-mb.png" alt="" width="360" height="297" />
@@ -145,6 +152,7 @@ const FADE_OUT_MS = 240;
 export class RouteLoader {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly language = inject(LanguageService);
 
   /** Prezent în DOM — rămâne `true` și pe durata fade-out-ului. */
   protected readonly rendered = signal(false);

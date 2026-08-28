@@ -13,6 +13,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.database import close_database_connection, ping_database
+from app.i18n import LanguageMiddleware
 from app.routers.exchange import router as exchange_router
 from app.routers.internal import router as internal_router
 from app.service import refresh_rates_from_bnr
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank Exchange Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 app.include_router(exchange_router)
 app.include_router(internal_router)
 

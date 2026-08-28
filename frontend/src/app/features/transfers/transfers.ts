@@ -26,6 +26,8 @@ import { TRANSACTION_CATEGORIES, categoryLabel } from '../../shared/categories';
 import { Select, SelectOption } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { LanguageService } from '../../services/language.service';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 type TransferStep = 'form' | 'review' | 'success';
 type MainTab = 'new' | 'scheduled';
@@ -41,7 +43,7 @@ type SendMode = 'send' | 'request';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe, Select],
+  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe, Select, TranslatePipe],
   templateUrl: './transfers.html',
   styleUrl: './transfers.css',
 })
@@ -49,13 +51,17 @@ export class Transfers implements OnInit {
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly language = inject(LanguageService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
-  protected readonly categoryOptions: SelectOption[] = TRANSACTION_CATEGORIES.map((c) => ({
-    value: c.value,
-    label: c.label,
-    colorVar: c.colorVar,
-  }));
+  protected readonly categoryOptions = computed<SelectOption[]>(() => {
+    const lang = this.language.language();
+    return TRANSACTION_CATEGORIES.map((c) => ({
+      value: c.value,
+      label: categoryLabel(c.value, lang),
+      colorVar: c.colorVar,
+    }));
+  });
   protected readonly categoryLabel = categoryLabel;
   protected readonly step = signal<TransferStep>('form');
   protected readonly mainTab = signal<MainTab>('new');
@@ -195,7 +201,7 @@ export class Transfers implements OnInit {
     const iban = this.scheduleToIban().trim().toUpperCase().replace(/\s+/g, '');
     const amountMinor = Math.round(this.scheduleAmountRon() * 100);
     if (iban.length < 10 || amountMinor <= 0) {
-      this.toast.error('Completează un IBAN valid și o sumă mai mare decât 0.');
+      this.toast.error(this.language.t('transfers.invalidScheduleFields'));
       return;
     }
 
@@ -212,11 +218,11 @@ export class Transfers implements OnInit {
           this.scheduledTransfers.update((list) => [...list, schedule]);
           this.scheduleSaving.set(false);
           this.scheduleModalOpen.set(false);
-          this.toast.success('Transfer programat creat.');
+          this.toast.success(this.language.t('transfers.scheduleCreated'));
         },
         error: (err) => {
           this.scheduleSaving.set(false);
-          this.toast.error(extractErrorMessage(err, 'Nu am putut crea transferul programat.'));
+          this.toast.error(extractErrorMessage(err, this.language.t('transfers.scheduleCreateError')));
         },
       });
   }
@@ -225,14 +231,14 @@ export class Transfers implements OnInit {
     this.banking.cancelScheduledTransfer(schedule.id).subscribe({
       next: () => {
         this.scheduledTransfers.update((list) => list.filter((s) => s.id !== schedule.id));
-        this.toast.success('Transfer programat anulat.');
+        this.toast.success(this.language.t('transfers.scheduleCancelled'));
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Anularea a eșuat.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('transfers.cancelError'))),
     });
   }
 
   protected frequencyLabel(frequency: ScheduleFrequency): string {
-    return frequency === 'weekly' ? 'Săptămânal' : 'Lunar';
+    return this.language.t(frequency === 'weekly' ? 'common.weekly' : 'common.monthly');
   }
 
   // --- Cereri de plată (link/QR de tip "Request Money") -------------------
@@ -255,13 +261,13 @@ export class Transfers implements OnInit {
   protected paymentRequestStatusLabel(status: PaymentRequestView['status']): string {
     switch (status) {
       case 'open':
-        return 'Deschisă';
+        return this.language.t('transfers.requestStatusOpen');
       case 'paid':
-        return 'Plătită';
+        return this.language.t('transfers.requestStatusPaid');
       case 'cancelled':
-        return 'Anulată';
+        return this.language.t('transfers.requestStatusCancelled');
       case 'expired':
-        return 'Expirată';
+        return this.language.t('transfers.requestStatusExpired');
     }
   }
 
@@ -269,7 +275,7 @@ export class Transfers implements OnInit {
     this.requestFormError.set(null);
     const amountMinor = Math.round((this.requestAmount() ?? 0) * 100);
     if (amountMinor <= 0) {
-      this.requestFormError.set('Introdu o sumă validă, mai mare decât 0.');
+      this.requestFormError.set(this.language.t('transfers.invalidAmount'));
       return;
     }
     // Verificarea live (vezi constructor) deja dezactivează butonul, dar
@@ -290,12 +296,12 @@ export class Transfers implements OnInit {
           this.paymentRequests.update((list) => [request, ...list]);
           this.requestAmount.set(null);
           this.requestDescription.set('');
-          this.toast.success('Cerere de plată creată.');
+          this.toast.success(this.language.t('transfers.requestCreated'));
           this.openShare(request);
         },
         error: (err) => {
           this.requestCreating.set(false);
-          this.requestFormError.set(extractErrorMessage(err, 'Nu am putut crea cererea de plată.'));
+          this.requestFormError.set(extractErrorMessage(err, this.language.t('transfers.requestCreateError')));
         },
       });
   }
@@ -323,7 +329,7 @@ export class Transfers implements OnInit {
 
   protected copyPaymentLink(requestId: string): void {
     navigator.clipboard?.writeText(this.paymentRequestLink(requestId)).then(() => {
-      this.toast.success('Link copiat în clipboard.');
+      this.toast.success(this.language.t('transfers.linkCopied'));
     });
   }
 
@@ -331,10 +337,10 @@ export class Transfers implements OnInit {
     this.banking.cancelPaymentRequest(request.id).subscribe({
       next: (updated) => {
         this.paymentRequests.update((list) => list.map((r) => (r.id === updated.id ? updated : r)));
-        this.toast.success('Cerere de plată anulată.');
+        this.toast.success(this.language.t('transfers.requestCancelled'));
         if (this.shareRequest()?.id === updated.id) this.closeShare();
       },
-      error: (err) => this.toast.error(extractErrorMessage(err, 'Anularea a eșuat.')),
+      error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('transfers.cancelError'))),
     });
   }
 
@@ -353,19 +359,19 @@ export class Transfers implements OnInit {
 
     const iban = this.toIban().trim().toUpperCase().replace(/\s+/g, '');
     if (iban.length < 10) {
-      this.formError.set('IBAN destinație invalid.');
+      this.formError.set(this.language.t('transfers.invalidIban'));
       return;
     }
     if (this.account() && iban === this.account()!.iban) {
-      this.formError.set('Nu poți transfera către propriul cont.');
+      this.formError.set(this.language.t('transfers.cannotTransferToSelf'));
       return;
     }
     if (!this.amount() || this.amount()! <= 0) {
-      this.formError.set('Introdu o sumă validă, mai mare decât 0.');
+      this.formError.set(this.language.t('transfers.invalidAmount'));
       return;
     }
     if (this.account() && this.amountMinor() > this.account()!.balance_minor) {
-      this.formError.set('Sold insuficient pentru această sumă.');
+      this.formError.set(this.language.t('transfers.insufficientBalanceAmount'));
       return;
     }
 
@@ -398,7 +404,7 @@ export class Transfers implements OnInit {
 
   protected submitCardPinConfirmation(): void {
     if (!/^\d{4}$/.test(this.cardPin())) {
-      this.toast.error('Introdu PIN-ul cardului (4 cifre).');
+      this.toast.error(this.language.t('transfers.invalidCardPin'));
       return;
     }
     this.cardPinBusy.set(true);
@@ -421,7 +427,7 @@ export class Transfers implements OnInit {
           this.cardPin.set('');
           this.completedTransaction.set(transaction);
           this.step.set('success');
-          this.toast.success('Transfer efectuat cu succes.');
+          this.toast.success(this.language.t('transfers.transferSuccess'));
           this.refreshAccount();
           this.maybeSaveBeneficiary();
         },
@@ -431,12 +437,12 @@ export class Transfers implements OnInit {
             this.needsCardPin.set(true);
             const detail = err.error?.detail;
             this.cardPinRequiredMessage.set(
-              typeof detail === 'string' ? detail : 'Acest transfer necesită confirmare cu PIN-ul cardului.',
+              typeof detail === 'string' ? detail : this.language.t('transfers.cardPinRequiredFallback'),
             );
             return;
           }
           if (isPinRetry && err instanceof HttpErrorResponse && err.status === 401) {
-            this.toast.error('PIN incorect.');
+            this.toast.error(this.language.t('transfers.wrongPin'));
             this.cardPin.set('');
             return;
           }
@@ -460,15 +466,15 @@ export class Transfers implements OnInit {
 
   private mapTransferError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      if (err.status === 0) return 'Serviciul de transferuri este indisponibil momentan. Încearcă din nou.';
-      if (err.status === 409) return 'Sold insuficient pentru acest transfer.';
-      if (err.status === 404) return 'Contul destinație (IBAN) nu există.';
+      if (err.status === 0) return this.language.t('transfers.serviceUnavailable');
+      if (err.status === 409) return this.language.t('transfers.insufficientBalance409');
+      if (err.status === 404) return this.language.t('transfers.destinationNotFound');
       if (err.status === 400) {
         const detail = err.error?.detail;
         if (typeof detail === 'string') return detail;
       }
     }
-    return 'Transferul a eșuat. Verifică datele și încearcă din nou.';
+    return this.language.t('transfers.transferFailedGeneric');
   }
 
   protected startNewTransfer(): void {

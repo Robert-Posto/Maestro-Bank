@@ -1,7 +1,8 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { categoryLabel } from '../../categories';
 import { transactionDisplayName } from '../../transaction-display';
 import { StatusBadge, type BadgeTone } from '../status-badge/status-badge';
@@ -9,6 +10,7 @@ import { ActionButton } from '../action-button/action-button';
 import { Icon } from '../icon/icon';
 import { MerchantAvatar } from '../merchant-avatar/merchant-avatar';
 import type { TransactionRisk } from '../../../services/banking.service';
+import { LanguageService } from '../../../services/language.service';
 
 export interface TransactionDetail {
   id: string;
@@ -37,11 +39,11 @@ const RISK_TONE: Record<TransactionRisk['tier'], BadgeTone> = {
   held: 'error',
 };
 
-const RISK_LABEL: Record<TransactionRisk['tier'], string> = {
-  safe: 'Sigur',
-  unusual: 'Neobișnuit',
-  potentially_dangerous: 'Potențial riscant',
-  held: 'Reținut',
+const RISK_LABEL_KEY: Record<TransactionRisk['tier'], string> = {
+  safe: 'transactions.riskSafe',
+  unusual: 'transactions.riskUnusual',
+  potentially_dangerous: 'transactions.riskDangerous',
+  held: 'transactions.riskHeld',
 };
 
 /**
@@ -53,13 +55,16 @@ const RISK_LABEL: Record<TransactionRisk['tier'], string> = {
 @Component({
   selector: 'app-transaction-details-panel',
   standalone: true,
-  imports: [MoneyPipe, DatePipe, StatusBadge, ActionButton, Icon, MerchantAvatar],
+  imports: [MoneyPipe, DatePipe, StatusBadge, ActionButton, Icon, MerchantAvatar, TranslatePipe],
   templateUrl: './transaction-details-panel.html',
   styleUrl: './transaction-details-panel.css',
 })
 export class TransactionDetailsPanel {
+  private readonly language = inject(LanguageService);
+
   readonly transaction = input.required<TransactionDetail>();
-  readonly accountLabel = input('Cont curent RON');
+  /** Nelegat de niciun apelant în prezent — fallback-ul tradus e suficient. */
+  readonly accountLabel = input<string | undefined>(undefined);
   readonly recognizing = input(false);
   readonly reporting = input(false);
   readonly cancellingHold = input(false);
@@ -77,8 +82,9 @@ export class TransactionDetailsPanel {
   protected readonly isPendingReview = computed(() => this.transaction().status === 'pending_review');
 
   protected readonly displayName = computed(() => transactionDisplayName(this.transaction()));
-  protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category));
+  protected readonly categoryLabel = computed(() => categoryLabel(this.transaction().category, this.language.language()));
   protected readonly signedAmount = computed(() => (this.transaction().direction === 'outgoing' ? -1 : 1) * this.transaction().amount_minor);
+  protected readonly resolvedAccountLabel = computed(() => this.accountLabel() ?? this.language.t('transactions.currentAccountRon'));
 
   protected readonly riskTone = computed<BadgeTone>(() => {
     const risk = this.transaction().risk;
@@ -86,6 +92,6 @@ export class TransactionDetailsPanel {
   });
   protected readonly riskLabel = computed(() => {
     const risk = this.transaction().risk;
-    return risk ? RISK_LABEL[risk.tier] : '';
+    return risk ? this.language.t(RISK_LABEL_KEY[risk.tier]) : '';
   });
 }

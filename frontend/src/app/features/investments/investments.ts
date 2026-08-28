@@ -12,6 +12,7 @@ import {
   InstrumentView,
   InvestmentsService,
 } from '../../services/investments.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { Icon } from '../../shared/components/icon/icon';
 import { ActionButton } from '../../shared/components/action-button/action-button';
@@ -19,6 +20,7 @@ import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loadin
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Modal } from '../../shared/components/modal/modal';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
@@ -35,7 +37,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-investments',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, PageHeader, Icon, ActionButton, LoadingSkeleton, EmptyState, Modal, MoneyPipe],
+  imports: [FormsModule, DecimalPipe, PageHeader, Icon, ActionButton, LoadingSkeleton, EmptyState, Modal, MoneyPipe, TranslatePipe],
   templateUrl: './investments.html',
   styleUrl: './investments.css',
 })
@@ -44,6 +46,7 @@ export class Investments implements OnInit, OnDestroy {
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
   private pollSubscription?: Subscription;
 
   protected readonly accounts = signal<AccountView[]>([]);
@@ -94,6 +97,23 @@ export class Investments implements OnInit, OnDestroy {
 
   protected selectCategory(label: string | null): void {
     this.selectedCategory.set(label);
+  }
+
+  /** Grupările interne (categoryGroups, selectedCategory) rămân pe valoarea
+   * brută trimisă de backend ("Tehnologie"/"Consum & Finanțe"/"ETF-uri") —
+   * doar eticheta AFIȘATĂ se traduce, ca la StatusBadge (status brut intern,
+   * label tradus la randare). */
+  protected categoryDisplayLabel(label: string): string {
+    switch (label) {
+      case 'Tehnologie':
+        return this.language.t('investments.categoryTechnology');
+      case 'Consum & Finanțe':
+        return this.language.t('investments.categoryConsumerFinance');
+      case 'ETF-uri':
+        return this.language.t('investments.categoryEtfs');
+      default:
+        return this.language.t('investments.categoryOther');
+    }
   }
 
   /** Iconiță + culoare distinctă pe categorie — doar cosmetic, ca eticheta
@@ -239,7 +259,7 @@ export class Investments implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.detailLoading.set(false);
-        this.detailError.set(extractErrorMessage(err, 'Nu am putut încărca detaliile.'));
+        this.detailError.set(extractErrorMessage(err, this.language.t('investments.detailLoadError')));
       },
     });
   }
@@ -312,12 +332,17 @@ export class Investments implements OnInit, OnDestroy {
       next: () => {
         this.buying.set(false);
         this.buyModalInstrument.set(null);
-        this.toast.success(`Ai cumpărat ${instrument.symbol} de ${this.buyAmountUsd()} USD.`);
+        this.toast.success(
+          this.language
+            .t('investments.boughtMessage')
+            .replace('{symbol}', instrument.symbol)
+            .replace('{amount}', String(this.buyAmountUsd())),
+        );
         this.refreshAccountsAndPortfolio();
       },
       error: (err) => {
         this.buying.set(false);
-        this.toast.error(extractErrorMessage(err, 'Cumpărarea a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('investments.buyFailed')));
       },
     });
   }
@@ -339,12 +364,14 @@ export class Investments implements OnInit, OnDestroy {
       next: () => {
         this.selling.set(false);
         this.sellModalHolding.set(null);
-        this.toast.success(`Ai vândut ${quantity} ${holding.symbol}.`);
+        this.toast.success(
+          this.language.t('investments.soldMessage').replace('{quantity}', String(quantity)).replace('{symbol}', holding.symbol),
+        );
         this.refreshAccountsAndPortfolio();
       },
       error: (err) => {
         this.selling.set(false);
-        this.toast.error(extractErrorMessage(err, 'Vânzarea a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('investments.sellFailed')));
       },
     });
   }

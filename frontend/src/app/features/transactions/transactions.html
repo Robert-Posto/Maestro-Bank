@@ -1,26 +1,26 @@
-<app-page-header title="Tranzacții" subtitle="Istoric complet și analiză inteligentă." />
+<app-page-header [title]="'transactions.title' | translate" [subtitle]="'transactions.subtitle' | translate" />
 
 <div class="tx-searchbar">
   <div class="tx-search">
     <app-icon name="search" [size]="18" />
     <input
       type="search"
-      placeholder="Caută tranzacții sau comercianți..."
+      [placeholder]="'transactions.searchPlaceholder' | translate"
       [ngModel]="search()"
       (ngModelChange)="search.set($event)"
       (keydown.enter)="applyFilters()"
     />
   </div>
 
-  <app-select class="tx-category-select" [options]="categoryOptions" [value]="category()" placeholder="Toate categoriile" (changed)="onCategoryChange($event)" />
+  <app-select class="tx-category-select" [options]="categoryOptions()" [value]="category()" [placeholder]="'transactions.allCategories' | translate" (changed)="onCategoryChange($event)" />
 
   <app-action-button variant="secondary" (pressed)="toggleFilters()">
-    <app-icon name="filter" [size]="16" /> Filtre avansate
+    <app-icon name="filter" [size]="16" /> {{ 'transactions.advancedFilters' | translate }}
     <app-icon name="chevron-down" [size]="14" class="tx-filters-chevron" [class.tx-filters-chevron--open]="filtersOpen()" />
   </app-action-button>
-  <app-action-button variant="ghost" (pressed)="resetFilters()">Resetează</app-action-button>
+  <app-action-button variant="ghost" (pressed)="resetFilters()">{{ 'transactions.reset' | translate }}</app-action-button>
   <app-action-button variant="secondary" [loading]="exporting()" (pressed)="exportCsv()">
-    <app-icon name="download" [size]="16" /> Exportă
+    <app-icon name="download" [size]="16" /> {{ 'transactions.export' | translate }}
   </app-action-button>
 </div>
 
@@ -28,7 +28,7 @@
   <div class="tx-filters-advanced__inner">
     <div class="tx-filters">
       <label class="tx-filter">
-        <span>Perioadă</span>
+        <span>{{ 'transactions.period' | translate }}</span>
         <div class="tx-filter__range">
           <app-icon name="calendar" [size]="16" />
           <input type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" />
@@ -38,12 +38,12 @@
       </label>
 
       <label class="tx-filter">
-        <span>Direcție</span>
-        <app-select [options]="directionOptions" [value]="direction()" placeholder="Toate" (changed)="direction.set($event)" />
+        <span>{{ 'transactions.direction' | translate }}</span>
+        <app-select [options]="directionOptions()" [value]="direction()" [placeholder]="'transactions.allDirections' | translate" (changed)="direction.set($event)" />
       </label>
 
       <label class="tx-filter">
-        <span>Sumă (lei)</span>
+        <span>{{ 'transactions.amountRon' | translate }}</span>
         <div class="tx-filter__range">
           <app-icon name="exchange" [size]="16" />
           <input type="number" min="0" placeholder="Min" [ngModel]="minAmount()" (ngModelChange)="minAmount.set($event)" />
@@ -52,7 +52,7 @@
         </div>
       </label>
     </div>
-    <app-action-button (pressed)="applyFilters()">Aplică filtrele</app-action-button>
+    <app-action-button (pressed)="applyFilters()">{{ 'transactions.applyFilters' | translate }}</app-action-button>
   </div>
 </div>
 
@@ -61,20 +61,20 @@
     @if (loading()) {
       <app-loading-skeleton [rows]="6" [height]="48" />
     } @else if (error()) {
-      <app-empty-state icon="info" title="Nu am putut încărca tranzacțiile" [description]="error()!" />
+      <app-empty-state icon="info" [title]="'transactions.loadErrorTitle' | translate" [description]="error()!" />
     } @else if (transactions().length === 0) {
-      <app-empty-state icon="receipt" title="Nicio tranzacție găsită" description="Încearcă să ajustezi filtrele sau fă un transfer nou." />
+      <app-empty-state icon="receipt" [title]="'transactions.noResultsTitle' | translate" [description]="'transactions.noResultsDescription' | translate" />
     } @else {
       <table class="tx-table">
         <thead>
           <tr>
-            <th>Dată</th>
-            <th>Comerciant / Descriere</th>
-            <th>Categorie</th>
-            <th>Cont / Card</th>
-            <th>Sumă</th>
-            <th>Status</th>
-            <th aria-label="Acțiuni"></th>
+            <th>{{ 'common.date' | translate }}</th>
+            <th>{{ 'transactions.merchantDescription' | translate }}</th>
+            <th>{{ 'common.category' | translate }}</th>
+            <th>{{ 'transactions.accountCard' | translate }}</th>
+            <th>{{ 'common.amount' | translate }}</th>
+            <th>{{ 'common.status' | translate }}</th>
+            <th [attr.aria-label]="'transactions.actions' | translate"></th>
           </tr>
         </thead>
         <tbody>
@@ -91,10 +91,10 @@
                 />
                 {{ displayName(tx) }}
               </td>
-              <td><span class="tx-table__category-dot"></span>{{ categoryLabel(tx.category) }}</td>
-              <td class="tx-table__account"><app-icon name="cards" [size]="15" /> Cont curent RON</td>
+              <td><span class="tx-table__category-dot"></span>{{ categoryLabel(tx.category, language.language()) }}</td>
+              <td class="tx-table__account"><app-icon name="cards" [size]="15" /> {{ 'transactions.currentAccountRon' | translate }}</td>
               <td [class.tx-table__amount--in]="tx.direction === 'incoming'" class="tx-table__amount">
-                {{ tx.direction === 'incoming' ? '+' : '-' }}{{ tx.amount_minor | money: tx.currency : false }} {{ tx.currency === 'RON' ? 'lei' : tx.currency }}
+                {{ tx.direction === 'incoming' ? '+' : '-' }}{{ tx.amount_minor | money: tx.currency : false }} {{ tx.currency === 'RON' ? ('common.lei' | translate) : tx.currency }}
               </td>
               <td><app-status-badge [status]="tx.status" /></td>
               <td class="tx-table__chevron" aria-hidden="true">›</td>
@@ -104,10 +104,10 @@
       </table>
 
       <div class="tx-pagination">
-        <span>Pagina {{ page() + 1 }}</span>
+        <span>{{ 'transactions.page' | translate }} {{ page() + 1 }}</span>
         <div class="tx-pagination__controls">
-          <button type="button" [disabled]="page() === 0" (click)="prevPage()">‹ Anterior</button>
-          <button type="button" [disabled]="!hasNextPage()" (click)="nextPage()">Următor ›</button>
+          <button type="button" [disabled]="page() === 0" (click)="prevPage()">‹ {{ 'transactions.previous' | translate }}</button>
+          <button type="button" [disabled]="!hasNextPage()" (click)="nextPage()">{{ 'transactions.next' | translate }} ›</button>
         </div>
       </div>
     }

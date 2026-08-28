@@ -56,16 +56,30 @@ NotificationKind = Literal[
 
 
 class NotificationCreate(BaseModel):
-    """Payload-ul trimis de UN ALT serviciu, prin POST /internal/notifications."""
+    """Payload-ul trimis de UN ALT serviciu, prin POST /internal/notifications.
+
+    Preferat: `message_key` + `message_params` (valori BRUTE) — support-service
+    randează textul în limba CITITORULUI la fiecare `GET /notifications`, deci
+    o notificare veche își schimbă limba când userul comută comutatorul (vezi
+    app/i18n.py::render_notification). `text` rămâne acceptat pentru
+    compatibilitate (apeluri vechi / notificări fără cheie în catalog)."""
 
     user_id: str
     kind: NotificationKind
-    text: str = Field(min_length=1, max_length=280)
+    text: str | None = Field(default=None, max_length=280)
+    message_key: str | None = Field(default=None, max_length=80)
+    message_params: dict[str, Any] | None = None
     # Id-ul resursei la care se referă notificarea (ex. id-ul tranzacției
     # pentru un transfer) — opțional, doar serviciile care au un id relevant
     # îl trimit. Folosit de frontend ca să deschidă direct acea resursă la
     # click, nu doar pagina ei generică (vezi Topbar::openNotification).
     reference_id: str | None = None
+
+    @model_validator(mode="after")
+    def require_text_or_key(self) -> "NotificationCreate":
+        if not self.text and not self.message_key:
+            raise ValueError("NotificationCreate: e nevoie de `text` sau `message_key`.")
+        return self
 
 
 class NotificationOut(BaseModel):

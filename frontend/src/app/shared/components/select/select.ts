@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
 
 import { Icon } from '../icon/icon';
+import { LanguageService } from '../../../services/language.service';
 
 export interface SelectOption {
   value: string;
@@ -34,7 +35,7 @@ export interface SelectOption {
         @if (selected()?.colorVar) {
           <span class="mb-select__dot" [style.background]="'var(' + selected()!.colorVar + ')'"></span>
         }
-        <span class="mb-select__label">{{ selected()?.label ?? placeholder() }}</span>
+        <span class="mb-select__label">{{ selected()?.label ?? (placeholder() ?? defaultPlaceholder()) }}</span>
         <app-icon name="chevron-down" [size]="14" class="mb-select__chevron" />
       </button>
 
@@ -212,13 +213,15 @@ export interface SelectOption {
 export class Select {
   readonly options = input.required<SelectOption[]>();
   readonly value = input<string>('');
-  readonly placeholder = input<string>('Alege');
+  readonly placeholder = input<string | undefined>(undefined);
   /** 'bare' = fără chenar/fundal propriu, pentru cuiburi într-un container deja stilizat. */
   readonly variant = input<'field' | 'bare'>('field');
   readonly changed = output<string>();
 
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly language = inject(LanguageService);
   protected readonly open = signal(false);
+  protected readonly defaultPlaceholder = computed(() => this.language.t('common.choose'));
 
   protected readonly selected = computed(() => this.options().find((o) => o.value === this.value()) ?? null);
 

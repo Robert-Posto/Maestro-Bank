@@ -43,13 +43,13 @@ from webauthn.helpers.structs import (
 
 from app.config import settings
 from app.database import get_database
+from app.i18n import translate
 from app.login_events import record_login_attempt
 from app.security import create_access_token
 
 logger = logging.getLogger("auth-service")
 
 _MAX_CREDENTIALS_PER_USER = 8  # cap defensiv demo — evită înregistrare nelimitată
-_GENERIC_NO_PASSKEY_DETAIL = "Nu există niciun passkey înregistrat pentru acest email."
 # Revocarea e soft-delete (`revoked_at`, vezi revoke_credential) — DEV-02
 # (fraud) are nevoie să "vadă" o revocare recentă. Orice altă interogare
 # din acest fișier vrea DOAR credențiale ACTIVE — filtrul de mai jos,
@@ -110,17 +110,17 @@ async def _consume_challenge(challenge_id: str, purpose: str) -> dict:
     try:
         object_id = ObjectId(challenge_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Challenge invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("challengeInvalid")) from exc
 
     doc = await db.webauthn_challenges.find_one_and_delete({"_id": object_id, "purpose": purpose})
     if doc is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Challenge invalid sau deja folosit.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("challengeInvalidOrUsed"))
 
     expires_at = doc["expires_at"]
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) >= expires_at:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Challenge expirat.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("challengeExpired"))
 
     return doc
 
@@ -178,7 +178,7 @@ async def _reject_if_sign_count_regressed(stored_credential: dict, credential: d
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Acest passkey pare compromis și a fost revocat automat. Adaugă unul nou.",
+            detail=translate("passkeyRevokedCompromised"),
         )
 
 
@@ -213,7 +213,7 @@ async def begin_registration(user: dict) -> tuple[str, dict[str, Any]]:
     if existing_count >= _MAX_CREDENTIALS_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ai atins numărul maxim de passkey-uri ({_MAX_CREDENTIALS_PER_USER}).",
+            detail=translate("maxPasskeysReached", max_credentials=_MAX_CREDENTIALS_PER_USER),
         )
 
     existing = await db.webauthn_credentials.find(
@@ -242,7 +242,7 @@ async def finish_registration(user: dict, challenge_id: str, credential: dict[st
     user_id = str(user["_id"])
     challenge_doc = await _consume_challenge(challenge_id, purpose="registration")
     if challenge_doc["user_id"] != user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Challenge invalid.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("challengeInvalid"))
 
     try:
         verification = verify_registration_response(
@@ -254,7 +254,7 @@ async def finish_registration(user: dict, challenge_id: str, credential: dict[st
         )
     except InvalidRegistrationResponse as exc:
         logger.info("auth-service: înregistrare passkey eșuată (user_id=%s): %s", user_id, exc)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nu am putut înregistra passkey-ul.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("passkeyRegistrationFailed")) from exc
 
     db = get_database()
     now = datetime.now(timezone.utc)
@@ -270,7 +270,7 @@ async def finish_registration(user: dict, challenge_id: str, credential: dict[st
     try:
         result = await db.webauthn_credentials.insert_one(doc)
     except DuplicateKeyError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Acest passkey este deja înregistrat.") from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("passkeyAlreadyRegistered")) from exc
 
     logger.info("auth-service: passkey înregistrat (user_id=%s, credential_id=%s)", user_id, result.inserted_id)
     return await db.webauthn_credentials.find_one({"_id": result.inserted_id})
@@ -318,11 +318,11 @@ async def finish_login(
     challenge_doc = await _consume_challenge(challenge_id, purpose="login")
     user_id = challenge_doc.get("user_id")
     if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_GENERIC_NO_PASSKEY_DETAIL)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("noPasskeyForEmail"))
 
     stored = await _find_stored_credential(credential, user_id=user_id)
     if stored is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_GENERIC_NO_PASSKEY_DETAIL)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("noPasskeyForEmail"))
 
     await _reject_if_sign_count_regressed(stored, credential)
 
@@ -338,13 +338,13 @@ async def finish_login(
         )
     except InvalidAuthenticationResponse as exc:
         logger.info("auth-service: autentificare passkey eșuată (user_id=%s): %s", user_id, exc)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_GENERIC_NO_PASSKEY_DETAIL) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("noPasskeyForEmail")) from exc
 
     await _record_successful_use(stored, verification.new_sign_count)
 
     user = await _get_user_by_id(user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_GENERIC_NO_PASSKEY_DETAIL)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("noPasskeyForEmail"))
 
     token = create_access_token(user_id=str(user["_id"]), email=user["email"], role=user.get("role", "customer"))
     await record_login_attempt(
@@ -367,7 +367,7 @@ async def begin_step_up(user_id: str, action: str, action_payload: str) -> tuple
         {"user_id": user_id, **_ACTIVE_CREDENTIAL_FILTER}
     ).to_list(length=_MAX_CREDENTIALS_PER_USER)
     if not creds:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu ai niciun passkey înregistrat.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("noPasskeyRegistered"))
 
     options = generate_authentication_options(
         rp_id=settings.webauthn_rp_id,
@@ -479,11 +479,11 @@ async def revoke_credential(user_id: str, credential_id: str) -> None:
     try:
         object_id = ObjectId(credential_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de passkey invalid.") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidPasskeyId")) from exc
 
     result = await db.webauthn_credentials.update_one(
         {"_id": object_id, "user_id": user_id, **_ACTIVE_CREDENTIAL_FILTER},
         {"$set": {"revoked_at": datetime.now(timezone.utc)}},
     )
     if result.matched_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey-ul nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("passkeyNotFound"))

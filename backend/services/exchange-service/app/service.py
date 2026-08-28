@@ -30,6 +30,7 @@ from app.config import (
     settings,
 )
 from app.database import get_database
+from app.i18n import translate
 from app.models import QuoteRequest
 
 logger = logging.getLogger("exchange-service")
@@ -99,7 +100,7 @@ def _foreign_currency(from_currency: str, to_currency: str) -> tuple[str, bool]:
         return from_currency, False
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Pereche valutară nesuportată. Perechi disponibile: RON <-> {', '.join(SUPPORTED_FOREIGN_CURRENCIES)}.",
+        detail=translate("unsupportedCurrencyPair", currencies=", ".join(SUPPORTED_FOREIGN_CURRENCIES)),
     )
 
 

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import service
+from app.i18n import LanguageMiddleware
 from app.routers.verification import router as verification_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [verification-service] %(levelname)s %(message)s")
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MaestroBank Verification Service", lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)
 app.include_router(verification_router)
 
 

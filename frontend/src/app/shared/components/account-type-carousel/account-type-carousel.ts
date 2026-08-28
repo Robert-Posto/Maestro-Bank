@@ -1,9 +1,18 @@
-import { Component, ElementRef, signal, input, output, viewChild } from '@angular/core';
+import { Component, ElementRef, signal, input, output, viewChild, inject } from '@angular/core';
 
 import { AccountType } from '../../../services/banking.service';
-import { AccountTypeMeta } from '../../account-types';
+import {
+  AccountTypeMeta,
+  accountTypeBenefits,
+  accountTypeDocumentHint,
+  accountTypeLabel,
+  accountTypeRateLabel,
+  accountTypeTagline,
+} from '../../account-types';
+import { LanguageService } from '../../../services/language.service';
 import { Icon } from '../icon/icon';
 import { ActionButton } from '../action-button/action-button';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 export interface AccountCreateEvent {
   type: AccountType;
@@ -22,7 +31,7 @@ export interface AccountCreateEvent {
 @Component({
   selector: 'app-account-type-carousel',
   standalone: true,
-  imports: [Icon, ActionButton],
+  imports: [Icon, ActionButton, TranslatePipe],
   template: `
     <div class="atc">
       <div class="atc__track" #track (scroll)="onScroll()">
@@ -31,11 +40,11 @@ export interface AccountCreateEvent {
             <span class="atc__icon" [style.color]="'var(' + t.colorVar + ')'" [style.background]="'color-mix(in srgb, var(' + t.colorVar + ') 14%, var(--mb-surface))'">
               <app-icon [name]="t.icon" [size]="26" />
             </span>
-            <h3>{{ t.label }}</h3>
-            <p class="atc__tagline">{{ t.tagline }}</p>
-            <span class="atc__rate" [style.color]="'var(' + t.colorVar + ')'">{{ t.rateLabel }}</span>
+            <h3>{{ label(t) }}</h3>
+            <p class="atc__tagline">{{ tagline(t) }}</p>
+            <span class="atc__rate" [style.color]="'var(' + t.colorVar + ')'">{{ rateLabel(t) }}</span>
             <ul class="atc__benefits">
-              @for (b of t.benefits; track b) {
+              @for (b of benefits(t); track b) {
                 <li><app-icon name="check" [size]="13" />{{ b }}</li>
               }
             </ul>
@@ -44,9 +53,9 @@ export interface AccountCreateEvent {
               <label class="atc__dropzone" [class.atc__dropzone--filled]="!!fileNames()[t.type]">
                 <input type="file" (change)="onFileSelected(t.type, $event)" accept=".pdf,.jpg,.jpeg,.png" />
                 <app-icon [name]="fileNames()[t.type] ? 'check' : 'download'" [size]="16" />
-                <span>{{ fileNames()[t.type] || 'Atașează document (PDF/imagine)' }}</span>
+                <span>{{ fileNames()[t.type] || ('accounts.attachDocument' | translate) }}</span>
               </label>
-              <p class="atc__document-hint">{{ t.documentHint }}</p>
+              <p class="atc__document-hint">{{ documentHint(t) }}</p>
             }
 
             <app-action-button
@@ -55,7 +64,7 @@ export interface AccountCreateEvent {
               [loading]="creatingType() === t.type"
               (pressed)="submit(t)"
             >
-              Deschide {{ t.label.toLowerCase() }}
+              {{ openCta(t) }}
             </app-action-button>
           </article>
         }
@@ -63,7 +72,7 @@ export interface AccountCreateEvent {
 
       @if (types().length > 1) {
         <div class="atc__nav">
-          <button type="button" class="atc__arrow" aria-label="Anterior" [disabled]="activeIndex() === 0" (click)="goTo(activeIndex() - 1)">
+          <button type="button" class="atc__arrow" [attr.aria-label]="'accounts.carouselPrev' | translate" [disabled]="activeIndex() === 0" (click)="goTo(activeIndex() - 1)">
             <span class="atc__arrow-icon atc__arrow-icon--prev"><app-icon name="chevron-right" [size]="16" /></span>
           </button>
           <div class="atc__dots">
@@ -72,12 +81,12 @@ export interface AccountCreateEvent {
                 type="button"
                 class="atc__dot"
                 [class.atc__dot--active]="activeIndex() === i"
-                [attr.aria-label]="'Vezi ' + t.label"
+                [attr.aria-label]="dotAriaLabel(t)"
                 (click)="goTo(i)"
               ></button>
             }
           </div>
-          <button type="button" class="atc__arrow" aria-label="Următorul" [disabled]="activeIndex() === types().length - 1" (click)="goTo(activeIndex() + 1)">
+          <button type="button" class="atc__arrow" [attr.aria-label]="'accounts.carouselNext' | translate" [disabled]="activeIndex() === types().length - 1" (click)="goTo(activeIndex() + 1)">
             <app-icon name="chevron-right" [size]="16" />
           </button>
         </div>
@@ -87,6 +96,8 @@ export interface AccountCreateEvent {
   styleUrl: './account-type-carousel.css',
 })
 export class AccountTypeCarousel {
+  private readonly language = inject(LanguageService);
+
   readonly types = input.required<AccountTypeMeta[]>();
   readonly creatingType = input<AccountType | null>(null);
   readonly create = output<AccountCreateEvent>();
@@ -95,6 +106,34 @@ export class AccountTypeCarousel {
   protected readonly activeIndex = signal(0);
   protected readonly fileNames = signal<Partial<Record<AccountType, string>>>({});
   private scrollTimeout?: ReturnType<typeof setTimeout>;
+
+  protected label(t: AccountTypeMeta): string {
+    return accountTypeLabel(t, this.language.language());
+  }
+
+  protected tagline(t: AccountTypeMeta): string {
+    return accountTypeTagline(t, this.language.language());
+  }
+
+  protected rateLabel(t: AccountTypeMeta): string {
+    return accountTypeRateLabel(t, this.language.language());
+  }
+
+  protected benefits(t: AccountTypeMeta): string[] {
+    return accountTypeBenefits(t, this.language.language());
+  }
+
+  protected documentHint(t: AccountTypeMeta): string | undefined {
+    return accountTypeDocumentHint(t, this.language.language());
+  }
+
+  protected openCta(t: AccountTypeMeta): string {
+    return `${this.language.t('accounts.openAccountTypeCta')} ${this.label(t).toLowerCase()}`;
+  }
+
+  protected dotAriaLabel(t: AccountTypeMeta): string {
+    return `${this.language.t('accounts.viewType')} ${this.label(t)}`;
+  }
 
   protected onFileSelected(type: AccountType, event: Event): void {
     const input = event.target as HTMLInputElement;

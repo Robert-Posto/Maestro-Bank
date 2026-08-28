@@ -63,8 +63,18 @@ async def client():
 def mock_notify(monkeypatch):
     calls = []
 
-    async def fake_notify(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
-        calls.append({"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id})
+    async def fake_notify(
+        user_id: str, kind: str, message_key: str, message_params: dict | None = None, reference_id: str | None = None
+    ) -> None:
+        calls.append(
+            {
+                "user_id": user_id,
+                "kind": kind,
+                "message_key": message_key,
+                "message_params": message_params,
+                "reference_id": reference_id,
+            }
+        )
 
     monkeypatch.setattr("app.service._notify_user", fake_notify)
     return calls

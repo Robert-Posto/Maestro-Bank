@@ -3,11 +3,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { AccountView, BankingService, PaymentRequestView, TransactionView } from '../../services/banking.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { Icon } from '../../shared/components/icon/icon';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
@@ -25,7 +27,7 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-pay-request',
   standalone: true,
-  imports: [RouterLink, PageHeader, ActionButton, Icon, EmptyState, MoneyPipe],
+  imports: [RouterLink, PageHeader, ActionButton, Icon, EmptyState, MoneyPipe, TranslatePipe],
   templateUrl: './pay-request.html',
   styleUrl: './pay-request.css',
 })
@@ -33,6 +35,7 @@ export class PayRequest implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly banking = inject(BankingService);
   private readonly toast = inject(ToastService);
+  private readonly language = inject(LanguageService);
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
@@ -85,7 +88,7 @@ export class PayRequest implements OnInit {
       next: (transaction) => {
         this.paying.set(false);
         this.paidTransaction.set(transaction);
-        this.toast.success('Plată efectuată cu succes.');
+        this.toast.success(this.language.t('payRequest.paymentSuccessToast'));
       },
       error: (err) => {
         this.paying.set(false);
@@ -103,11 +106,11 @@ export class PayRequest implements OnInit {
       next: (updated) => {
         this.cancelling.set(false);
         this.request.set(updated);
-        this.toast.success('Cerere de plată anulată.');
+        this.toast.success(this.language.t('payRequest.requestCancelledToast'));
       },
       error: (err) => {
         this.cancelling.set(false);
-        this.toast.error(extractErrorMessage(err, 'Anularea a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('payRequest.cancelError')));
       },
     });
   }
@@ -115,25 +118,25 @@ export class PayRequest implements OnInit {
   protected statusLabel(status: PaymentRequestView['status']): string {
     switch (status) {
       case 'open':
-        return 'Deschisă';
+        return this.language.t('payRequest.statusOpen');
       case 'paid':
-        return 'Plătită';
+        return this.language.t('payRequest.statusPaid');
       case 'cancelled':
-        return 'Anulată';
+        return this.language.t('payRequest.statusCancelled');
       case 'expired':
-        return 'Expirată';
+        return this.language.t('payRequest.statusExpired');
     }
   }
 
   private mapPayError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      if (err.status === 0) return 'Serviciul de transferuri este indisponibil momentan. Încearcă din nou.';
-      if (err.status === 409) return 'Această cerere de plată nu mai este activă (a fost plătită, anulată sau a expirat).';
+      if (err.status === 0) return this.language.t('payRequest.transferServiceUnavailable');
+      if (err.status === 409) return this.language.t('payRequest.requestNoLongerActive');
       if (err.status === 400) {
         const detail = err.error?.detail;
         if (typeof detail === 'string') return detail;
       }
     }
-    return 'Plata a eșuat. Verifică soldul și încearcă din nou.';
+    return this.language.t('payRequest.paymentFailedGeneric');
   }
 }

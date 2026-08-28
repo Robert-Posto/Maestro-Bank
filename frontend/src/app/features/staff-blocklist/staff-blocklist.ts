@@ -11,7 +11,9 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { Modal } from '../../shared/components/modal/modal';
 import { Icon } from '../../shared/components/icon/icon';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { LanguageService } from '../../services/language.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 /**
@@ -24,13 +26,14 @@ import { extractErrorMessage } from '../../shared/error-utils';
 @Component({
   selector: 'app-staff-blocklist',
   standalone: true,
-  imports: [DatePipe, FormsModule, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Modal, Icon],
+  imports: [DatePipe, FormsModule, PageHeader, StatusBadge, LoadingSkeleton, EmptyState, ActionButton, ConfirmDialog, Modal, Icon, TranslatePipe],
   templateUrl: './staff-blocklist.html',
   styleUrl: './staff-blocklist.css',
 })
 export class StaffBlocklist implements OnInit {
   private readonly staffApi = inject(StaffService);
   private readonly toast = inject(ToastService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -58,7 +61,7 @@ export class StaffBlocklist implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(extractErrorMessage(err, 'Nu am putut încărca lista de blocare.'));
+        this.error.set(extractErrorMessage(err, this.language.t('staffBlocklist.loadError')));
         this.loading.set(false);
       },
     });
@@ -79,7 +82,7 @@ export class StaffBlocklist implements OnInit {
   protected submitAdd(): void {
     const iban = this.ibanInput().trim();
     if (!iban) {
-      this.addError.set('IBAN-ul este obligatoriu.');
+      this.addError.set(this.language.t('staffBlocklist.ibanRequired'));
       return;
     }
 
@@ -90,11 +93,11 @@ export class StaffBlocklist implements OnInit {
         this.saving.set(false);
         this.addOpen.set(false);
         this.entries.update((list) => [entry, ...list.filter((e) => e.iban !== entry.iban)]);
-        this.toast.success(`${entry.iban} a fost adăugat pe lista de blocare.`);
+        this.toast.success(this.language.t('staffBlocklist.addedToast').replace('{iban}', entry.iban));
       },
       error: (err) => {
         this.saving.set(false);
-        this.addError.set(extractErrorMessage(err, 'Nu am putut adăuga IBAN-ul pe listă.'));
+        this.addError.set(extractErrorMessage(err, this.language.t('staffBlocklist.addError')));
       },
     });
   }
@@ -118,16 +121,16 @@ export class StaffBlocklist implements OnInit {
         this.removing.set(false);
         this.pendingRemoval.set(null);
         this.entries.update((list) => list.filter((e) => e.id !== entry.id));
-        this.toast.success(`${entry.iban} a fost scos de pe lista de blocare.`);
+        this.toast.success(this.language.t('staffBlocklist.removedToast').replace('{iban}', entry.iban));
       },
       error: (err) => {
         this.removing.set(false);
-        this.toast.error(extractErrorMessage(err, 'Nu am putut elimina intrarea.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('staffBlocklist.removeError')));
       },
     });
   }
 
   protected sourceLabel(entry: BlocklistEntryView): string {
-    return entry.source === 'confirmed_fraud_review' ? 'Automat — fraudă confirmată' : 'Manual';
+    return this.language.t(entry.source === 'confirmed_fraud_review' ? 'staffBlocklist.sourceAuto' : 'staffBlocklist.sourceManual');
   }
 }

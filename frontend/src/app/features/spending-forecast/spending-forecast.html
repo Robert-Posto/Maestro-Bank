@@ -1,20 +1,20 @@
-<app-page-header title="Spending & Forecast" subtitle="Analiză determinist calculată din tranzacțiile tale — fără AI." />
+<app-page-header title="Spending & Forecast" [subtitle]="'forecast.subtitle' | translate" />
 
 @if (loading()) {
   <app-loading-skeleton [rows]="4" [height]="90" />
 } @else if (error()) {
-  <app-empty-state icon="info" title="Nu am putut încărca analiza" [description]="error()!" />
+  <app-empty-state icon="info" [title]="'forecast.loadErrorTitle' | translate" [description]="error()!" />
 } @else {
   <div class="sf-stats">
-    <app-stat-card [flush]="true" label="Cheltuieli luna aceasta" [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')" icon="arrow-up-right" iconTone="red" />
-    <app-stat-card [flush]="true" label="Medie zilnică cheltuită" [value]="(spending()?.average_daily_spending_minor ?? 0 | money: 'RON')" icon="spending" iconTone="blue" />
+    <app-stat-card [flush]="true" [label]="'forecast.spendingThisMonth' | translate" [value]="(spending()?.total_spent_minor ?? 0 | money: 'RON')" icon="arrow-up-right" iconTone="red" />
+    <app-stat-card [flush]="true" [label]="'forecast.dailyAverage' | translate" [value]="(spending()?.average_daily_spending_minor ?? 0 | money: 'RON')" icon="spending" iconTone="blue" />
   </div>
 
   <div class="sf-grid">
     <section class="sf-panel">
-      <h2>Cheltuieli pe categorie</h2>
+      <h2>{{ 'forecast.byCategory' | translate }}</h2>
       @if (categoryBars().length === 0) {
-        <app-empty-state icon="budgets" title="Nicio cheltuială luna aceasta" />
+        <app-empty-state icon="budgets" [title]="'forecast.noSpendingThisMonth' | translate" />
       } @else {
         <div class="sf-bars">
           @for (bar of categoryBars(); track bar.category) {
@@ -31,49 +31,49 @@
     </section>
 
     <section class="sf-panel">
-      <h2>Cash-flow — ultimele {{ cashFlow()?.period_days ?? 30 }} zile</h2>
+      <h2>{{ 'forecast.cashFlowPrefix' | translate }} {{ cashFlow()?.period_days ?? 30 }} {{ 'forecast.days' | translate }}</h2>
       @if (cashFlowPoints().length === 0) {
-        <app-empty-state icon="spending" title="Fără date suficiente" />
+        <app-empty-state icon="spending" [title]="'forecast.notEnoughData' | translate" />
       } @else {
-        <svg class="sf-chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-label="Grafic cash-flow net pe zi">
+        <svg class="sf-chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" [attr.aria-label]="'forecast.chartAriaLabel' | translate">
           <line x1="0" [attr.y1]="zeroLineY()" x2="600" [attr.y2]="zeroLineY()" class="sf-chart__zero-line" />
           <path [attr.d]="cashFlowAreaPath()" class="sf-chart__area" />
           <path [attr.d]="cashFlowPath()" class="sf-chart__line" />
           @for (p of cashFlowPoints(); track p.date) {
             <circle [attr.cx]="p.x" [attr.cy]="p.y" r="2.5" class="sf-chart__point">
-              <title>{{ p.date }}: {{ p.netMinor / 100 | number: '1.2-2' }} lei</title>
+              <title>{{ p.date }}: {{ p.netMinor / 100 | number: '1.2-2' }} {{ 'forecast.leiUnit' | translate }}</title>
             </circle>
           }
         </svg>
-        <p class="sf-chart__caption">Flux net zilnic (încasări − plăți). Punctele deasupra liniei punctate = zi pozitivă.</p>
+        <p class="sf-chart__caption">{{ 'forecast.dailyNetFlowCaption' | translate }}</p>
       }
     </section>
   </div>
 
   <section class="sf-panel sf-forecast" id="forecast">
-    <h2>Forecast lunar</h2>
+    <h2>{{ 'forecast.monthlyForecast' | translate }}</h2>
     <div class="sf-forecast-grid">
       <div>
-        <span>Sold curent</span>
+        <span>{{ 'forecast.currentBalance' | translate }}</span>
         <strong>{{ forecast()?.current_balance_minor ?? 0 | money: 'RON' }}</strong>
       </div>
       <div>
-        <span>Cheltuieli estimate</span>
+        <span>{{ 'forecast.estimatedExpenses' | translate }}</span>
         <strong class="sf-forecast-negative">-{{ forecast()?.expected_expenses_minor ?? 0 | money: 'RON' }}</strong>
       </div>
       <div>
-        <span>Zile rămase în lună</span>
+        <span>{{ 'forecast.daysRemainingInMonth' | translate }}</span>
         <strong>{{ forecast()?.days_remaining_in_month ?? 0 }}</strong>
       </div>
       <div class="sf-forecast-grid__highlight">
-        <span>Sold estimat la final de lună</span>
+        <span>{{ 'forecast.estimatedEndOfMonthBalance' | translate }}</span>
         <strong>{{ forecast()?.estimated_end_of_month_balance_minor ?? 0 | money: 'RON' }}</strong>
       </div>
     </div>
 
     @if (forecast()?.upcoming_obligations?.length) {
       <div class="sf-obligations">
-        <h3>Obligații viitoare</h3>
+        <h3>{{ 'forecast.upcomingObligations' | translate }}</h3>
         @for (o of forecast()!.upcoming_obligations; track o.name) {
           <div class="sf-obligation-row">
             <span>{{ o.name }}</span>

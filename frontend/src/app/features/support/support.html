@@ -1,20 +1,20 @@
 <div class="support-page">
-<app-page-header [title]="pageTitle()" subtitle="Întreabă orice — te trimitem automat la răspunsul potrivit." />
+<app-page-header [title]="pageTitle()" [subtitle]="'support.subtitle' | translate" />
 
 <div class="support-layout">
-  <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" aria-label="Chat cu Asistentul MaestroBank">
+  <section class="support-chat" [class.support-chat--empty]="chatMessages().length === 0" [attr.aria-label]="'support.chatAriaLabel' | translate">
     <header class="support-chat__bar">
       <div class="support-chat__identity">
         <span class="support-chat__identity-avatar"><app-icon [name]="identityIcon()" [size]="17" /></span>
         <div class="support-chat__identity-text">
           @if (isConfirmedSupport()) {
             <strong class="support-chat__identity-breadcrumb">
-              <span>Asistent</span>
+              <span>{{ 'nav.assistant' | translate }}</span>
               <app-icon name="chevron-right" [size]="12" />
-              <span>Support Agent</span>
+              <span>{{ 'support.agentName' | translate }}</span>
             </strong>
           } @else {
-            <strong>Asistent MaestroBank</strong>
+            <strong>{{ 'support.assistantName' | translate }}</strong>
           }
           <span>{{ identitySubtitle() }}</span>
         </div>
@@ -25,11 +25,11 @@
           <button
             type="button"
             class="support-chat__back-btn"
-            title="Pornește o conversație nouă"
+            [title]="'support.changeQuestionTitle' | translate"
             (click)="startNewConversation()"
           >
             <app-icon name="chevron-left" [size]="14" />
-            <span>Pune altă întrebare</span>
+            <span>{{ 'support.changeQuestion' | translate }}</span>
           </button>
         }
 
@@ -47,10 +47,10 @@
           @if (conversationsMenuOpen()) {
             <div class="support-chat__conversations-menu">
               <button type="button" class="support-conversations__new" (click)="startNewConversation()">
-                <app-icon name="plus" [size]="14" /> Conversație nouă
+                <app-icon name="plus" [size]="14" /> {{ 'support.newConversation' | translate }}
               </button>
               @if (conversations().length === 0) {
-                <p class="support-conversations__empty">Nicio conversație salvată încă.</p>
+                <p class="support-conversations__empty">{{ 'support.noConversationsSaved' | translate }}</p>
               } @else {
                 <div class="support-conversations__list">
                   @for (conversation of conversations(); track conversation.id) {
@@ -62,7 +62,11 @@
                     >
                       <span class="support-conversations__item-title">{{ conversation.title }}</span>
                       <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-                      <span class="support-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                      <span
+                        class="support-conversations__item-delete"
+                        [attr.aria-label]="'support.deleteConversation' | translate"
+                        (click)="deleteConversation($event, conversation.id)"
+                      >
                         <app-icon name="trash" [size]="13" />
                       </span>
                     </button>
@@ -79,14 +83,11 @@
       @if (chatMessages().length === 0) {
         <div class="support-chat__welcome">
           <div class="support-chat__welcome-icon"><app-icon name="support" [size]="26" /></div>
-          <span class="support-chat__welcome-eyebrow">Asistent MaestroBank</span>
-          <h2>Cu ce te pot ajuta?</h2>
-          <p>
-            Întreabă orice — cont, card, tranzacții, tichete, sau chiar buget și cheltuieli. Dacă întrebarea ține de
-            fapt de MaestroAgent, te trimit automat acolo.
-          </p>
+          <span class="support-chat__welcome-eyebrow">{{ 'support.assistantName' | translate }}</span>
+          <h2>{{ 'support.welcomeTitle' | translate }}</h2>
+          <p>{{ 'support.welcomeDescription' | translate }}</p>
           <div class="support-chat__welcome-suggestions">
-            @for (item of faqItems; track item.q) {
+            @for (item of faqItems(); track item.q) {
               <button type="button" class="support-chat__suggestion-chip" (click)="askSuggested(item)">
                 <span>{{ item.q }}</span><app-icon name="chevron-right" [size]="16" />
               </button>
@@ -102,7 +103,7 @@
           }
           <div class="support-chat__message-col">
             @if (chatMessage.role === 'support') {
-              <span class="support-chat__message-name">Support Agent <span class="support-chat__message-time">{{ chatMessage.time }}</span></span>
+              <span class="support-chat__message-name">{{ 'support.agentName' | translate }} <span class="support-chat__message-time">{{ chatMessage.time }}</span></span>
             }
 
             @if (chatMessage.role === 'user') {
@@ -119,7 +120,7 @@
                   (click)="toggleSpeak(chatMessage)"
                 >
                   <app-icon [name]="speech.speakingMessageId() === chatMessage.id ? 'stop' : 'volume'" [size]="13" />
-                  {{ speech.speakingMessageId() === chatMessage.id ? 'Oprește' : 'Ascultă' }}
+                  {{ (speech.speakingMessageId() === chatMessage.id ? 'support.stop' : 'support.listen') | translate }}
                 </button>
               }
 
@@ -157,7 +158,7 @@
               @if (chatMessage.context?.card; as card) {
                 <div class="support-chat__context-card-status">
                   <div class="support-chat__context-card-status-header">
-                    <span>Card •••• {{ card.last_four }}</span>
+                    <span>{{ 'support.cardLabel' | translate }} •••• {{ card.last_four }}</span>
                     <app-status-badge [status]="card.is_frozen ? 'frozen' : card.status" />
                   </div>
                   <div class="support-chat__context-card-features">
@@ -182,7 +183,7 @@
               }
 
               @if (chatMessage.recommendedActions; as actions) {
-                <div class="support-chat__recommended-actions" role="group" aria-label="Acțiuni recomandate">
+                <div class="support-chat__recommended-actions" role="group" [attr.aria-label]="'support.recommendedActionsAriaLabel' | translate">
                   @for (action of actions; track action.label) {
                     <button type="button" class="support-chat__recommended-action" [disabled]="supportTyping()" (click)="runRecommendedAction(action)">
                       {{ action.label }}
@@ -202,13 +203,13 @@
         <div class="support-chat__message-row">
           <span class="support-chat__message-avatar"><app-icon name="support" [size]="16" /></span>
           <div class="support-chat__message-col">
-            <span class="support-chat__message-name">Support Agent</span>
-            <div class="support-chat__thinking" aria-label="Support Agent analizează cererea ta...">
+            <span class="support-chat__message-name">{{ 'support.agentName' | translate }}</span>
+            <div class="support-chat__thinking" [attr.aria-label]="'support.typingAriaLabel' | translate">
               <span class="support-chat__thinking-word">{{ thinkingWord() }}</span>
               <span class="support-chat__thinking-dots"><span></span><span></span><span></span></span>
             </div>
             @if (supportTypingSlow()) {
-              <span class="support-chat__slow-hint">Verific contul, cardurile sau tranzacțiile tale — mai durează puțin.</span>
+              <span class="support-chat__slow-hint">{{ 'support.slowHint' | translate }}</span>
             }
           </div>
         </div>
@@ -216,8 +217,8 @@
     </div>
 
     @if (chatMessages().length > 0) {
-      <div class="support-chat__quick-replies" role="group" aria-label="Întrebări rapide">
-        @for (item of faqItems; track item.q) {
+      <div class="support-chat__quick-replies" role="group" [attr.aria-label]="'support.quickRepliesAriaLabel' | translate">
+        @for (item of faqItems(); track item.q) {
           <button type="button" class="support-chat__quick-reply" [disabled]="supportTyping()" (click)="askSuggested(item)">{{ item.q }}</button>
         }
       </div>
@@ -229,7 +230,7 @@
           type="button"
           class="support-chat__mic-btn"
           [class.support-chat__mic-btn--active]="speech.listening()"
-          [attr.aria-label]="speech.listening() ? 'Oprește ascultarea' : 'Vorbește mesajul'"
+          [attr.aria-label]="(speech.listening() ? 'support.micStop' : 'support.micStart') | translate"
           [disabled]="supportTyping()"
           (click)="toggleListening()"
         >
@@ -240,43 +241,43 @@
         type="text"
         name="chatMessage"
         autocomplete="off"
-        aria-label="Mesaj pentru Asistentul MaestroBank"
-        [placeholder]="speech.listening() ? 'Te ascult...' : 'Scrie mesajul tău...'"
+        [attr.aria-label]="'support.inputAriaLabel' | translate"
+        [placeholder]="(speech.listening() ? 'support.listeningPlaceholder' : 'support.inputPlaceholder') | translate"
         [ngModel]="chatInput()"
         (ngModelChange)="chatInput.set($event)"
         [disabled]="supportTyping()"
       />
-      <button type="submit" [disabled]="!chatInput().trim() || supportTyping()" aria-label="Trimite mesajul">
+      <button type="submit" [disabled]="!chatInput().trim() || supportTyping()" [attr.aria-label]="'support.send' | translate">
         <app-icon name="send" [size]="19" />
       </button>
     </form>
-    <p class="support-chat__notice">Răspunsurile AI sunt generate automat și pot conține greșeli. Nu trimite parole, PIN-uri sau date complete ale cardului.</p>
+    <p class="support-chat__notice">{{ 'support.notice' | translate }}</p>
   </section>
 </div>
 </div>
 
 @if (modalOpen()) {
-  <app-modal title="Solicitare nouă" (closed)="modalOpen.set(false)">
+  <app-modal [title]="'support.newRequestTitle' | translate" (closed)="modalOpen.set(false)">
     <div class="support-form">
       <label>
-        <span>Categorie</span>
+        <span>{{ 'common.category' | translate }}</span>
         <select [ngModel]="category()" (ngModelChange)="category.set($event)">
-          <option value="card">Card</option>
-          <option value="transfer">Transfer</option>
-          <option value="account">Cont</option>
-          <option value="technical">Tehnic</option>
-          <option value="other">Altele</option>
+          <option value="card">{{ 'support.categoryCard' | translate }}</option>
+          <option value="transfer">{{ 'support.categoryTransfer' | translate }}</option>
+          <option value="account">{{ 'support.categoryAccount' | translate }}</option>
+          <option value="technical">{{ 'support.categoryTechnical' | translate }}</option>
+          <option value="other">{{ 'support.categoryOther' | translate }}</option>
         </select>
       </label>
       <label>
-        <span>Subiect</span>
-        <input type="text" placeholder="Ex: Cardul nu funcționează" [ngModel]="subject()" (ngModelChange)="subject.set($event)" />
+        <span>{{ 'support.subjectLabel' | translate }}</span>
+        <input type="text" [placeholder]="'support.subjectPlaceholder' | translate" [ngModel]="subject()" (ngModelChange)="subject.set($event)" />
       </label>
       <label>
-        <span>Mesaj</span>
-        <textarea rows="4" placeholder="Descrie problema ta..." [ngModel]="message()" (ngModelChange)="message.set($event)"></textarea>
+        <span>{{ 'support.messageLabel' | translate }}</span>
+        <textarea rows="4" [placeholder]="'support.messagePlaceholder' | translate" [ngModel]="message()" (ngModelChange)="message.set($event)"></textarea>
       </label>
-      <app-action-button [fullWidth]="true" [loading]="saving()" (pressed)="submitTicket()">Trimite solicitarea</app-action-button>
+      <app-action-button [fullWidth]="true" [loading]="saving()" (pressed)="submitTicket()">{{ 'support.submitRequest' | translate }}</app-action-button>
     </div>
   </app-modal>
 }

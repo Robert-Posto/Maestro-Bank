@@ -2,9 +2,12 @@ import { Component, OnDestroy, ElementRef, inject, signal, viewChild } from '@an
 import { Router } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
+import { LanguageService } from '../../../services/language.service';
 import { VerificationService } from '../../../services/verification.service';
+import { AuthLanguageToggle } from '../../../shared/components/auth-language-toggle/auth-language-toggle';
 import { Icon } from '../../../shared/components/icon/icon';
 import { extractErrorMessage } from '../../../shared/error-utils';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 /** Pasul 2/3 din onboarding — poză buletin + selfie live, comparate de
  * verification-service (DeepFace). Camera se pornește DOAR la cerere
@@ -12,7 +15,7 @@ import { extractErrorMessage } from '../../../shared/error-utils';
 @Component({
   selector: 'app-verify-identity',
   standalone: true,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe, AuthLanguageToggle],
   templateUrl: './verify-identity.html',
   styleUrl: './verify-identity.css',
 })
@@ -20,6 +23,7 @@ export class VerifyIdentity implements OnDestroy {
   private readonly verificationApi = inject(VerificationService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly language = inject(LanguageService);
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
@@ -69,7 +73,7 @@ export class VerifyIdentity implements OnDestroy {
       this.cameraStream.set(this.mediaStream);
       this.cameraActive.set(true);
     } catch {
-      this.cameraError.set('Nu am putut accesa camera. Verifică permisiunile browserului.');
+      this.cameraError.set(this.language.t('auth.verifyIdentity.cameraDenied'));
     }
   }
 
@@ -108,7 +112,7 @@ export class VerifyIdentity implements OnDestroy {
     const idDocument = this.idDocumentFile();
     const selfie = this.selfieBlob();
     if (!idDocument || !selfie) {
-      this.error.set('Adaugă atât poza buletinului, cât și un selfie.');
+      this.error.set(this.language.t('auth.verifyIdentity.missingFiles'));
       return;
     }
 
@@ -134,7 +138,7 @@ export class VerifyIdentity implements OnDestroy {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(extractErrorMessage(err, 'Verificarea a eșuat. Încearcă din nou.'));
+        this.error.set(extractErrorMessage(err, this.language.t('auth.verifyIdentity.failed')));
       },
     });
   }
