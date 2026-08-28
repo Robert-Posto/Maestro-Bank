@@ -1,11 +1,28 @@
 <app-page-header title="Puncte & Recompense" subtitle="Câștigi puncte la plățile către comercianți, le răscumperi pentru cashback sau le pariezi la roata norocului." />
 
+<section class="points-section" id="how-points-work">
+  <h2>Cum funcționează, pas cu pas</h2>
+  <p class="points-section__subtitle">Glisează stânga-dreapta prin cărți — de la o cumpărătură la cashback în cont.</p>
+  <app-swipe-card-deck [cards]="howPointsWorkCards" />
+</section>
+
+@if (!welcomeBonusLoading() && !welcomeBonusClaimed()) {
+  <div class="welcome-bonus-banner">
+    <span class="welcome-bonus-banner__icon"><app-icon name="gift" [size]="22" /></span>
+    <div class="welcome-bonus-banner__text">
+      <p class="welcome-bonus-banner__title">Ai {{ welcomeBonusPoints() | number }} puncte de bun-venit, nerevendicate</p>
+      <p class="welcome-bonus-banner__subtitle">Le poți folosi imediat pentru prima ta recompensă.</p>
+    </div>
+    <app-action-button [loading]="claimingWelcomeBonus()" (pressed)="claimWelcomeBonus()">Revendică</app-action-button>
+  </div>
+}
+
 <div class="points-balance-card">
   <span class="points-balance-card__label">Sold puncte</span>
   @if (balanceLoading()) {
     <app-loading-skeleton [rows]="1" [height]="40" />
   } @else {
-    <strong class="points-balance-card__value">{{ balance() | number }}</strong>
+    <strong class="points-balance-card__value">{{ displayedBalance() | number }}</strong>
   }
   <p class="points-balance-card__hint">
     Câștigi puncte doar la plăți către comercianți (nu la transferuri către alți useri MaestroBank) — vezi ratele pe categorie mai jos.

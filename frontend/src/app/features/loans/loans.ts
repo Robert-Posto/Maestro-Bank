@@ -5,11 +5,11 @@ import { FormsModule } from '@angular/forms';
 import { LoanPaymentView, LoanRateView, LoanTermMonths, LoanView, LoansService } from '../../services/loans.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
-import { Icon } from '../../shared/components/icon/icon';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Modal } from '../../shared/components/modal/modal';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
+import { SwipeCardDeck, SwipeDeckCard } from '../../shared/components/swipe-card-deck/swipe-card-deck';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
@@ -18,18 +18,10 @@ const TERM_OPTIONS: LoanTermMonths[] = [12, 24, 36, 60];
 const MIN_AMOUNT_RON = 1000;
 const MAX_AMOUNT_RON = 50_000;
 
-interface HowItWorksCard {
-  kind: 'cover' | 'step' | 'benefit';
-  icon?: string;
-  step?: number;
-  title: string;
-  text: string;
-}
-
-/** Cartea de explicații — "Cum funcționează" — glisabilă (vezi
- * card-deck din loans.html/css). Pasul cu pasul + de ce MaestroBank,
- * o singură idee pe card, ca un onboarding real, nu un perete de text. */
-const HOW_IT_WORKS_CARDS: HowItWorksCard[] = [
+/** Cartea de explicații — "Cum funcționează" — vezi app-swipe-card-deck.
+ * Pas cu pas + de ce MaestroBank, o singură idee pe card, ca un onboarding
+ * real, nu un perete de text. */
+const HOW_IT_WORKS_CARDS: SwipeDeckCard[] = [
   {
     kind: 'cover',
     title: 'Cum funcționează un credit MaestroBank',
@@ -39,7 +31,7 @@ const HOW_IT_WORKS_CARDS: HowItWorksCard[] = [
     kind: 'step',
     step: 1,
     title: 'Alegi suma și termenul',
-    text: 'Simulatorul de mai sus îți arată rata exactă înainte să aplici — fără surprize.',
+    text: 'Simulatorul de mai jos îți arată rata exactă înainte să aplici — fără surprize.',
   },
   {
     kind: 'step',
@@ -99,7 +91,19 @@ const HOW_IT_WORKS_CARDS: HowItWorksCard[] = [
 @Component({
   selector: 'app-loans',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, PageHeader, ActionButton, Icon, LoadingSkeleton, EmptyState, Modal, StatusBadge, MoneyPipe],
+  imports: [
+    FormsModule,
+    DatePipe,
+    DecimalPipe,
+    PageHeader,
+    ActionButton,
+    LoadingSkeleton,
+    EmptyState,
+    Modal,
+    StatusBadge,
+    SwipeCardDeck,
+    MoneyPipe,
+  ],
   templateUrl: './loans.html',
   styleUrl: './loans.css',
 })
@@ -110,6 +114,7 @@ export class Loans implements OnInit, OnDestroy {
   protected readonly termOptions = TERM_OPTIONS;
   protected readonly minAmountRon = MIN_AMOUNT_RON;
   protected readonly maxAmountRon = MAX_AMOUNT_RON;
+  protected readonly howItWorksCards = HOW_IT_WORKS_CARDS;
 
   protected readonly rates = signal<LoanRateView[]>([]);
   protected readonly ratesLoading = signal(true);
@@ -131,17 +136,6 @@ export class Loans implements OnInit, OnDestroy {
   /** Numărul afișat efectiv — animat spre `calculatorInstallmentMinor()` la
    * fiecare schimbare, ca rezultatul să "prindă viață" în loc să sară brusc. */
   protected readonly displayedInstallmentMinor = signal(0);
-
-  protected readonly howItWorksCards = HOW_IT_WORKS_CARDS;
-  protected readonly activeCardIndex = signal(0);
-  protected readonly dragOffsetPx = signal(0);
-  protected readonly isDragging = signal(false);
-  protected readonly trackTransform = computed(
-    () => `translateX(calc(${-this.activeCardIndex() * 100}% + ${this.dragOffsetPx()}px))`,
-  );
-
-  private dragStartX = 0;
-  private dragPointerId: number | null = null;
 
   private animationFrameId: number | null = null;
   private readonly prefersReducedMotion =
@@ -229,46 +223,6 @@ export class Loans implements OnInit, OnDestroy {
 
   protected setCalculatorAmount(value: number): void {
     this.calculatorAmountRon.set(Math.min(this.maxAmountRon, Math.max(this.minAmountRon, value || this.minAmountRon)));
-  }
-
-  // --- Cartea "Cum funcționează" — swipe stânga/dreapta -----------------------------
-
-  protected nextCard(): void {
-    this.activeCardIndex.update((i) => (i + 1) % this.howItWorksCards.length);
-  }
-
-  protected prevCard(): void {
-    this.activeCardIndex.update((i) => (i - 1 + this.howItWorksCards.length) % this.howItWorksCards.length);
-  }
-
-  protected goToCard(index: number): void {
-    this.activeCardIndex.set(index);
-  }
-
-  protected onCardPointerDown(event: PointerEvent): void {
-    this.isDragging.set(true);
-    this.dragStartX = event.clientX;
-    this.dragPointerId = event.pointerId;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  }
-
-  protected onCardPointerMove(event: PointerEvent): void {
-    if (!this.isDragging() || event.pointerId !== this.dragPointerId) return;
-    this.dragOffsetPx.set(event.clientX - this.dragStartX);
-  }
-
-  protected onCardPointerUp(): void {
-    if (!this.isDragging()) return;
-    const offset = this.dragOffsetPx();
-    const threshold = 60;
-    if (offset < -threshold) {
-      this.nextCard();
-    } else if (offset > threshold) {
-      this.prevCard();
-    }
-    this.isDragging.set(false);
-    this.dragOffsetPx.set(0);
-    this.dragPointerId = null;
   }
 
   protected scrollToCalculator(): void {

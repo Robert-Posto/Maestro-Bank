@@ -10,7 +10,7 @@ export interface BalanceView {
 
 export interface LedgerEntryView {
   id: string;
-  entry_type: 'earn' | 'redeem' | 'wager' | 'wheel_win';
+  entry_type: 'earn' | 'redeem' | 'wager' | 'wheel_win' | 'welcome_bonus';
   points_delta: number;
   created_at: string;
   category: string | null;
@@ -51,6 +51,16 @@ export interface WheelSpinResultView {
   new_balance: number;
   ron_credited_minor: number | null;
   spin_id: string;
+}
+
+export interface WelcomeBonusStatusView {
+  claimed: boolean;
+  bonus_points: number;
+}
+
+export interface ClaimWelcomeBonusResultView {
+  new_balance: number;
+  points_awarded: number;
 }
 
 /**
@@ -94,5 +104,13 @@ export class PointsService {
 
   spin(wageredPoints: number): Observable<WheelSpinResultView> {
     return this.http.post<WheelSpinResultView>(`${API_BASE_URL}/points/wheel/spin`, { wagered_points: wageredPoints });
+  }
+
+  getWelcomeBonusStatus(): Observable<WelcomeBonusStatusView> {
+    return this.http.get<WelcomeBonusStatusView>(`${API_BASE_URL}/points/welcome-bonus/status`);
+  }
+
+  claimWelcomeBonus(): Observable<ClaimWelcomeBonusResultView> {
+    return this.http.post<ClaimWelcomeBonusResultView>(`${API_BASE_URL}/points/welcome-bonus/claim`, {});
   }
 }

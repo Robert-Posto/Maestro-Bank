@@ -11,6 +11,8 @@ Extern (prin Gateway) acestea devin:
   POST /api/points/rewards/{id}/redeem
   GET  /api/points/wheel/segments
   POST /api/points/wheel/spin
+  GET  /api/points/welcome-bonus/status
+  POST /api/points/welcome-bonus/claim
 """
 
 from fastapi import APIRouter, Query
@@ -18,10 +20,12 @@ from fastapi import APIRouter, Query
 from app import service
 from app.models import (
     BalanceOut,
+    ClaimWelcomeBonusOut,
     EarnRateOut,
     LedgerEntryOut,
     RedeemRewardOut,
     RewardOut,
+    WelcomeBonusStatusOut,
     WheelSegmentOut,
     WheelSpinOut,
     WheelSpinRequest,
@@ -66,3 +70,13 @@ async def get_wheel_segments(user_id: str = CurrentUserId):
 @router.post("/wheel/spin", response_model=WheelSpinOut)
 async def spin_wheel_route(payload: WheelSpinRequest, user_id: str = CurrentUserId):
     return await service.spin_wheel(user_id, payload.wagered_points)
+
+
+@router.get("/welcome-bonus/status", response_model=WelcomeBonusStatusOut)
+async def get_welcome_bonus_status(user_id: str = CurrentUserId):
+    return await service.get_welcome_bonus_status(user_id)
+
+
+@router.post("/welcome-bonus/claim", response_model=ClaimWelcomeBonusOut)
+async def claim_welcome_bonus_route(user_id: str = CurrentUserId):
+    return await service.claim_welcome_bonus(user_id)

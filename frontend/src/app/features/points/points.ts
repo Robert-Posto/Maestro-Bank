@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -11,13 +11,73 @@ import {
 } from '../../services/points.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
+import { Icon } from '../../shared/components/icon/icon';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Modal } from '../../shared/components/modal/modal';
+import { SwipeCardDeck, SwipeDeckCard } from '../../shared/components/swipe-card-deck/swipe-card-deck';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { TRANSACTION_CATEGORIES, categoryLabel, categoryColorVar } from '../../shared/categories';
+
+/** Cartea de explicații — "Cum funcționează Punctele" — vezi
+ * app-swipe-card-deck (aceeași componentă ca la Credite). */
+const HOW_POINTS_WORK_CARDS: SwipeDeckCard[] = [
+  {
+    kind: 'cover',
+    title: 'Cum funcționează Punctele MaestroBank',
+    text: 'Câștigi, răscumperi sau riști la roată — pe scurt, glisează pentru următorul pas.',
+  },
+  {
+    kind: 'step',
+    step: 1,
+    title: 'Cumperi de la un comerciant',
+    text: 'Orice plată către un cont care nu e al altui user MaestroBank îți dă puncte, ca procent din sumă.',
+  },
+  {
+    kind: 'step',
+    step: 2,
+    title: 'Rata diferă pe categorie',
+    text: 'Vezi tabelul de mai jos — de la 0,5% la facturi, până la 3% la restaurante și shopping.',
+  },
+  {
+    kind: 'step',
+    step: 3,
+    title: 'Le răscumperi pentru cashback',
+    text: 'Alegi o recompensă din catalog — banii intră direct în contul tău curent, nu un voucher simulat.',
+  },
+  {
+    kind: 'step',
+    step: 4,
+    title: 'Sau le riști la roată',
+    text: 'Pariezi puncte pe o învârtire — mai multe puncte pariate, șanse mai bune la premii mai bune.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'gift',
+    title: '500 de puncte de bun-venit',
+    text: 'Primești un bonus doar pentru că ești client MaestroBank — revendică-l mai sus, dacă n-ai făcut-o încă.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'unlock',
+    title: 'Fără puncte pe transferuri',
+    text: 'Doar cumpărăturile reale la comercianți dau puncte — nu și banii trimiși prietenilor.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'banknote',
+    title: 'Cashback real',
+    text: 'Fiecare recompensă înseamnă bani adevărați în cont, creditați instant.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'check',
+    title: 'Roata e corectă',
+    text: 'Rezultatul se decide pe server ÎNAINTE să vezi roata învârtindu-se — nu poate fi manipulat din browser.',
+  },
+];
 
 /**
  * Puncte de loialitate — câștigate ca procent din plățile către comercianți
@@ -32,20 +92,41 @@ import { TRANSACTION_CATEGORIES, categoryLabel, categoryColorVar } from '../../s
 @Component({
   selector: 'app-points',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, PageHeader, ActionButton, LoadingSkeleton, EmptyState, Modal, MoneyPipe],
+  imports: [
+    FormsModule,
+    DecimalPipe,
+    PageHeader,
+    ActionButton,
+    Icon,
+    LoadingSkeleton,
+    EmptyState,
+    Modal,
+    SwipeCardDeck,
+    MoneyPipe,
+  ],
   templateUrl: './points.html',
   styleUrl: './points.css',
 })
-export class Points implements OnInit {
+export class Points implements OnInit, OnDestroy {
   private readonly pointsApi = inject(PointsService);
   private readonly toast = inject(ToastService);
 
   protected readonly categories = TRANSACTION_CATEGORIES;
   protected categoryLabel = categoryLabel;
   protected categoryColorVar = categoryColorVar;
+  protected readonly howPointsWorkCards = HOW_POINTS_WORK_CARDS;
 
   protected readonly balance = signal(0);
   protected readonly balanceLoading = signal(true);
+  /** Soldul afișat efectiv — animat spre `balance()` la fiecare schimbare
+   * (bonus revendicat, răscumpărare, spin), ca la rata din simulatorul de
+   * Credite — numărul "prinde viață" în loc să sară brusc. */
+  protected readonly displayedBalance = signal(0);
+
+  protected readonly welcomeBonusClaimed = signal(true);
+  protected readonly welcomeBonusPoints = signal(0);
+  protected readonly welcomeBonusLoading = signal(true);
+  protected readonly claimingWelcomeBonus = signal(false);
 
   protected readonly earnRates = signal<EarnRateView[]>([]);
   protected readonly earnRatesLoading = signal(true);
@@ -70,11 +151,44 @@ export class Points implements OnInit {
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
 
+  private balanceAnimationFrameId: number | null = null;
+
+  constructor() {
+    effect(() => this.animateBalanceTo(this.balance()));
+  }
+
   ngOnInit(): void {
     this.loadBalance();
     this.loadEarnRates();
     this.loadRewards();
     this.loadWheelSegments();
+    this.loadWelcomeBonusStatus();
+  }
+
+  ngOnDestroy(): void {
+    if (this.balanceAnimationFrameId !== null) cancelAnimationFrame(this.balanceAnimationFrameId);
+  }
+
+  private animateBalanceTo(target: number): void {
+    if (this.balanceAnimationFrameId !== null) cancelAnimationFrame(this.balanceAnimationFrameId);
+    if (this.prefersReducedMotion()) {
+      this.displayedBalance.set(target);
+      return;
+    }
+    const start = this.displayedBalance();
+    const startTime = performance.now();
+    const duration = 400;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this.displayedBalance.set(Math.round(start + (target - start) * eased));
+      if (t < 1) {
+        this.balanceAnimationFrameId = requestAnimationFrame(step);
+      } else {
+        this.balanceAnimationFrameId = null;
+      }
+    };
+    this.balanceAnimationFrameId = requestAnimationFrame(step);
   }
 
   private loadBalance(): void {
@@ -125,6 +239,39 @@ export class Points implements OnInit {
    * sau categoria nu apare (nu ar trebui, sunt fixe pe backend). */
   protected earnRateFor(category: string): number {
     return this.earnRates().find((r) => r.category === category)?.rate_percent ?? 0;
+  }
+
+  // --- Bonus de bun-venit -------------------------------------------------------------
+
+  private loadWelcomeBonusStatus(): void {
+    this.welcomeBonusLoading.set(true);
+    this.pointsApi.getWelcomeBonusStatus().subscribe({
+      next: (result) => {
+        this.welcomeBonusClaimed.set(result.claimed);
+        this.welcomeBonusPoints.set(result.bonus_points);
+        this.welcomeBonusLoading.set(false);
+      },
+      error: () => this.welcomeBonusLoading.set(false),
+    });
+  }
+
+  protected claimWelcomeBonus(): void {
+    if (this.claimingWelcomeBonus() || this.welcomeBonusClaimed()) return;
+
+    this.claimingWelcomeBonus.set(true);
+    this.pointsApi.claimWelcomeBonus().subscribe({
+      next: (result) => {
+        this.claimingWelcomeBonus.set(false);
+        this.welcomeBonusClaimed.set(true);
+        this.balance.set(result.new_balance);
+        this.toast.success(`Ai primit ${result.points_awarded} puncte de bun-venit!`);
+        this.loadRewards();
+      },
+      error: (err) => {
+        this.claimingWelcomeBonus.set(false);
+        this.toast.error(extractErrorMessage(err, 'Revendicarea bonusului a eșuat.'));
+      },
+    });
   }
 
   // --- Recompense ----------------------------------------------------------------

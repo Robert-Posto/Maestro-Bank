@@ -19,6 +19,7 @@
   font-size: var(--mb-font-size-2xl);
   font-weight: var(--mb-font-weight-bold);
   color: var(--mb-blue-600);
+  font-variant-numeric: tabular-nums;
 }
 
 .points-balance-card__hint {
@@ -26,6 +27,53 @@
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
   max-width: 560px;
+}
+
+/* --- Bonus de bun-venit ------------------------------------------------------- */
+
+.welcome-bonus-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-4);
+  background: linear-gradient(120deg, var(--mb-info-bg) 0%, var(--mb-surface) 70%);
+  border: 1px solid var(--mb-blue-500);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-5) var(--mb-space-6);
+  margin-bottom: var(--mb-space-6);
+  box-shadow:
+    0 10px 24px rgba(47, 111, 237, 0.14),
+    var(--mb-shadow-sm);
+}
+
+.welcome-bonus-banner__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--mb-blue-600);
+  color: #fff;
+}
+
+.welcome-bonus-banner__text {
+  flex: 1;
+}
+
+.welcome-bonus-banner__title {
+  font-size: var(--mb-font-size-base);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.welcome-bonus-banner__subtitle {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+@media (max-width: 560px) {
+  .welcome-bonus-banner {
+    flex-wrap: wrap;
+  }
 }
 
 .points-section {

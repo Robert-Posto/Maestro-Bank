@@ -30,14 +30,17 @@ from app.database import get_database
 from app.earn_rates import compute_points_earned, list_earn_rates
 from app.models import (
     BalanceOut,
+    ClaimWelcomeBonusOut,
     CreditForTransactionOut,
     LedgerEntryOut,
     RedeemRewardOut,
     RewardOut,
+    WelcomeBonusStatusOut,
     WheelSegmentOut,
     WheelSpinOut,
 )
 from app.rewards_catalog import REWARDS_CATALOG, get_reward
+from app.welcome_bonus import WELCOME_BONUS_POINTS
 from app.wheel_segments import REFERENCE_WAGER, WHEEL_SEGMENTS
 
 logger = logging.getLogger("points-service")
@@ -170,6 +173,38 @@ async def credit_for_transaction(
     await _insert_entry(user_id=user_id, entry_type="earn", points_delta=points, category=category)
     logger.info("points-service: %s puncte câștigate (user_id=%s, categorie=%s)", points, user_id, category)
     return CreditForTransactionOut(points_earned=points)
+
+
+async def _has_claimed_welcome_bonus(user_id: str) -> bool:
+    doc = await get_database().ledger_entries.find_one({"user_id": user_id, "entry_type": "welcome_bonus"})
+    return doc is not None
+
+
+async def get_welcome_bonus_status(user_id: str) -> WelcomeBonusStatusOut:
+    claimed = await _has_claimed_welcome_bonus(user_id)
+    return WelcomeBonusStatusOut(claimed=claimed, bonus_points=WELCOME_BONUS_POINTS)
+
+
+async def claim_welcome_bonus(user_id: str) -> ClaimWelcomeBonusOut:
+    """Un singur bonus per user — a doua încercare e respinsă (409), nu
+    acordă din nou. Verificarea + scrierea nu sunt atomice (fără tranzacții
+    Mongo multi-document, aceeași fereastră de risc deja acceptată în tot
+    acest backend) — un dublu-click chiar simultan ar putea, teoretic,
+    trece de ambele verificări; impactul practic e neglijabil (un bonus fix,
+    mic, o singură dată în viața contului), nu justifică o soluție mai
+    complexă."""
+    if await _has_claimed_welcome_bonus(user_id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ai revendicat deja bonusul de bun-venit.")
+
+    await _insert_entry(user_id=user_id, entry_type="welcome_bonus", points_delta=WELCOME_BONUS_POINTS)
+    new_balance = await _balance(user_id)
+    logger.info("points-service: bonus de bun-venit revendicat (user_id=%s, puncte=%s)", user_id, WELCOME_BONUS_POINTS)
+    await _notify_user(
+        user_id,
+        "welcome_bonus_claimed",
+        f"Ai primit {WELCOME_BONUS_POINTS} puncte de bun-venit — le poți folosi direct pentru o recompensă.",
+    )
+    return ClaimWelcomeBonusOut(new_balance=new_balance, points_awarded=WELCOME_BONUS_POINTS)
 
 
 async def list_rewards(user_id: str) -> list[RewardOut]:

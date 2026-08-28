@@ -59,6 +59,17 @@ async def client():
         yield ac
 
 
+@pytest.fixture
+def mock_notify(monkeypatch):
+    calls = []
+
+    async def fake_notify(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
+        calls.append({"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id})
+
+    monkeypatch.setattr("app.service._notify_user", fake_notify)
+    return calls
+
+
 # --- Câștig puncte (credit-for-transaction) -------------------------------------
 
 
@@ -199,9 +210,49 @@ async def test_wheel_weighted_distribution_shifts_toward_wins_with_higher_wager(
     assert high_wager_wins > low_wager_wins
 
 
+# --- Bonus de bun-venit -----------------------------------------------------------
+
+
+async def test_welcome_bonus_status_starts_unclaimed():
+    from app.service import get_welcome_bonus_status
+
+    status_out = await get_welcome_bonus_status(USER_ID)
+    assert status_out.claimed is False
+    assert status_out.bonus_points == 500
+
+
+async def test_claim_welcome_bonus_credits_points_once(mock_notify):
+    from app.service import claim_welcome_bonus, get_balance, get_welcome_bonus_status
+
+    result = await claim_welcome_bonus(USER_ID)
+    assert result.points_awarded == 500
+    assert result.new_balance == 500
+
+    balance = await get_balance(USER_ID)
+    assert balance.balance == 500
+
+    status_out = await get_welcome_bonus_status(USER_ID)
+    assert status_out.claimed is True
+    assert any(call["kind"] == "welcome_bonus_claimed" for call in mock_notify)
+
+
+async def test_claim_welcome_bonus_rejects_second_claim(mock_notify):
+    from app.service import claim_welcome_bonus
+
+    await claim_welcome_bonus(USER_ID)
+    with pytest.raises(HTTPException) as exc_info:
+        await claim_welcome_bonus(USER_ID)
+    assert exc_info.value.status_code == 409
+
+
 # --- Endpoint HTTP -----------------------------------------------------------------
 
 
 async def test_balance_endpoint_requires_auth(client: AsyncClient):
     response = await client.get("/points/balance")
+    assert response.status_code == 401
+
+
+async def test_welcome_bonus_claim_endpoint_requires_auth(client: AsyncClient):
+    response = await client.post("/points/welcome-bonus/claim")
     assert response.status_code == 401

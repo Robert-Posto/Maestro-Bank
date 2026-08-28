@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-LedgerEntryType = Literal["earn", "redeem", "wager", "wheel_win"]
+LedgerEntryType = Literal["earn", "redeem", "wager", "wheel_win", "welcome_bonus"]
 
 
 class BalanceOut(BaseModel):
@@ -77,3 +77,13 @@ class CreditForTransactionRequest(BaseModel):
 
 class CreditForTransactionOut(BaseModel):
     points_earned: int
+
+
+class WelcomeBonusStatusOut(BaseModel):
+    claimed: bool
+    bonus_points: int
+
+
+class ClaimWelcomeBonusOut(BaseModel):
+    new_balance: int
+    points_awarded: int
