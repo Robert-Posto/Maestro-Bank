@@ -168,6 +168,30 @@ export class Support implements OnInit, OnDestroy {
     return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
   });
 
+  /** Adevărat doar după ce a existat DEJA cel puțin un tur — orice
+   * conversație populată aici e prin definiție o conversație de Support
+   * (ramura spending_forecast din askAgent navighează imediat la Copilot,
+   * nu populează niciodată chatMessages aici). Înainte de primul mesaj
+   * identitatea rămâne generică ("Asistent"), fiindcă întrebarea încă
+   * n-a fost clasificată — poate ajunge oricare din cei doi agenți. */
+  private readonly isConfirmedSupport = computed(() => this.chatMessages().length > 0);
+
+  /** Titlul de sus al paginii (PageHeader) — vezi isConfirmedSupport. */
+  protected readonly pageTitle = computed(() => (this.isConfirmedSupport() ? 'Asistent → Support Agent' : 'Asistent'));
+
+  /** Numele + iconița din bara de identitate a chat-ului — aceeași logică
+   * ca pageTitle, dar cu subtitlu propriu (mai descriptiv aici decât în
+   * PageHeader). */
+  protected readonly identityName = computed(() =>
+    this.isConfirmedSupport() ? 'Asistent → Support Agent' : 'Asistent MaestroBank',
+  );
+  protected readonly identitySubtitle = computed(() =>
+    this.isConfirmedSupport()
+      ? 'Cont, card, tranzacții și tichete'
+      : 'Întreabă orice — te ajutăm sau te trimitem la agentul potrivit',
+  );
+  protected readonly identityIcon = computed(() => (this.isConfirmedSupport() ? 'support' : 'sparkles'));
+
   constructor() {
     effect(() => {
       this.chatMessages();

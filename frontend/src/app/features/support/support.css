@@ -91,13 +91,19 @@
 }
 
 .support-chat__identity-text strong {
+  overflow: hidden;
   font-size: var(--mb-font-size-sm);
   color: var(--mb-text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .support-chat__identity-text span {
+  overflow: hidden;
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .support-chat__conversations {
