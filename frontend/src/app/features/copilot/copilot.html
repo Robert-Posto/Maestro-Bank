@@ -12,44 +12,56 @@
         </div>
       </div>
 
-      <div class="copilot-chat__conversations" #conversationsMenuEl>
+      <div class="copilot-chat__bar-actions">
         <button
           type="button"
-          class="copilot-chat__conversations-trigger"
-          [class.copilot-chat__conversations-trigger--open]="conversationsMenuOpen()"
-          (click)="toggleConversationsMenu()"
+          class="copilot-chat__back-btn"
+          title="Înapoi la Asistent — pune o altă întrebare"
+          (click)="backToMainAgent()"
         >
-          <span>{{ activeConversationTitle() }}</span>
-          <app-icon name="chevron-down" [size]="14" />
+          <app-icon name="chevron-left" [size]="14" />
+          <span>Înapoi la Asistent</span>
         </button>
 
-        @if (conversationsMenuOpen()) {
-          <div class="copilot-chat__conversations-menu">
-            <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
-              <app-icon name="plus" [size]="14" /> Conversație nouă
-            </button>
-            @if (conversations().length === 0) {
-              <p class="copilot-conversations__empty">Nicio conversație salvată încă.</p>
-            } @else {
-              <div class="copilot-conversations__list">
-                @for (conversation of conversations(); track conversation.id) {
-                  <button
-                    type="button"
-                    class="copilot-conversations__item"
-                    [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
-                    (click)="openConversation(conversation.id)"
-                  >
-                    <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
-                    <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-                    <span class="copilot-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
-                      <app-icon name="trash" [size]="13" />
-                    </span>
-                  </button>
-                }
-              </div>
-            }
-          </div>
-        }
+        <div class="copilot-chat__conversations" #conversationsMenuEl>
+          <button
+            type="button"
+            class="copilot-chat__conversations-trigger"
+            [class.copilot-chat__conversations-trigger--open]="conversationsMenuOpen()"
+            (click)="toggleConversationsMenu()"
+          >
+            <span>{{ activeConversationTitle() }}</span>
+            <app-icon name="chevron-down" [size]="14" />
+          </button>
+
+          @if (conversationsMenuOpen()) {
+            <div class="copilot-chat__conversations-menu">
+              <button type="button" class="copilot-conversations__new" (click)="startNewConversation()">
+                <app-icon name="plus" [size]="14" /> Conversație nouă
+              </button>
+              @if (conversations().length === 0) {
+                <p class="copilot-conversations__empty">Nicio conversație salvată încă.</p>
+              } @else {
+                <div class="copilot-conversations__list">
+                  @for (conversation of conversations(); track conversation.id) {
+                    <button
+                      type="button"
+                      class="copilot-conversations__item"
+                      [class.copilot-conversations__item--active]="conversation.id === activeConversationId()"
+                      (click)="openConversation(conversation.id)"
+                    >
+                      <span class="copilot-conversations__item-title">{{ conversation.title }}</span>
+                      <span class="copilot-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+                      <span class="copilot-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                        <app-icon name="trash" [size]="13" />
+                      </span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     </header>
 

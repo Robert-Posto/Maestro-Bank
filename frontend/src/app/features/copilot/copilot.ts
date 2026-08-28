@@ -168,6 +168,18 @@ export class Copilot implements OnInit, OnDestroy {
     this.chatMessages.set([]);
   }
 
+  /** Buton "Înapoi la Asistent" din header — pentru un user ajuns aici prin
+   * redirecționare automată (vezi support.ts::askAgent) care vrea de fapt
+   * să pună o întrebare complet diferită (alt domeniu, nu buget/prognoză).
+   * Trimite explicit query param "fresh" (citit în support.ts::ngOnInit),
+   * ca acolo să pornească o conversație nouă — altfel prima întrebare ar
+   * continua o conversație veche, care nu se mai reclasifică (vezi
+   * askAgent, clasificarea rulează doar la prima tură a unei conversații
+   * NOI), și userul ar rămâne "blocat" pe Support chiar dacă vrea alt agent. */
+  protected backToMainAgent(): void {
+    this.router.navigate(['/app/support'], { queryParams: { fresh: '1' } });
+  }
+
   protected openConversation(id: string): void {
     this.conversationsMenuOpen.set(false);
     if (id === this.activeConversationId()) return;

@@ -183,6 +183,18 @@ export class Support implements OnInit, OnDestroy {
     const presetCategory = this.route.snapshot.queryParamMap.get('category') as TicketCategory | null;
     if (presetCategory) this.category.set(presetCategory);
     if (shouldOpen) this.openModal();
+
+    // Venit prin butonul "Înapoi la Asistent" de pe MaestroAgent (vezi
+    // copilot.ts::backToMainAgent) — pornim explicit o conversație nouă,
+    // ca prima întrebare de-aici să fie reclasificată de la zero (vezi
+    // askAgent mai jos: clasificarea rulează doar la prima tură a unei
+    // conversații NOI). Fără asta, dacă rămăsese activă o conversație
+    // veche de Support, userul ar fi "blocat" acolo chiar dacă a apăsat
+    // explicit "înapoi" ca să întrebe altceva.
+    if (this.route.snapshot.queryParamMap.get('fresh') === '1') {
+      this.startNewConversation();
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
   }
 
   ngOnDestroy(): void {
