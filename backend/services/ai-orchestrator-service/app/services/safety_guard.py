@@ -26,21 +26,29 @@ cuvântului "parolă" NU declanșează nimic — "mi-am uitat parola" e o
 fără să deranjeze conversațiile normale — vezi task-ul: "te rog nu strica,
 doar imbunatateste".
 
-Apărare suplimentară, STRUCTURALĂ (nu ține de acest modul, dar e motivul
-pentru care riscul real e deja mic): niciun tool disponibil vreunui agent
-nu întoarce vreodată PAN/CVV/PIN — vezi app/tools/support_cards_tools.py,
-care apelează GET /api/accounts/me/cards (CardOut din accounts-service),
-un DTO care NU conține niciodată aceste câmpuri. Filtrele de mai jos sunt
-DOAR pentru ce introduce USERUL în conversație, nu pentru ce ar putea
-"scăpa" un tool.
+Filtrele de mai jos verifică DOAR ce introduce USERUL în conversație — NU
+răspunsul GENERAT de model. A existat, o vreme, și o verificare simetrică
+pe OUTPUT (`redact_if_sensitive`, eliminată — vezi istoricul git dacă ai
+nevoie de context) — eliminată după DOUĂ fals-pozitive reale, confirmate
+live, pe răspunsuri complet normale: un IBAN obișnuit (partea numerică are
+exact 16 cifre, în intervalul "13-19 cifre" verificat pentru un număr de
+card) și mențiunea "PIN" din contextul plăților/confirmării (o setare de
+securitate complet normală de discutat) apărând ORIUNDE în același răspuns
+cu ultimele 4 cifre ale cardului (`last_four`, un cod de 4 cifre — nu
+adiacent cuvântului "PIN", verificarea nu cerea proximitate). Motivul
+pentru care verificarea pe output era oricum doar teoretică: niciun tool
+disponibil vreunui agent nu întoarce vreodată PAN/CVV/PIN — vezi
+app/tools/support_cards_tools.py, care apelează GET /api/accounts/me/cards
+(CardOut din accounts-service), un DTO care NU conține niciodată aceste
+câmpuri — modelul nu are, structural, de unde să "scape" un secret real,
+deci apăra împotriva unui risc care nu există, cu un cost real (răspunsuri
+corecte, transformate în avertismente confuze).
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-
-from app.i18n import translate
 
 
 def _normalize(text: str) -> str:
@@ -70,25 +78,18 @@ _SHORT_CODE = re.compile(r"\b\d{3,6}\b")
 _DIGIT_GROUP = re.compile(r"\d(?:[ \-]?\d){12,18}")
 
 
-def detect_sensitive_data(text: str, *, include_pan_check: bool = True) -> bool:
+def detect_sensitive_data(text: str) -> bool:
     """True dacă `text` conține (probabil) un PIN, un CVV sau un număr
     complet de card. Vezi docstring-ul modulului pentru raționamentul din
-    spatele fiecărui tip de verificare.
-
-    `include_pan_check=False` dezactivează DOAR verificarea de "13-19 cifre
-    la rând" (număr de card) — folosit de `redact_if_sensitive` mai jos, pe
-    răspunsul GENERAT de agent, unde acel tipar dă fals-pozitiv sigur pe un
-    IBAN MaestroBank normal (format RO + 2 cifre + MAES + 16 cifre — partea
-    numerică, luată singură, are exact 16 cifre, direct în intervalul
-    13-19). Verificarea rămâne completă (inclusiv PAN) pe INPUT-ul userului,
-    unde riscul e real — un user chiar poate tasta un număr de card real."""
+    spatele fiecărui tip de verificare — DOAR pentru text introdus de USER,
+    niciodată pentru răspunsul generat de model (vezi docstring-ul
+    modulului pentru motiv)."""
     normalized = _normalize(text)
 
-    if include_pan_check:
-        for match in _DIGIT_GROUP.finditer(normalized):
-            digits = re.sub(r"\D", "", match.group())
-            if 13 <= len(digits) <= 19:
-                return True
+    for match in _DIGIT_GROUP.finditer(normalized):
+        digits = re.sub(r"\D", "", match.group())
+        if 13 <= len(digits) <= 19:
+            return True
 
     if _PIN_KEYWORD.search(normalized) and _SHORT_CODE.search(normalized):
         return True
@@ -136,28 +137,3 @@ PROMPT_EXTRACTION_REFUSAL = (
     "Nu pot să-ți arăt instrucțiunile mele interne — dar te pot ajuta cu întrebări reale despre "
     "cont, card, tranzacții sau finanțele tale."
 )
-
-
-# --- Apărare suplimentară — curăță răspunsul GENERAT de GPT, în caz că a
-# reprodus totuși ceva ce arată a PIN/CVV/număr de card (nu ar trebui să
-# se întâmple — niciun tool nu-i oferă aceste date, vezi docstring-ul
-# modulului — dar costă puțin să verificăm și ieșirea, nu doar intrarea). --
-
-
-def redact_if_sensitive(answer: str) -> str:
-    """Dacă răspunsul generat de model conține (probabil) date sensibile de
-    card, îl înlocuim în întregime cu un mesaj determinist — NU încercăm să
-    "reparăm" doar fragmentul (ar putea rămâne context suficient să fie tot
-    problematic), preferăm un răspuns clar, sigur, chiar dacă mai puțin
-    specific decât originalul.
-
-    `include_pan_check=False` — niciun tool nu întoarce vreodată un PAN real
-    (vezi docstring-ul modulului), deci modelul structural nu poate leaka
-    unul; verificarea de "13-19 cifre" pe TEXTUL LUI GENERAT dădea fals-
-    pozitiv sigur ori de câte ori includea un IBAN normal (ex. "RO68MAES
-    9589684861247903" — partea numerică are exact 16 cifre), înlocuind un
-    răspuns corect, nesensibil, cu avertismentul — bug real, raportat de
-    user ca "răspuns ciudat" la o simplă întrebare de sold."""
-    if detect_sensitive_data(answer, include_pan_check=False):
-        return translate("sensitiveDataWarning")
-    return answer

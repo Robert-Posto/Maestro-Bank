@@ -427,7 +427,7 @@ async def run_support_agent(
         if not tool_calls:
             # Fallback — modelul ar trebui să folosească mereu respond_to_user,
             # dar nu ne bazăm strict pe asta pentru un răspuns utilizabil.
-            return safety_guard.redact_if_sensitive(response_message.content or ""), "unknown", [], False, collected_context
+            return response_message.content or "", "unknown", [], False, collected_context
 
         messages.append(
             {
@@ -445,13 +445,16 @@ async def run_support_agent(
                 arguments = {}
 
             if name == CONTROL_TOOL:
-                # Apărare suplimentară — vezi safety_guard.py::redact_if_sensitive.
-                # Nu ar trebui să se întâmple niciodată (niciun tool nu-i
-                # oferă PIN/CVV/PAN, vezi docstring-ul modulului), dar
-                # costă puțin să verificăm și ce a GENERAT GPT, nu doar
-                # mesajul userului (verificat mai sus, înainte de buclă).
+                # NU mai verificăm ieșirea GPT-ului cu safety_guard (vezi
+                # docstring-ul modulului acela pentru motiv — un fals-pozitiv
+                # real, confirmat live: mențiunea normală "PIN" din
+                # contextul plăților, combinată cu orice cod scurt din
+                # același răspuns (ex. last_four), transforma un răspuns
+                # corect de status card într-un avertisment confuz).
+                # Mesajul userului tot e verificat, ÎNAINTE de buclă (vezi
+                # detect_sensitive_data mai sus) — acolo e riscul real.
                 return (
-                    safety_guard.redact_if_sensitive(arguments.get("answer", "")),
+                    arguments.get("answer", ""),
                     arguments.get("intent", "unknown"),
                     arguments.get("recommended_actions", []),
                     bool(arguments.get("out_of_scope", False)),

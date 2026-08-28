@@ -249,11 +249,10 @@ async def handle_message(
 
         if final_text is None:
             final_text = translate("forecastFallbackAnswer")
-        # Apărare suplimentară — vezi safety_guard.py::redact_if_sensitive.
-        # Nu ar trebui să se întâmple niciodată (niciun tool nu-i oferă
-        # PIN/CVV/PAN), dar costă puțin să verificăm și ce a GENERAT GPT,
-        # nu doar mesajul userului (verificat mai sus, înainte de apel).
-        final_text = safety_guard.redact_if_sensitive(final_text)
+        # NU mai verificăm ieșirea GPT-ului cu safety_guard (vezi
+        # docstring-ul acelui modul pentru motiv — fals-pozitiv real,
+        # confirmat live, pe răspunsuri normale). Mesajul userului tot e
+        # verificat, înainte de apel — acolo e riscul real.
 
         # Citim called_tools ÎNAINTE de ensure_core_data — vezi
         # _CARD_TRIGGERS mai sus, relevanța cardurilor reflectă DOAR
