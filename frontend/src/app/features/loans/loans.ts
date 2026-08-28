@@ -3,6 +3,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { LoanPaymentView, LoanRateView, LoanTermMonths, LoanView, LoansService } from '../../services/loans.service';
+import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
@@ -11,6 +12,7 @@ import { Modal } from '../../shared/components/modal/modal';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { SwipeCardDeck, SwipeDeckCard } from '../../shared/components/swipe-card-deck/swipe-card-deck';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
@@ -19,62 +21,20 @@ const MIN_AMOUNT_RON = 1000;
 const MAX_AMOUNT_RON = 50_000;
 
 /** Cartea de explicații — "Cum funcționează" — vezi app-swipe-card-deck.
- * Pas cu pas + de ce MaestroBank, o singură idee pe card, ca un onboarding
- * real, nu un perete de text. */
-const HOW_IT_WORKS_CARDS: SwipeDeckCard[] = [
-  {
-    kind: 'cover',
-    title: 'Cum funcționează un credit MaestroBank',
-    text: 'Patru pași, fără birocrație — glisează pentru următorul.',
-  },
-  {
-    kind: 'step',
-    step: 1,
-    title: 'Alegi suma și termenul',
-    text: 'Simulatorul de mai jos îți arată rata exactă înainte să aplici — fără surprize.',
-  },
-  {
-    kind: 'step',
-    step: 2,
-    title: 'Verificăm venitul tău real',
-    text: 'Ne uităm la istoricul tău de tranzacții din ultimele 3 luni, nu la ce declari.',
-  },
-  {
-    kind: 'step',
-    step: 3,
-    title: 'Banii intră imediat în cont',
-    text: 'Fără așteptare, fără aprobare manuală — dacă eligibilitatea e îndeplinită.',
-  },
-  {
-    kind: 'step',
-    step: 4,
-    title: 'Rata se plătește singură',
-    text: 'Automat, lunar, din contul curent — sau achiți oricând tot restul, fără cost suplimentar.',
-  },
-  {
-    kind: 'benefit',
-    icon: 'flash',
-    title: 'Aprobare pe loc',
-    text: 'Verificăm venitul tău real, din istoric — nu aștepți zile pentru un răspuns.',
-  },
-  {
-    kind: 'benefit',
-    icon: 'check',
-    title: 'Fără costuri ascunse',
-    text: 'Rata din simulator e exact ce plătești — fără comisioane suplimentare.',
-  },
-  {
-    kind: 'benefit',
-    icon: 'banknote',
-    title: 'Plată automată',
-    text: 'Rata se scade singură din cont, lunar — nu ții tu evidența.',
-  },
-  {
-    kind: 'benefit',
-    icon: 'unlock',
-    title: 'Achiți oricând',
-    text: 'Plată anticipată, fără dobândă suplimentară pentru perioada rămasă.',
-  },
+ * Doar structura + cheile i18n aici; textul tradus e asamblat de
+ * `howItWorksCards` (computed) în componentă, ca la copilot.ts. */
+type DeckCardKeys = Omit<SwipeDeckCard, 'title' | 'text'> & { titleKey: string; textKey: string };
+
+const HOW_IT_WORKS_CARD_KEYS: DeckCardKeys[] = [
+  { kind: 'cover', titleKey: 'loans.howItWorks.coverTitle', textKey: 'loans.howItWorks.coverText' },
+  { kind: 'step', step: 1, titleKey: 'loans.howItWorks.step1Title', textKey: 'loans.howItWorks.step1Text' },
+  { kind: 'step', step: 2, titleKey: 'loans.howItWorks.step2Title', textKey: 'loans.howItWorks.step2Text' },
+  { kind: 'step', step: 3, titleKey: 'loans.howItWorks.step3Title', textKey: 'loans.howItWorks.step3Text' },
+  { kind: 'step', step: 4, titleKey: 'loans.howItWorks.step4Title', textKey: 'loans.howItWorks.step4Text' },
+  { kind: 'benefit', icon: 'flash', titleKey: 'loans.howItWorks.benefitInstantTitle', textKey: 'loans.howItWorks.benefitInstantText' },
+  { kind: 'benefit', icon: 'check', titleKey: 'loans.howItWorks.benefitNoHiddenTitle', textKey: 'loans.howItWorks.benefitNoHiddenText' },
+  { kind: 'benefit', icon: 'banknote', titleKey: 'loans.howItWorks.benefitAutoTitle', textKey: 'loans.howItWorks.benefitAutoText' },
+  { kind: 'benefit', icon: 'unlock', titleKey: 'loans.howItWorks.benefitPayoffTitle', textKey: 'loans.howItWorks.benefitPayoffText' },
 ];
 
 /**
@@ -103,6 +63,7 @@ const HOW_IT_WORKS_CARDS: SwipeDeckCard[] = [
     StatusBadge,
     SwipeCardDeck,
     MoneyPipe,
+    TranslatePipe,
   ],
   templateUrl: './loans.html',
   styleUrl: './loans.css',
@@ -110,11 +71,22 @@ const HOW_IT_WORKS_CARDS: SwipeDeckCard[] = [
 export class Loans implements OnInit, OnDestroy {
   private readonly loansApi = inject(LoansService);
   private readonly toast = inject(ToastService);
+  protected readonly language = inject(LanguageService);
 
   protected readonly termOptions = TERM_OPTIONS;
   protected readonly minAmountRon = MIN_AMOUNT_RON;
   protected readonly maxAmountRon = MAX_AMOUNT_RON;
-  protected readonly howItWorksCards = HOW_IT_WORKS_CARDS;
+  /** Cardurile "Cum funcționează", traduse după limba activă (mirror pe
+   * copilot.ts::suggestedQuestions). */
+  protected readonly howItWorksCards = computed<SwipeDeckCard[]>(() =>
+    HOW_IT_WORKS_CARD_KEYS.map((c) => ({
+      kind: c.kind,
+      icon: c.icon,
+      step: c.step,
+      title: this.language.t(c.titleKey),
+      text: this.language.t(c.textKey),
+    })),
+  );
 
   protected readonly rates = signal<LoanRateView[]>([]);
   protected readonly ratesLoading = signal(true);
@@ -260,12 +232,12 @@ export class Loans implements OnInit, OnDestroy {
       next: () => {
         this.applying.set(false);
         this.applyConfirmOpen.set(false);
-        this.toast.success('Creditul a fost aprobat — suma e deja în contul tău curent.');
+        this.toast.success(this.language.t('loans.approvedToast'));
         this.loadLoans();
       },
       error: (err) => {
         this.applying.set(false);
-        this.toast.error(extractErrorMessage(err, 'Cererea de credit a fost respinsă.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('loans.applyRejected')));
       },
     });
   }
@@ -290,12 +262,12 @@ export class Loans implements OnInit, OnDestroy {
       next: () => {
         this.payingOff.set(false);
         this.payoffTarget.set(null);
-        this.toast.success('Credit achitat anticipat.');
+        this.toast.success(this.language.t('loans.payoffDoneToast'));
         this.loadLoans();
       },
       error: (err) => {
         this.payingOff.set(false);
-        this.toast.error(extractErrorMessage(err, 'Plata anticipată a eșuat.'));
+        this.toast.error(extractErrorMessage(err, this.language.t('loans.payoffFailed')));
       },
     });
   }

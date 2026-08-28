@@ -15,7 +15,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.database import get_database
-from app.i18n import translate
+from app.i18n import current_language, render_notification, render_notification_from_text, translate
 from app.models import DocumentCreate, DocumentSignRequest, NotificationCreate, TicketCreate
 
 logger = logging.getLogger("support-service")
@@ -62,13 +62,24 @@ async def get_ticket_for_user(ticket_id: str, user_id: str) -> dict:
 
 
 async def create_notification(payload: NotificationCreate) -> dict:
-    """Apelat DOAR intern, de alte servicii (accounts/budgets/transactions) —
-    vezi app/routers/notifications.py. Userul nu poate crea notificări direct."""
+    """Apelat DOAR intern, de alte servicii (accounts/loans/points/
+    transactions) — vezi app/routers/notifications.py. Userul nu poate crea
+    notificări direct.
+
+    Stocăm `message_key` + `message_params` (brute) — textul se randează în
+    limba CITITORULUI la fiecare citire (vezi list_notifications_for_user).
+    `text` stocat e un snapshot RO: fallback pentru notificări fără cheie în
+    catalog și pentru `NotificationOut` (răspunsul acestui POST, folosit rar
+    de apelanții interni)."""
+    rendered_ro = render_notification(payload.message_key, payload.message_params, "ro")
+    text_snapshot = payload.text or rendered_ro or ""
     db = get_database()
     doc = {
         "user_id": payload.user_id,
         "kind": payload.kind,
-        "text": payload.text,
+        "text": text_snapshot,
+        "message_key": payload.message_key,
+        "message_params": payload.message_params,
         "read": False,
         "created_at": datetime.now(timezone.utc),
         "reference_id": payload.reference_id,
@@ -78,10 +89,26 @@ async def create_notification(payload: NotificationCreate) -> dict:
     return await db.notifications.find_one({"_id": result.inserted_id})
 
 
+def _render_for_reader(doc: dict) -> dict:
+    """Compune `text` în limba request-ului curent:
+      1. din `message_key` + `message_params` (notificări noi);
+      2. altfel, potrivind `text`-ul stocat înapoi pe un șablon RO din
+         catalog (notificări VECHI, dinainte de mecanism — vezi
+         i18n.py::render_notification_from_text);
+      3. altfel, `text`-ul stocat ca atare (șablon nerecunoscut)."""
+    lang = current_language()
+    rendered = render_notification(doc.get("message_key"), doc.get("message_params"), lang) or (
+        render_notification_from_text(doc.get("text") or "", lang)
+    )
+    doc["text"] = rendered or doc.get("text") or ""
+    return doc
+
+
 async def list_notifications_for_user(user_id: str) -> list[dict]:
     db = get_database()
     cursor = db.notifications.find({"user_id": user_id}).sort("created_at", -1).limit(30)
-    return await cursor.to_list(length=30)
+    docs = await cursor.to_list(length=30)
+    return [_render_for_reader(doc) for doc in docs]
 
 
 async def mark_all_read(user_id: str) -> None:
@@ -192,7 +219,8 @@ async def create_document(payload: DocumentCreate, staff_user_id: str) -> dict:
         NotificationCreate(
             user_id=payload.user_id,
             kind="document_sign",
-            text=translate("newDocumentToSign", title=payload.title),
+            message_key="newDocumentToSign",
+            message_params={"title": payload.title},
         )
     )
 

@@ -39,4 +39,7 @@ export const COMMON_I18N: Record<string, TranslationEntry> = {
   'common.lei': { ro: 'lei', en: 'RON' },
   'common.showPassword': { ro: 'Arată parola', en: 'Show password' },
   'common.hidePassword': { ro: 'Ascunde parola', en: 'Hide password' },
+  'common.previousCard': { ro: 'Cardul anterior', en: 'Previous card' },
+  'common.nextCard': { ro: 'Cardul următor', en: 'Next card' },
+  'common.goToCard': { ro: 'Cardul {n}', en: 'Card {n}' },
 };

@@ -20,6 +20,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 from app.database import get_database
 from app.eligibility import EligibilityResult, evaluate_eligibility, render_rejection_reason
+from app.i18n import translate
 from app.models import LoanApplyRequest, LoanOut, LoanPaymentOut
 from app.rates import MAX_LOAN_MINOR, MIN_LOAN_MINOR, compute_monthly_installment_minor, get_rate
 
@@ -37,12 +38,12 @@ async def _get_current_account(user_id: str) -> dict:
             )
         except httpx.RequestError as exc:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
             ) from exc
     if response.status_code == 404:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nu am găsit contul tău curent.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("currentAccountNotFound"))
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la interogarea accounts-service.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
     return response.json()
 
 
@@ -58,12 +59,12 @@ async def _debit_account(account_id: str, amount_minor: int) -> bool:
             )
         except httpx.RequestError as exc:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
             ) from exc
     if response.status_code == 409:
         return False
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la debitarea contului.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountDebitError"))
     return True
 
 
@@ -76,19 +77,30 @@ async def _credit_account(account_id: str, amount_minor: int) -> None:
             )
         except httpx.RequestError as exc:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="accounts-service indisponibil."
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")
             ) from exc
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Eroare la creditarea contului.")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountCreditError"))
 
 
-async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
-    """Best-effort — la fel ca _notify_user din transactions-service/points-service."""
+async def _notify_user(
+    user_id: str, kind: str, message_key: str, message_params: dict | None = None, reference_id: str | None = None
+) -> None:
+    """Best-effort. Trimite `message_key` + `message_params` (valori BRUTE) —
+    support-service randează textul în limba CITITORULUI la fiecare citire
+    (vezi support-service/app/i18n.py::render_notification), deci notificarea
+    își schimbă limba la comutarea comutatorului, retroactiv."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id},
+                json={
+                    "user_id": user_id,
+                    "kind": kind,
+                    "message_key": message_key,
+                    "message_params": message_params or {},
+                    "reference_id": reference_id,
+                },
             )
     except httpx.HTTPError:
         logger.warning("loans-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
@@ -133,7 +145,7 @@ async def apply_for_loan(user_id: str, payload: LoanApplyRequest) -> LoanOut:
     if payload.amount_minor < MIN_LOAN_MINOR or payload.amount_minor > MAX_LOAN_MINOR:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Suma trebuie să fie între {MIN_LOAN_MINOR / 100:.2f} și {MAX_LOAN_MINOR / 100:.2f} RON.",
+            detail=translate("amountOutOfRange", min=f"{MIN_LOAN_MINOR / 100:.2f}", max=f"{MAX_LOAN_MINOR / 100:.2f}"),
         )
 
     rate = get_rate(payload.term_months)
@@ -180,8 +192,12 @@ async def apply_for_loan(user_id: str, payload: LoanApplyRequest) -> LoanOut:
     await _notify_user(
         user_id,
         "loan_approved",
-        f"Creditul tău de {payload.amount_minor / 100:.2f} lei a fost aprobat — rata lunară e "
-        f"{monthly_installment_minor / 100:.2f} lei, pe {payload.term_months} luni.",
+        "loanApproved",
+        {
+            "amount_minor": payload.amount_minor,
+            "instalment_minor": monthly_installment_minor,
+            "months": payload.term_months,
+        },
         reference_id=str(result.inserted_id),
     )
     return _to_loan_out(doc)
@@ -197,10 +213,10 @@ async def _get_own_loan(loan_id: str, user_id: str) -> dict:
     try:
         oid = ObjectId(loan_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credit inexistent.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("loanNotFound")) from exc
     doc = await get_database().loans.find_one({"_id": oid, "user_id": user_id})
     if doc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credit inexistent.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("loanNotFound"))
     return doc
 
 
@@ -217,12 +233,12 @@ async def payoff_loan(loan_id: str, user_id: str) -> LoanOut:
     avantajul clientului — la fel ca lichidarea unui depozit)."""
     doc = await _get_own_loan(loan_id, user_id)
     if doc["status"] != "active":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Creditul nu mai este activ.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("loanNoLongerActive"))
 
     payoff_amount_minor = doc["outstanding_principal_minor"]
     succeeded = await _debit_account(doc["account_id"], payoff_amount_minor)
     if not succeeded:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sold insuficient pentru plata anticipată.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("insufficientBalanceForPayoff"))
 
     now = datetime.now(timezone.utc)
     db = get_database()
@@ -246,7 +262,8 @@ async def payoff_loan(loan_id: str, user_id: str) -> LoanOut:
     await _notify_user(
         user_id,
         "loan_paid_off",
-        f"Ai plătit anticipat restul de {payoff_amount_minor / 100:.2f} lei — creditul e închis.",
+        "loanPaidOffEarly",
+        {"amount_minor": payoff_amount_minor},
         reference_id=loan_id,
     )
     return _to_loan_out(doc)
@@ -305,7 +322,8 @@ async def process_due_payments() -> int:
             await _notify_user(
                 doc["user_id"],
                 "loan_payment_missed",
-                f"Rata de {amount_minor / 100:.2f} lei nu a putut fi plătită — sold insuficient. Reîncercăm automat.",
+                "loanPaymentMissed",
+                {"amount_minor": amount_minor},
                 reference_id=str(doc["_id"]),
             )
             processed += 1
@@ -346,14 +364,15 @@ async def process_due_payments() -> int:
         await _notify_user(
             doc["user_id"],
             "loan_payment",
-            f"Rata de {amount_minor / 100:.2f} lei a fost plătită automat.",
+            "loanPayment",
+            {"amount_minor": amount_minor},
             reference_id=str(doc["_id"]),
         )
         if now_paid_off:
             await _notify_user(
                 doc["user_id"],
                 "loan_paid_off",
-                "Ultima rată a fost plătită — creditul e închis.",
+                "loanClosed",
                 reference_id=str(doc["_id"]),
             )
         processed += 1

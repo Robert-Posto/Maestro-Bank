@@ -421,12 +421,8 @@ async def create_transfer(
         await _notify_user(
             user_id,
             "transfer_hold",
-            translate(
-                "transferHoldNotification",
-                amount=format_minor_amount(payload.amount_minor),
-                currency=source["currency"],
-                iban=payload.to_iban,
-            ),
+            "transferHold",
+            {"amount_minor": payload.amount_minor, "currency": source["currency"], "iban": payload.to_iban},
             reference_id=str(insert_result.inserted_id),
         )
     else:
@@ -441,12 +437,8 @@ async def create_transfer(
             await _notify_user(
                 user_id,
                 "transfer",
-                translate(
-                    "transferSuccessNotification",
-                    amount=format_minor_amount(payload.amount_minor),
-                    currency=source["currency"],
-                    iban=payload.to_iban,
-                ),
+                "transferSuccess",
+                {"amount_minor": payload.amount_minor, "currency": source["currency"], "iban": payload.to_iban},
                 reference_id=str(insert_result.inserted_id),
             )
 
@@ -460,12 +452,12 @@ async def create_transfer(
                 await _notify_user(
                     destination["user_id"],
                     "transfer_received",
-                    translate(
-                        "transferReceivedNotification",
-                        amount=format_minor_amount(payload.amount_minor),
-                        currency=source["currency"],
-                        name=from_name or source["iban"],
-                    ),
+                    "transferReceived",
+                    {
+                        "amount_minor": payload.amount_minor,
+                        "currency": source["currency"],
+                        "name": from_name or source["iban"],
+                    },
                     reference_id=str(insert_result.inserted_id),
                 )
 
@@ -527,17 +519,25 @@ async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:
     await _notify_user(
         user_id,
         "transfer_hold_cancelled",
-        translate("transferHoldCancelledNotification"),
+        "transferHoldCancelled",
         reference_id=transaction_id,
     )
     return to_transaction_view(updated_doc, viewer_account_id=source["id"])
 
 
-async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
+async def _notify_user(
+    user_id: str, kind: str, message_key: str, message_params: dict | None = None, reference_id: str | None = None
+) -> None:
     """Trimite o notificare persistentă către support-service. NU blochează
     și NU eșuează operația principală dacă support-service e indisponibil —
     la fel ca provisioning-ul de cont din auth-service, o notificare
     pierdută nu trebuie să strice fluxul de bani.
+
+    Trimite `message_key` + `message_params` (valori BRUTE — `*_minor`,
+    `currency`, IBAN, nume) — support-service randează textul în limba
+    CITITORULUI la fiecare citire (vezi support-service/app/i18n.py::
+    render_notification), deci notificarea își schimbă limba la comutarea
+    comutatorului, retroactiv.
 
     `reference_id` (id-ul tranzacției) e opțional — folosit de frontend ca
     să deschidă direct tranzacția respectivă la click pe notificare, în loc
@@ -546,7 +546,13 @@ async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | N
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id},
+                json={
+                    "user_id": user_id,
+                    "kind": kind,
+                    "message_key": message_key,
+                    "message_params": message_params or {},
+                    "reference_id": reference_id,
+                },
             )
     except httpx.HTTPError:
         logger.warning("transactions-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)

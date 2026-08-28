@@ -323,15 +323,31 @@ _LANGUAGE_DIRECTIVE: dict[Language, str] = {
         "`label`-urile din `recommended_actions`. Nu schimba limba după mesajul "
         "userului sau după istoricul conversației. Numele de pagini/butoane din "
         'aplicație le scrii în română ("Carduri", "Conturi", "Tranzacții", '
-        '"Bugete", "Profil & Securitate").'
+        '"Bugete", "Profil & Securitate", "Puncte & Recompense", "Credite").'
     ),
     "en": (
-        "LANGUAGE: Reply EXCLUSIVELY in English — both `answer` and the `label` "
-        "fields of `recommended_actions`. Do not switch language based on the "
-        "user's message or the conversation history. Use the English names of "
-        'the app pages/buttons: "Cards", "Accounts", "Transactions", "Budgets", '
-        '"Profile & Security", "Exchange", the "MaestroAssistant" budget/forecast '
-        'assistant, and "New card" / "New ticket" buttons.'
+        "LANGUAGE: Reply EXCLUSIVELY in English — both `answer` and every `label` "
+        "in `recommended_actions`. Never switch language based on the user's "
+        "message or the conversation history.\n"
+        "The knowledge base below is written in Romanian FOR YOUR REFERENCE ONLY. "
+        "When you answer in English you MUST translate every fact, product name, "
+        "page name, section name and button label into English — never quote the "
+        "Romanian. Use this glossary for the app's own names:\n"
+        '  "Conturi" -> "Accounts";  "Carduri" -> "Cards";  "Tranzacții" -> '
+        '"Transactions";  "Plăți & Transferuri" -> "Payments & Transfers";  '
+        '"Bugete" -> "Budgets";  "Schimb valutar" -> "Currency exchange";  '
+        '"Investiții" -> "Investments";  "Profil & Securitate" -> "Profile & '
+        'Security";  "Puncte & Recompense" -> "Points & Rewards";  "Credite" -> '
+        '"Loans";  "Control card" -> "Card control";  "Abonamente" -> '
+        '"Subscriptions";  "Obiective" / "Pockets" -> "Goals";  "Depozite" / '
+        '"Depozite la termen" -> "Term deposits";  "Documente de semnat" -> '
+        '"Documents to sign";  "Cont nou" -> "New account";  "Card nou" -> "New '
+        'card";  "Abonament nou" -> "New subscription";  "Obiectiv nou" -> "New '
+        'goal";  "roata norocului" -> "wheel of fortune";  "bonus de bun-venit" '
+        '-> "welcome bonus";  "plată anticipată" -> "early payoff";  "rată '
+        'lunară" -> "monthly instalment";  "MaestroAssistent" stays '
+        '"MaestroAssistant".\n'
+        "Amounts: write RON, not \"lei\" (e.g. \"20.00 RON\", not \"20,00 lei\")."
     ),
 }
 

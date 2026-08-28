@@ -214,8 +214,11 @@ _LANGUAGE_DIRECTIVE: dict[Language, str] = {
         "LANGUAGE: Reply EXCLUSIVELY in English. Every sentence of your answer "
         "— including the conclusion, the advice and any follow-up question — "
         "must be in English, even if the user writes in Romanian or the "
-        "conversation history is in Romanian. The examples in this prompt are "
-        "illustrative of the logic only, not of the language."
+        "conversation history is in Romanian. The rules and examples in this "
+        "prompt are written in Romanian for your reference; follow their meaning "
+        "but phrase your reply in English — never quote the Romanian. Translate "
+        "any app page or subscription name too (e.g. \"pagina Bugete\" -> \"the "
+        "Budgets page\"). Write amounts as RON, not \"lei\"."
     ),
 }
 

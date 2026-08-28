@@ -394,7 +394,7 @@ async def _set_card_frozen(card_id: str, user_id: str, is_frozen: bool) -> dict:
 
 async def freeze_card(card_id: str, user_id: str) -> dict:
     card = await _set_card_frozen(card_id, user_id, True)
-    await _notify_user(user_id, "card", translate("cardBlockedNotification", last_four=card["last_four"]))
+    await _notify_user(user_id, "card", "cardBlocked", {"last_four": card["last_four"]})
     return card
 
 
@@ -492,14 +492,24 @@ async def create_card(user_id: str, payload: CardCreateRequest) -> dict:
     return await db.cards.find_one({"_id": card_result.inserted_id})
 
 
-async def _notify_user(user_id: str, kind: str, text: str) -> None:
+async def _notify_user(user_id: str, kind: str, message_key: str, message_params: dict | None = None) -> None:
     """Trimite o notificare persistentă către support-service. NU blochează
-    și NU eșuează operația principală dacă support-service e indisponibil."""
+    și NU eșuează operația principală dacă support-service e indisponibil.
+
+    Trimite `message_key` + `message_params` (valori BRUTE) — support-service
+    randează textul în limba CITITORULUI la fiecare citire (vezi
+    support-service/app/i18n.py::render_notification), deci notificarea își
+    schimbă limba când userul comută comutatorul."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text},
+                json={
+                    "user_id": user_id,
+                    "kind": kind,
+                    "message_key": message_key,
+                    "message_params": message_params or {},
+                },
             )
     except httpx.HTTPError:
         logger.warning("accounts-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
