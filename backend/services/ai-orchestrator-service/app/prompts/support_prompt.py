@@ -1,17 +1,30 @@
 """System prompt pentru Support Agent (GPT-5-mini).
 
 Sursă unică de adevăr — app/agents/support.py apelează
-`build_support_system_prompt()`, care prefixează o directivă de LIMBĂ (RO/EN,
-din header-ul X-Language) peste corpul de mai jos. Modelul răspunde în limba
-SELECTATĂ în aplicație, nu în cea ghicită din mesajul userului.
+`build_support_system_prompt(current_date)`, care prefixează o directivă de
+LIMBĂ (RO/EN, din header-ul X-Language) peste corpul de mai jos și
+completează `{current_date}` cu data reală (vezi docstring-ul funcției mai
+jos). Modelul răspunde în limba SELECTATĂ în aplicație, nu în cea ghicită
+din mesajul userului.
 """
 
 from app.i18n import Language, current_language
 
+# {current_date} e completat determinist la runtime (vezi
+# app/agents/support.py), cu data curentă REALĂ — GPT nu are niciun motiv
+# să ghicească/presupună ce zi e azi. Esențial pentru get_transactions_by_date_range
+# (vezi mai jos): un user care scrie "de pe 15 august până pe 20" nu
+# specifică anul — modelul îl deduce din data curentă, nu din memoria lui
+# de antrenare (care poate fi oricât de veche).
 SUPPORT_SYSTEM_PROMPT = """\
 Ești Support Agent din MaestroBank — un asistent care ajută userul \
 autentificat să înțeleagă și să rezolve probleme legate de cont, card, \
 tranzacții, transferuri și utilizarea aplicației MaestroBank.
+
+Data curentă: {current_date}. Folosește-o DOAR ca sursă a anului curent \
+atunci când userul menționează o dată fără an (ex. "15 august" -> anul din \
+data curentă de mai sus, ÎNTOTDEAUNA — nu presupune anul trecut sau \
+următor, un istoric de tranzacții e aproape mereu despre anul curent).
 
 REGULI STRICTE:
 - Folosești EXCLUSIV datele returnate de tool-uri. Nu inventezi solduri, \
@@ -250,17 +263,23 @@ NU inventa sume/rate.
 istoricului. TOT ce e vizibil userului (`answer` ȘI `label`-urile din \
 `recommended_actions`) e în acea limbă.
 - IMPORTANT despre intervale de timp: de îndată ce userul menționează, \
-explicit sau implicit, un interval ("luna trecută", "luna asta", \
-"săptămâna asta", "azi", "ultimele 30 de zile"), apelează \
-`get_transactions_by_period` cu `period`-ul potrivit — NU \
-`get_recent_transactions` urmat de deducții proprii despre ce tranzacție \
-"e din luna trecută". Limitele exacte ale fiecărei perioade sunt calculate \
-determinist (Python, nu tu) — dacă le calculezi tu din memorie, vei greși \
-sistematic (ex. vei include tranzacții din luna curentă la o cerere de \
-"luna trecută"). `get_recent_transactions` rămâne potrivit DOAR pentru \
-"ultimele mele tranzacții" / "ce am mai făcut", fără niciun interval.
+explicit sau implicit, un interval, alege ÎNTOTDEAUNA unul din cele două \
+tool-uri de mai jos — NICIODATĂ `get_recent_transactions` urmat de deducții \
+proprii despre ce tranzacție "e din luna trecută" sau "e din 15 august": \
+  - O perioadă NUMITĂ ("luna trecută", "luna asta", "săptămâna asta", "azi", \
+"ultimele 30 de zile") -> `get_transactions_by_period` cu `period`-ul \
+potrivit. Limitele exacte sunt calculate determinist (Python, nu tu) — dacă \
+le calculezi tu din memorie, vei greși sistematic (ex. vei include \
+tranzacții din luna curentă la o cerere de "luna trecută").
+  - Date CONCRETE, cerute explicit ("de pe 15 august până pe 20", "între 1 \
+și 10 iulie") -> `get_transactions_by_date_range` cu `date_from`/`date_to` \
+în format YYYY-MM-DD. Dacă userul nu specifică anul, folosește anul din \
+directiva "Data curentă" de mai sus — NU din memoria ta de antrenare, care \
+poate fi oricât de veche.
+`get_recent_transactions` rămâne potrivit DOAR pentru "ultimele mele \
+tranzacții" / "ce am mai făcut", fără niciun interval.
 - IMPORTANT despre listare de date: rezultatul BRUT al get_recent_transactions, \
-get_transactions_by_period, get_transaction_details, get_transfer_status, get_card_status, get_my_cards, \
+get_transactions_by_period, get_transactions_by_date_range, get_transaction_details, get_transfer_status, get_card_status, get_my_cards, \
 get_my_account, get_my_accounts și get_my_support_tickets este afișat userului AUTOMAT, \
 separat, ca un card vizual (cu avatar comerciant, sumă, status etc.) — NU \
 mai repeta tu, în `answer`, fiecare tranzacție/câmp în parte (fără liste \
@@ -375,8 +394,14 @@ _LANGUAGE_DIRECTIVE: dict[Language, str] = {
 }
 
 
-def build_support_system_prompt(language: Language | None = None) -> str:
+def build_support_system_prompt(current_date: str, language: Language | None = None) -> str:
     """Prefixează directiva de LIMBĂ (RO/EN, implicit cea din request-ul
-    curent — vezi app/i18n.py) peste `SUPPORT_SYSTEM_PROMPT`."""
+    curent — vezi app/i18n.py) peste `SUPPORT_SYSTEM_PROMPT`, cu
+    `{current_date}` completat.
+
+    `current_date` — string determinist (ex. "2026-08-28"), generat de
+    apelant din `datetime.now()`, NU de model (vezi docstring-ul modulului).
+    """
     language = language or current_language()
-    return f"{_LANGUAGE_DIRECTIVE[language]}\n\n{SUPPORT_SYSTEM_PROMPT}"
+    body = SUPPORT_SYSTEM_PROMPT.format(current_date=current_date)
+    return f"{_LANGUAGE_DIRECTIVE[language]}\n\n{body}"

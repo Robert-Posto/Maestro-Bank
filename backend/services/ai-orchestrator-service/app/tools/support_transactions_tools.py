@@ -84,6 +84,50 @@ async def get_transactions_by_period(authorization: str, period: PeriodName, lim
         return {"error": exc.detail, "status_code": exc.status_code}
 
 
+def _explicit_range_bounds(date_from: str, date_to: str) -> tuple[datetime, datetime]:
+    """Parsează două date de CALENDAR (YYYY-MM-DD, fără oră) — modelul le
+    trimite deja rezolvate la anul curent (vezi directiva "Data curentă" din
+    system prompt). Limita de sus include TOATĂ ziua respectivă (23:59:59.999999),
+    nu doar miezul nopții — altfel `$lte` din transactions-service ar exclude
+    orice tranzacție din ziua finală care nu are ora exact 00:00:00.000000.
+    Ridică ValueError la format invalid sau interval inversat — apelantul
+    (get_transactions_by_date_range) îl transformă într-un rezultat clar
+    pentru model, nu într-o excepție necontrolată."""
+    try:
+        start = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        end_day = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError(f"Format de dată invalid (așteptat YYYY-MM-DD): {exc}") from exc
+    end = end_day + timedelta(days=1, microseconds=-1)
+    if start > end:
+        raise ValueError("Data de început e după data de sfârșit.")
+    return start, end
+
+
+async def get_transactions_by_date_range(authorization: str, date_from: str, date_to: str, limit: int = 100) -> Any:
+    """Tranzacțiile userului într-un interval EXPLICIT, cerut de user cu
+    date concrete (ex. "de pe 15 august până pe 20") — pentru orice cerere
+    care NU se potrivește cu o perioadă numită din get_transactions_by_period
+    (today/this_week/this_month/last_month/last_N_days). `date_from`/`date_to`
+    sunt date de calendar YYYY-MM-DD — dacă userul nu specifică anul,
+    folosește anul din directiva "Data curentă" a promptului de sistem, NU
+    ghici. Limita de sus include toată ziua respectivă."""
+    try:
+        start, end = _explicit_range_bounds(date_from, date_to)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    limit = max(1, min(int(limit), 100))
+    try:
+        return await gateway_request(
+            "GET",
+            "/api/transactions",
+            authorization,
+            params={"date_from": start.isoformat(), "date_to": end.isoformat(), "limit": limit},
+        )
+    except GatewayError as exc:
+        return {"error": exc.detail, "status_code": exc.status_code}
+
+
 async def get_transfer_status(authorization: str, transaction_id: str) -> dict[str, Any]:
     """Statusul unui transfer — identic cu get_transaction_details, pentru
     că un transfer ESTE o tranzacție (nu există o entitate "transfer"

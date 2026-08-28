@@ -547,3 +547,34 @@ async def test_currency_conversion_question_uses_real_exchange_quote(monkeypatch
     )
 
     assert "20,15" in response.answer or "20.15" in response.answer
+
+
+async def test_explicit_date_range_question_uses_date_range_tool(monkeypatch, support_auth_header: dict[str, str]):
+    """"Tranzacțiile de pe 15 august până pe 20" -> GPT cheamă
+    get_transactions_by_date_range cu date exacte (nu get_transactions_by_period,
+    care e doar pentru perioade NUMITE, nici get_recent_transactions)."""
+    captured: dict = {}
+
+    async def fake_get_transactions_by_date_range(authorization, date_from, date_to, limit=100):
+        captured["date_from"] = date_from
+        captured["date_to"] = date_to
+        return [{"id": "tx-aug-18", "description": "Cumpărături"}]
+
+    monkeypatch.setattr(support_transactions_tools, "get_transactions_by_date_range", fake_get_transactions_by_date_range)
+
+    fake_llm = FakeLLMClient(
+        [
+            FakeMessage(tool_calls=[make_tool_call("get_transactions_by_date_range", {"date_from": "2026-08-15", "date_to": "2026-08-20"})]),
+            FakeMessage(
+                tool_calls=[make_tool_call("respond_to_user", {"answer": "Iată tranzacțiile din 15-20 august.", "intent": "transaction_details"})]
+            ),
+        ]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Tranzacțiile de pe 15 august până pe 20"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert captured["date_from"] == "2026-08-15"
+    assert captured["date_to"] == "2026-08-20"
+    assert response.context["transactions"][0]["id"] == "tx-aug-18"

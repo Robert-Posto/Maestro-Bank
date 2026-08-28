@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from app.config import settings
@@ -79,6 +80,7 @@ _READ_TOOL_MODULES: dict[str, Any] = {
     "get_transaction_details": support_transactions_tools,
     "get_recent_transactions": support_transactions_tools,
     "get_transactions_by_period": support_transactions_tools,
+    "get_transactions_by_date_range": support_transactions_tools,
     "get_transfer_status": support_transactions_tools,
     "get_my_support_tickets": support_ticket_tools,
     "get_exchange_rates": support_exchange_tools,
@@ -97,6 +99,7 @@ CONTROL_TOOL = "respond_to_user"
 _CONTEXT_KEY_BY_TOOL: dict[str, str] = {
     "get_recent_transactions": "transactions",
     "get_transactions_by_period": "transactions",
+    "get_transactions_by_date_range": "transactions",
     "get_transaction_details": "transaction",
     "get_transfer_status": "transaction",
     "get_card_status": "card",
@@ -199,6 +202,29 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "limit": {"type": "integer", "description": "Câte tranzacții maxim, implicit 50."},
                 },
                 "required": ["period"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_transactions_by_date_range",
+            "description": (
+                "Întoarce tranzacțiile userului într-un interval EXPLICIT, cerut de user cu date concrete "
+                "(ex. 'de pe 15 august până pe 20', 'între 1 și 10 iulie'). Folosește ACEST tool, NU "
+                "get_transactions_by_period, când userul dă date concrete care nu se potrivesc cu o "
+                "perioadă numită (today/this_week/this_month/last_month/last_N_days). Dacă userul nu "
+                "specifică anul, folosește anul din directiva 'Data curentă' a promptului de sistem — "
+                "NU ghici, NU folosi anul din memoria ta de antrenare."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {"type": "string", "description": "Data de început, format YYYY-MM-DD."},
+                    "date_to": {"type": "string", "description": "Data de sfârșit (inclusiv), format YYYY-MM-DD."},
+                    "limit": {"type": "integer", "description": "Câte tranzacții maxim, implicit 100."},
+                },
+                "required": ["date_from", "date_to"],
             },
         },
     },
@@ -387,7 +413,8 @@ async def run_support_agent(
         logger.info("Support Agent: încercare de extragere a promptului — răspuns determinist, fără apel GPT")
         return translate("promptExtractionRefusal"), "unknown", [], False, {}
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": build_support_system_prompt()}]
+    current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    messages: list[dict[str, Any]] = [{"role": "system", "content": build_support_system_prompt(current_date)}]
     messages.extend({"role": m.role, "content": m.content} for m in history[-_MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
 
