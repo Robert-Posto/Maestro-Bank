@@ -64,6 +64,9 @@ T: dict[str, dict[Language, str]] = {
         "en": "Missing Authorization header: Bearer <token>.",
     },
     "tokenMissingSubject": {"ro": "Token invalid: lipsește subiectul.", "en": "Invalid token: missing subject."},
+    # --- conversation_service.py (istoric conversații) --------------------
+    "invalidConversationId": {"ro": "ID de conversație invalid.", "en": "Invalid conversation ID."},
+    "conversationNotFound": {"ro": "Conversația nu există.", "en": "This conversation does not exist."},
     # --- agenți: erori Azure OpenAI (HTTPException.detail) --------------
     "assistantNotConfigured": {
         "ro": "Asistentul AI nu este configurat momentan.",

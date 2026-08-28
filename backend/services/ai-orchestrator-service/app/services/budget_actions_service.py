@@ -129,7 +129,12 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
         category = payload.get("category")
         limit_minor = payload.get("limit_minor")
         if not name or not category or not limit_minor:
-            raise ToolError("Datele acțiunii sunt incomplete (lipsește nume, categorie sau limită).")
+            raise ToolError(
+                pick(
+                    "Datele acțiunii sunt incomplete (lipsește nume, categorie sau limită).",
+                    "The action data is incomplete (missing name, category or limit).",
+                )
+            )
         budget = await budgets_tools.create_budget(
             {"name": name, "category": category, "limit_minor": limit_minor, "period": payload.get("period", "monthly")},
             authorization_header,
@@ -143,10 +148,10 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
     if action_type == "update_budget":
         budget_id = payload.get("budget_id")
         if not budget_id:
-            raise ToolError("Lipsește identificatorul bugetului de modificat.")
+            raise ToolError(pick("Lipsește identificatorul bugetului de modificat.", "Missing the budget ID to update."))
         fields = {key: value for key, value in payload.items() if key != "budget_id"}
         if not fields:
-            raise ToolError("Nu există nimic de modificat.")
+            raise ToolError(pick("Nu există nimic de modificat.", "There is nothing to update."))
         budget = await budgets_tools.update_budget(budget_id, fields, authorization_header)
         return {
             "success": True,
@@ -159,8 +164,8 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
     if action_type == "delete_budget":
         budget_id = payload.get("budget_id")
         if not budget_id:
-            raise ToolError("Lipsește identificatorul bugetului de șters.")
+            raise ToolError(pick("Lipsește identificatorul bugetului de șters.", "Missing the budget ID to delete."))
         await budgets_tools.delete_budget(budget_id, authorization_header)
         return {"success": True, "message": pick("Bugetul a fost șters.", "The budget was deleted."), "budget": None}
 
-    raise ToolError(f"Tip de acțiune necunoscut: {action_type}")
+    raise ToolError(pick(f"Tip de acțiune necunoscut: {action_type}", f"Unknown action type: {action_type}"))

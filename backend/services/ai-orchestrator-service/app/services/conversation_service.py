@@ -19,6 +19,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.database import get_database
+from app.i18n import translate
 
 Agent = Literal["spending_forecast", "support"]
 
@@ -72,12 +73,14 @@ async def get_conversation(user_id: str, agent: Agent, conversation_id: str) -> 
     try:
         object_id = ObjectId(conversation_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de conversație invalid.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalidConversationId")
+        ) from exc
 
     doc = await db.conversations.find_one({"_id": object_id})
     if doc is None or doc["user_id"] != user_id or doc["agent"] != agent:
         # 404, NU 403 — nu confirmăm că o conversație a altcuiva există.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversația nu există.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("conversationNotFound"))
     return _with_utc_tzinfo(doc)
 
 

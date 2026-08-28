@@ -83,13 +83,13 @@ async def get_current_user_id(authorization: str | None = Header(default=None)) 
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Lipsește header-ul Authorization: Bearer <token>.",
+            detail=translate("missingAuthorizationHeader"),
         )
     token = authorization.split(" ", 1)[1]
     payload = _decode(token)
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalid: lipsește subiectul.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenMissingSubject"))
     return user_id
 
 

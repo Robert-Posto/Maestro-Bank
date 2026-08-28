@@ -67,7 +67,9 @@ async def chat(
     except RuntimeError as exc:
         # Ridicată de app/llm/azure_openai.py când AZURE_OPENAI_ENDPOINT /
         # AZURE_OPENAI_API_KEY lipsesc — răspuns curat, NU un 500 brut.
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=translate("assistantNotConfigured")
+        ) from exc
     except APIError as exc:
         # Eroare REALĂ de la Azure (endpoint/deployment greșit, cheie
         # invalidă, model indisponibil etc.) — nu propagăm mesajul brut al
