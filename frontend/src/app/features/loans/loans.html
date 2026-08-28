@@ -1,5 +1,5 @@
 <app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici.">
-  <app-action-button variant="ghost" (pressed)="howItWorksOpen.set(true)">
+  <app-action-button variant="ghost" (pressed)="openHowItWorks()">
     <app-icon name="info" [size]="16" /> Cum funcționează
   </app-action-button>
 </app-page-header>
@@ -70,27 +70,14 @@
   </div>
 </section>
 
-<section class="trust-row">
-  <div class="trust-card">
-    <span class="trust-card__icon"><app-icon name="flash" [size]="18" /></span>
-    <p class="trust-card__title">Aprobare pe loc</p>
-    <p class="trust-card__text">Verificăm venitul tău real, din istoric — nu aștepți zile pentru un răspuns.</p>
+<section class="how-it-works-teaser">
+  <div class="how-it-works-teaser__text">
+    <p class="how-it-works-teaser__title">Cum funcționează, pas cu pas</p>
+    <p class="how-it-works-teaser__subtitle">De la sumă la rată automată — glisează prin cărțile de mai jos.</p>
   </div>
-  <div class="trust-card">
-    <span class="trust-card__icon"><app-icon name="check" [size]="18" /></span>
-    <p class="trust-card__title">Fără costuri ascunse</p>
-    <p class="trust-card__text">Rata din simulator e exact ce plătești — fără comisioane suplimentare.</p>
-  </div>
-  <div class="trust-card">
-    <span class="trust-card__icon"><app-icon name="banknote" [size]="18" /></span>
-    <p class="trust-card__title">Plată automată</p>
-    <p class="trust-card__text">Rata se scade singură din cont, lunar — nu ții tu evidența.</p>
-  </div>
-  <div class="trust-card">
-    <span class="trust-card__icon"><app-icon name="unlock" [size]="18" /></span>
-    <p class="trust-card__title">Achiți oricând</p>
-    <p class="trust-card__text">Plată anticipată, fără dobândă suplimentară pentru perioada rămasă.</p>
-  </div>
+  <app-action-button variant="secondary" (pressed)="openHowItWorks()">
+    <app-icon name="info" [size]="16" /> Deschide explicațiile
+  </app-action-button>
 </section>
 
 <section class="loans-section">
@@ -146,37 +133,51 @@
 </section>
 
 @if (howItWorksOpen()) {
-  <app-modal title="Cum funcționează un credit MaestroBank" [maxWidth]="560" (closed)="howItWorksOpen.set(false)">
-    <ol class="how-it-works">
-      <li>
-        <span class="how-it-works__step">1</span>
-        <div>
-          <p class="how-it-works__title">Alegi suma și termenul</p>
-          <p class="how-it-works__text">Simulatorul de mai sus îți arată rata exactă înainte să aplici — fără surprize.</p>
+  <app-modal title="Cum funcționează" [maxWidth]="460" (closed)="howItWorksOpen.set(false)">
+    <div class="card-deck" tabindex="0" (keydown.arrowleft)="prevCard()" (keydown.arrowright)="nextCard()">
+      <button type="button" class="card-deck__nav" aria-label="Cardul anterior" (click)="prevCard()">
+        <app-icon name="chevron-left" [size]="18" />
+      </button>
+
+      <div
+        class="card-deck__viewport"
+        (pointerdown)="onCardPointerDown($event)"
+        (pointermove)="onCardPointerMove($event)"
+        (pointerup)="onCardPointerUp()"
+        (pointercancel)="onCardPointerUp()"
+      >
+        <div class="card-deck__track" [class.card-deck__track--dragging]="isDragging()" [style.transform]="trackTransform()">
+          @for (card of howItWorksCards; track $index) {
+            <div class="deck-card" [class.deck-card--cover]="card.kind === 'cover'">
+              @if (card.kind === 'step') {
+                <span class="deck-card__step">{{ card.step }}</span>
+              } @else if (card.kind === 'benefit') {
+                <span class="deck-card__icon"><app-icon [name]="card.icon!" [size]="22" /></span>
+              }
+              <p class="deck-card__title">{{ card.title }}</p>
+              <p class="deck-card__text">{{ card.text }}</p>
+            </div>
+          }
         </div>
-      </li>
-      <li>
-        <span class="how-it-works__step">2</span>
-        <div>
-          <p class="how-it-works__title">Verificăm venitul tău real</p>
-          <p class="how-it-works__text">Ne uităm la istoricul tău de tranzacții din ultimele 3 luni, nu la ce declari.</p>
-        </div>
-      </li>
-      <li>
-        <span class="how-it-works__step">3</span>
-        <div>
-          <p class="how-it-works__title">Banii intră imediat în cont</p>
-          <p class="how-it-works__text">Fără așteptare, fără aprobare manuală — dacă eligibilitatea e îndeplinită.</p>
-        </div>
-      </li>
-      <li>
-        <span class="how-it-works__step">4</span>
-        <div>
-          <p class="how-it-works__title">Rata se plătește singură</p>
-          <p class="how-it-works__text">Automat, lunar, din contul curent — sau achiți oricând tot restul, fără cost suplimentar.</p>
-        </div>
-      </li>
-    </ol>
+      </div>
+
+      <button type="button" class="card-deck__nav" aria-label="Cardul următor" (click)="nextCard()">
+        <app-icon name="chevron-right" [size]="18" />
+      </button>
+    </div>
+
+    <div class="card-deck__dots">
+      @for (card of howItWorksCards; track $index; let i = $index) {
+        <button
+          type="button"
+          class="card-deck__dot"
+          [class.card-deck__dot--active]="activeCardIndex() === i"
+          [attr.aria-label]="'Cardul ' + (i + 1)"
+          (click)="goToCard(i)"
+        ></button>
+      }
+    </div>
+
     <p class="how-it-works__note">
       Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu
       lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.

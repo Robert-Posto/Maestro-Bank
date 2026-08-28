@@ -18,6 +18,73 @@ const TERM_OPTIONS: LoanTermMonths[] = [12, 24, 36, 60];
 const MIN_AMOUNT_RON = 1000;
 const MAX_AMOUNT_RON = 50_000;
 
+interface HowItWorksCard {
+  kind: 'cover' | 'step' | 'benefit';
+  icon?: string;
+  step?: number;
+  title: string;
+  text: string;
+}
+
+/** Cartea de explicații — "Cum funcționează" — glisabilă (vezi
+ * card-deck din loans.html/css). Pasul cu pasul + de ce MaestroBank,
+ * o singură idee pe card, ca un onboarding real, nu un perete de text. */
+const HOW_IT_WORKS_CARDS: HowItWorksCard[] = [
+  {
+    kind: 'cover',
+    title: 'Cum funcționează un credit MaestroBank',
+    text: 'Patru pași, fără birocrație — glisează pentru următorul.',
+  },
+  {
+    kind: 'step',
+    step: 1,
+    title: 'Alegi suma și termenul',
+    text: 'Simulatorul de mai sus îți arată rata exactă înainte să aplici — fără surprize.',
+  },
+  {
+    kind: 'step',
+    step: 2,
+    title: 'Verificăm venitul tău real',
+    text: 'Ne uităm la istoricul tău de tranzacții din ultimele 3 luni, nu la ce declari.',
+  },
+  {
+    kind: 'step',
+    step: 3,
+    title: 'Banii intră imediat în cont',
+    text: 'Fără așteptare, fără aprobare manuală — dacă eligibilitatea e îndeplinită.',
+  },
+  {
+    kind: 'step',
+    step: 4,
+    title: 'Rata se plătește singură',
+    text: 'Automat, lunar, din contul curent — sau achiți oricând tot restul, fără cost suplimentar.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'flash',
+    title: 'Aprobare pe loc',
+    text: 'Verificăm venitul tău real, din istoric — nu aștepți zile pentru un răspuns.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'check',
+    title: 'Fără costuri ascunse',
+    text: 'Rata din simulator e exact ce plătești — fără comisioane suplimentare.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'banknote',
+    title: 'Plată automată',
+    text: 'Rata se scade singură din cont, lunar — nu ții tu evidența.',
+  },
+  {
+    kind: 'benefit',
+    icon: 'unlock',
+    title: 'Achiți oricând',
+    text: 'Plată anticipată, fără dobândă suplimentară pentru perioada rămasă.',
+  },
+];
+
 /**
  * Credite personale — simulatorul (sumă + termen) e centrul paginii: userul
  * vede rata exactă ÎNAINTE să aplice, fără să ghicească. Formula de
@@ -66,6 +133,16 @@ export class Loans implements OnInit, OnDestroy {
   protected readonly displayedInstallmentMinor = signal(0);
 
   protected readonly howItWorksOpen = signal(false);
+  protected readonly howItWorksCards = HOW_IT_WORKS_CARDS;
+  protected readonly activeCardIndex = signal(0);
+  protected readonly dragOffsetPx = signal(0);
+  protected readonly isDragging = signal(false);
+  protected readonly trackTransform = computed(
+    () => `translateX(calc(${-this.activeCardIndex() * 100}% + ${this.dragOffsetPx()}px))`,
+  );
+
+  private dragStartX = 0;
+  private dragPointerId: number | null = null;
 
   private animationFrameId: number | null = null;
   private readonly prefersReducedMotion =
@@ -153,6 +230,51 @@ export class Loans implements OnInit, OnDestroy {
 
   protected setCalculatorAmount(value: number): void {
     this.calculatorAmountRon.set(Math.min(this.maxAmountRon, Math.max(this.minAmountRon, value || this.minAmountRon)));
+  }
+
+  // --- Cartea "Cum funcționează" — swipe stânga/dreapta -----------------------------
+
+  protected nextCard(): void {
+    this.activeCardIndex.update((i) => (i + 1) % this.howItWorksCards.length);
+  }
+
+  protected prevCard(): void {
+    this.activeCardIndex.update((i) => (i - 1 + this.howItWorksCards.length) % this.howItWorksCards.length);
+  }
+
+  protected goToCard(index: number): void {
+    this.activeCardIndex.set(index);
+  }
+
+  protected onCardPointerDown(event: PointerEvent): void {
+    this.isDragging.set(true);
+    this.dragStartX = event.clientX;
+    this.dragPointerId = event.pointerId;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  protected onCardPointerMove(event: PointerEvent): void {
+    if (!this.isDragging() || event.pointerId !== this.dragPointerId) return;
+    this.dragOffsetPx.set(event.clientX - this.dragStartX);
+  }
+
+  protected onCardPointerUp(): void {
+    if (!this.isDragging()) return;
+    const offset = this.dragOffsetPx();
+    const threshold = 60;
+    if (offset < -threshold) {
+      this.nextCard();
+    } else if (offset > threshold) {
+      this.prevCard();
+    }
+    this.isDragging.set(false);
+    this.dragOffsetPx.set(0);
+    this.dragPointerId = null;
+  }
+
+  protected openHowItWorks(): void {
+    this.activeCardIndex.set(0);
+    this.howItWorksOpen.set(true);
   }
 
   protected loanProgressPercent(loan: LoanView): number {

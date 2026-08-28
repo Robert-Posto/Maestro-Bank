@@ -207,89 +207,163 @@
   }
 }
 
-/* --- "De ce MaestroBank" --------------------------------------------------------- */
+/* --- Banner spre carte -------------------------------------------------------- */
 
-.trust-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.how-it-works-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--mb-space-4);
+  flex-wrap: wrap;
+  background: var(--mb-info-bg);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-5) var(--mb-space-6);
   margin-bottom: var(--mb-space-8);
 }
 
-.trust-card {
-  background: var(--mb-surface);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius-md);
-  padding: var(--mb-space-5);
-}
-
-.trust-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--mb-blue-50);
-  color: var(--mb-blue-600);
-  margin-bottom: var(--mb-space-3);
-}
-
-.trust-card__title {
-  font-size: var(--mb-font-size-sm);
+.how-it-works-teaser__title {
+  font-size: var(--mb-font-size-base);
   font-weight: var(--mb-font-weight-semibold);
-  margin-bottom: var(--mb-space-1);
 }
 
-.trust-card__text {
+.how-it-works-teaser__subtitle {
   font-size: var(--mb-font-size-xs);
   color: var(--mb-text-tertiary);
 }
 
-@media (max-width: 800px) {
-  .trust-row {
-    grid-template-columns: repeat(2, 1fr);
+/* --- Cartea "Cum funcționează" — glisabilă, stânga/dreapta ------------------------ */
+
+.card-deck {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  outline: none;
+}
+
+.card-deck__nav {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-surface);
+  color: var(--mb-text-secondary);
+  cursor: pointer;
+  transition: all var(--mb-transition-fast);
+}
+
+.card-deck__nav:hover {
+  border-color: var(--mb-blue-500);
+  color: var(--mb-blue-600);
+}
+
+.card-deck__viewport {
+  flex: 1;
+  overflow: hidden;
+  border-radius: var(--mb-radius-lg);
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.card-deck__viewport:active {
+  cursor: grabbing;
+}
+
+.card-deck__track {
+  display: flex;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-deck__track--dragging {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-deck__track {
+    transition: none;
   }
 }
 
-/* --- Cum funcționează (popup) ---------------------------------------------------- */
-
-.how-it-works {
-  list-style: none;
+.deck-card {
+  flex: 0 0 100%;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
-  gap: var(--mb-space-5);
-  margin-bottom: var(--mb-space-5);
-}
-
-.how-it-works li {
-  display: flex;
-  gap: var(--mb-space-4);
-}
-
-.how-it-works__step {
-  flex-shrink: 0;
-  display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  text-align: center;
+  gap: var(--mb-space-3);
+  padding: var(--mb-space-8) var(--mb-space-6);
+  background: var(--mb-surface-muted);
+  user-select: none;
+}
+
+.deck-card--cover {
+  background: var(--mb-info-bg);
+}
+
+.deck-card--cover .deck-card__title {
+  font-size: var(--mb-font-size-lg);
+}
+
+.deck-card__step {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--mb-blue-600);
   color: #fff;
-  font-size: var(--mb-font-size-xs);
   font-weight: var(--mb-font-weight-semibold);
 }
 
-.how-it-works__title {
+.deck-card__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--mb-blue-50);
+  color: var(--mb-blue-600);
+}
+
+.deck-card__title {
+  font-size: var(--mb-font-size-md);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+}
+
+.deck-card__text {
   font-size: var(--mb-font-size-sm);
-  font-weight: var(--mb-font-weight-semibold);
-  margin-bottom: 2px;
+  color: var(--mb-text-secondary);
+  max-width: 320px;
 }
 
-.how-it-works__text {
-  font-size: var(--mb-font-size-xs);
-  color: var(--mb-text-tertiary);
+.card-deck__dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: var(--mb-space-4) 0;
+}
+
+.card-deck__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: var(--mb-border);
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--mb-transition-fast);
+}
+
+.card-deck__dot--active {
+  background: var(--mb-blue-600);
+  width: 18px;
+  border-radius: var(--mb-radius-pill);
 }
 
 .how-it-works__note {
