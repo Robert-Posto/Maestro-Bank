@@ -31,6 +31,11 @@ import { Component, input } from '@angular/core';
           background-position: 0 50%;
         }
       }
+      @media (prefers-reduced-motion: reduce) {
+        .skeleton-row {
+          animation: none;
+        }
+      }
     `,
   ],
 })

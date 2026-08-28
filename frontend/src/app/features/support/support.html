@@ -261,13 +261,7 @@
     <div class="support-form">
       <label>
         <span>{{ 'common.category' | translate }}</span>
-        <select [ngModel]="category()" (ngModelChange)="category.set($event)">
-          <option value="card">{{ 'support.categoryCard' | translate }}</option>
-          <option value="transfer">{{ 'support.categoryTransfer' | translate }}</option>
-          <option value="account">{{ 'support.categoryAccount' | translate }}</option>
-          <option value="technical">{{ 'support.categoryTechnical' | translate }}</option>
-          <option value="other">{{ 'support.categoryOther' | translate }}</option>
-        </select>
+        <app-select [options]="categoryOptions()" [value]="category()" (changed)="setCategory($event)" />
       </label>
       <label>
         <span>{{ 'support.subjectLabel' | translate }}</span>

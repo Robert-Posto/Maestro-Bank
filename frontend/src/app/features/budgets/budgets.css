@@ -371,8 +371,7 @@ app-empty-state {
   font-weight: var(--mb-font-weight-medium);
 }
 
-.budget-form input,
-.budget-form select {
+.budget-form input {
   font-family: inherit;
   font-size: var(--mb-font-size-base);
   min-height: 44px;
@@ -383,10 +382,13 @@ app-empty-state {
   color: var(--mb-text-primary);
 }
 
-.budget-form input:focus,
-.budget-form select:focus {
+.budget-form input:focus {
   border-color: var(--mb-blue-500);
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.budget-form app-select {
+  display: block;
 }
 
 /* --- Responsive --- */

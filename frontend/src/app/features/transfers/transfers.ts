@@ -241,6 +241,19 @@ export class Transfers implements OnInit {
     return this.language.t(frequency === 'weekly' ? 'common.weekly' : 'common.monthly');
   }
 
+  /** app-select în loc de <select> nativ — vezi budgets.ts::periodOptions,
+   * același motiv (popup-ul nativ ignoră tokenii --mb-*, rupe dark mode). */
+  protected readonly frequencyOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return [
+      { value: 'weekly', label: this.frequencyLabel('weekly') },
+      { value: 'monthly', label: this.frequencyLabel('monthly') },
+    ];
+  });
+  protected setScheduleFrequency(value: string): void {
+    this.scheduleFrequency.set(value as ScheduleFrequency);
+  }
+
   // --- Cereri de plată (link/QR de tip "Request Money") -------------------
 
   private loadPaymentRequests(): void {

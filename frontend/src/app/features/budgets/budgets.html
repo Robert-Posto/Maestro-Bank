@@ -210,11 +210,7 @@
       </label>
       <label>
         <span>{{ 'budgets.period' | translate }}</span>
-        <select [ngModel]="budgetPeriod()" (ngModelChange)="budgetPeriod.set($event)">
-          <option value="weekly">{{ 'common.weekly' | translate }}</option>
-          <option value="monthly">{{ 'common.monthly' | translate }}</option>
-          <option value="yearly">{{ 'common.yearly' | translate }}</option>
-        </select>
+        <app-select [options]="periodOptions()" [value]="budgetPeriod()" (changed)="setBudgetPeriod($event)" />
       </label>
       <app-action-button [fullWidth]="true" [loading]="budgetSaving()" (pressed)="saveBudget()">{{ 'budgets.createBudget' | translate }}</app-action-button>
     </div>

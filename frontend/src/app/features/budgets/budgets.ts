@@ -68,6 +68,20 @@ export class Budgets implements OnInit {
   protected categoryLabel(value: string | undefined | null): string {
     return categoryLabel(value, this.language.language());
   }
+
+  /** Vezi categoryOptions mai sus — același motiv (app-select în loc de
+   * <select> nativ, care ignora tokenii --mb-* și rupea dark mode). */
+  protected readonly periodOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return [
+      { value: 'weekly', label: this.language.t('common.weekly') },
+      { value: 'monthly', label: this.language.t('common.monthly') },
+      { value: 'yearly', label: this.language.t('common.yearly') },
+    ];
+  });
+  protected setBudgetPeriod(value: string): void {
+    this.budgetPeriod.set(value as BudgetPeriod);
+  }
   protected readonly categoryColorVar = categoryColorVar;
   protected readonly daysUntilBilling = daysUntilBilling;
   protected daysUntilBillingLabel(billingDay: number): string {

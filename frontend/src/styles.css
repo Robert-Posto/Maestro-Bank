@@ -202,6 +202,21 @@ a {
   background: var(--mb-blue-100);
 }
 
+/* Inel de focus consistent, la nivel de aplicație — pentru navigare cu
+   tastatura (:focus-visible NU apare la un click de mouse, deci nu
+   aglomerează vizual pentru restul userilor). Fără asta, fiecare buton/link
+   fără propriul stil de focus explicit cădea pe outline-ul implicit al
+   browserului — diferit ca aspect de la un browser la altul și inconsecvent
+   cu restul aplicației. --mb-blue-500 e constant în ambele teme (folosit
+   deja direct, ca rgba(47, 111, 237, ...), în inelele de focus ale
+   input-urilor/select-ului custom), deci regula rămâne corectă și în dark
+   mode fără o redefinire separată. */
+:focus-visible {
+  outline: 2px solid var(--mb-blue-500);
+  outline-offset: 2px;
+  border-radius: var(--mb-radius-sm);
+}
+
 /* Scrollbar discret (webkit) — nu impune, doar rafinează */
 ::-webkit-scrollbar {
   width: 8px;

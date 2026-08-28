@@ -37,7 +37,9 @@ export type ActionButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
         transition:
           background var(--mb-transition-fast),
           border-color var(--mb-transition-fast),
-          opacity var(--mb-transition-fast);
+          opacity var(--mb-transition-fast),
+          box-shadow var(--mb-transition-fast),
+          transform var(--mb-transition-fast);
         white-space: nowrap;
       }
       .btn:disabled {
@@ -47,12 +49,22 @@ export type ActionButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
       .btn--full {
         width: 100%;
       }
+      /* Umbră + lift discret la hover — butonul primar apare pe aproape
+         fiecare formular din aplicație, deci o singură nuanță de "apăsabil"
+         în plus aici se simte pe toată aplicația, nu doar într-un loc. */
       .btn--primary {
         background: var(--mb-blue-500);
         color: #fff;
+        box-shadow: 0 2px 8px -2px rgba(47, 111, 237, 0.35);
       }
       .btn--primary:not(:disabled):hover {
         background: var(--mb-blue-600);
+        box-shadow: 0 6px 16px -4px rgba(47, 111, 237, 0.42);
+        transform: translateY(-1px);
+      }
+      .btn--primary:not(:disabled):active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px -2px rgba(47, 111, 237, 0.35);
       }
       .btn--secondary {
         background: var(--mb-surface);
@@ -90,6 +102,15 @@ export type ActionButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
       @keyframes btn-spin {
         to {
           transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .btn {
+          transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast), opacity var(--mb-transition-fast);
+        }
+        .btn--primary:not(:disabled):hover,
+        .btn--primary:not(:disabled):active {
+          transform: none;
         }
       }
     `,

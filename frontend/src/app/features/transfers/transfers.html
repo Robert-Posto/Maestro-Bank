@@ -429,10 +429,7 @@
       </label>
       <label>
         <span>{{ 'transfers.frequency' | translate }}</span>
-        <select [ngModel]="scheduleFrequency()" (ngModelChange)="scheduleFrequency.set($event)">
-          <option value="weekly">{{ 'common.weekly' | translate }}</option>
-          <option value="monthly">{{ 'common.monthly' | translate }}</option>
-        </select>
+        <app-select [options]="frequencyOptions()" [value]="scheduleFrequency()" (changed)="setScheduleFrequency($event)" />
       </label>
       <app-action-button [fullWidth]="true" [loading]="scheduleSaving()" (pressed)="saveSchedule()">
         {{ 'transfers.createScheduledTransfer' | translate }}

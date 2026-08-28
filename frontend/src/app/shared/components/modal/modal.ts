@@ -53,13 +53,24 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
         font-size: var(--mb-font-size-md);
       }
       .modal-close {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border: none;
+        border-radius: 50%;
         background: transparent;
         font-size: 1.25rem;
         line-height: 1;
         color: var(--mb-text-tertiary);
         cursor: pointer;
         padding: var(--mb-space-1);
+        transition: background var(--mb-transition-fast), color var(--mb-transition-fast);
+      }
+      .modal-close:hover {
+        background: var(--mb-surface-muted);
+        color: var(--mb-text-primary);
       }
       .modal-body {
         padding: var(--mb-space-6);
@@ -80,6 +91,12 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
         to {
           transform: translateY(0) scale(1);
           opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .modal-backdrop,
+        .modal-panel {
+          animation: none;
         }
       }
     `,

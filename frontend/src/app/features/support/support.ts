@@ -22,6 +22,7 @@ import { ActionButton } from '../../shared/components/action-button/action-butto
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { Modal } from '../../shared/components/modal/modal';
 import { Icon } from '../../shared/components/icon/icon';
+import { Select, SelectOption } from '../../shared/components/select/select';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 import { TransactionRow, TransactionRowData } from '../../shared/components/transaction-row/transaction-row';
@@ -117,7 +118,7 @@ function formatChatTime(date: Date): string {
 @Component({
   selector: 'app-support',
   standalone: true,
-  imports: [FormsModule, DatePipe, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, TransactionRow, TranslatePipe],
+  imports: [FormsModule, DatePipe, MoneyPipe, MarkdownLitePipe, PageHeader, ActionButton, StatusBadge, Modal, Icon, Select, TransactionRow, TranslatePipe],
   templateUrl: './support.html',
   styleUrl: './support.css',
 })
@@ -140,6 +141,21 @@ export class Support implements OnInit, OnDestroy {
 
   protected readonly subject = signal('');
   protected readonly category = signal<TicketCategory>('other');
+  /** app-select în loc de <select> nativ — vezi budgets.ts::periodOptions,
+   * același motiv (popup-ul nativ ignoră tokenii --mb-*, rupe dark mode). */
+  protected readonly categoryOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return [
+      { value: 'card', label: this.language.t('support.categoryCard') },
+      { value: 'transfer', label: this.language.t('support.categoryTransfer') },
+      { value: 'account', label: this.language.t('support.categoryAccount') },
+      { value: 'technical', label: this.language.t('support.categoryTechnical') },
+      { value: 'other', label: this.language.t('support.categoryOther') },
+    ];
+  });
+  protected setCategory(value: string): void {
+    this.category.set(value as TicketCategory);
+  }
   protected readonly message = signal('');
   protected readonly chatInput = signal('');
   protected readonly supportTyping = signal(false);

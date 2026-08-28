@@ -34,10 +34,22 @@ import { LanguageService } from '../../../services/language.service';
         padding: var(--mb-space-10) var(--mb-space-6);
         color: var(--mb-text-secondary);
       }
+      /* Cerc discret în loc de iconița "goală" la 50% opacitate — folosit
+         pe fiecare listă/tabel gol din aplicație, deci un singur badge mai
+         "finisat" aici ridică vizual toată aplicația dintr-o mișcare, fără
+         să atingă fiecare pagină individual. Fundal derivat din token
+         (--mb-surface-muted), nu o culoare fixă, deci rămâne corect și în
+         dark mode. */
       .empty-state__icon {
         display: inline-flex;
-        margin-bottom: var(--mb-space-3);
-        opacity: 0.5;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        margin-bottom: var(--mb-space-4);
+        border-radius: 50%;
+        background: var(--mb-surface-muted);
+        color: var(--mb-text-tertiary);
       }
       .empty-state__title {
         font-weight: var(--mb-font-weight-medium);

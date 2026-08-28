@@ -31,6 +31,12 @@
   border-radius: var(--mb-radius-lg);
   padding: var(--mb-space-5);
   box-shadow: var(--mb-shadow-xs);
+  transition: box-shadow var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.sf-panel:hover {
+  box-shadow: var(--mb-shadow-sm);
+  border-color: var(--mb-border-strong);
 }
 
 .sf-panel h2 {
@@ -63,12 +69,20 @@
   height: 8px;
   border-radius: var(--mb-radius-pill);
   background: var(--mb-surface-muted);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 .sf-bar-row__fill {
   height: 100%;
   border-radius: var(--mb-radius-pill);
+  transition: width 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-bar-row__fill {
+    transition: none;
+  }
 }
 
 .sf-bar-row__value {
@@ -123,6 +137,12 @@
   padding: var(--mb-space-3);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius-md);
+  transition: border-color var(--mb-transition-fast), box-shadow var(--mb-transition-fast);
+}
+
+.sf-forecast-grid > div:hover {
+  border-color: var(--mb-border-strong);
+  box-shadow: var(--mb-shadow-xs);
 }
 
 .sf-forecast-grid span {
@@ -141,7 +161,12 @@
 
 .sf-forecast-grid__highlight {
   border-color: var(--mb-blue-500) !important;
-  background: var(--mb-blue-50);
+  background: linear-gradient(160deg, var(--mb-blue-50) 0%, var(--mb-surface) 130%);
+  box-shadow: 0 0 0 1px var(--mb-blue-500) inset;
+}
+
+.sf-forecast-grid__highlight:hover {
+  box-shadow: 0 0 0 1px var(--mb-blue-500) inset, var(--mb-shadow-xs);
 }
 
 .sf-obligations {
@@ -159,8 +184,15 @@
   grid-template-columns: 1fr auto auto;
   gap: var(--mb-space-4);
   font-size: var(--mb-font-size-sm);
-  padding: var(--mb-space-2) 0;
+  padding: var(--mb-space-2) var(--mb-space-2);
+  margin: 0 calc(var(--mb-space-2) * -1);
+  border-radius: var(--mb-radius-sm);
   border-bottom: 1px solid var(--mb-border);
+  transition: background var(--mb-transition-fast);
+}
+
+.sf-obligation-row:hover {
+  background: var(--mb-surface-muted);
 }
 
 .sf-obligation-row:last-child {

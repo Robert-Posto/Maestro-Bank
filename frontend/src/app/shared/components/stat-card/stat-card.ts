@@ -38,6 +38,23 @@ export type StatTrend = 'up' | 'down' | 'neutral';
         flex-direction: column;
         gap: var(--mb-space-2);
         min-width: 0;
+        transition: box-shadow var(--mb-transition-fast), border-color var(--mb-transition-fast), transform var(--mb-transition-fast);
+      }
+      /* Nu pe varianta --flush (mai multe carduri unite într-un singur
+         bloc, vezi comentariul de mai jos) — acolo un hover izolat pe UNUL
+         singur ar rupe vizual continuitatea blocului. */
+      .stat-card:not(.stat-card--flush):hover {
+        box-shadow: var(--mb-shadow-sm);
+        border-color: var(--mb-border-strong);
+        transform: translateY(-1px);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .stat-card {
+          transition: none;
+        }
+        .stat-card:not(.stat-card--flush):hover {
+          transform: none;
+        }
       }
       /* Pentru situația în care mai multe stat-card-uri stau într-un rând
          unificat (o singură cutie cu divizoare) — wrapper-ul din pagina

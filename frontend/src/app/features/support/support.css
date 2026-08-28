@@ -1132,7 +1132,6 @@
 }
 
 .support-form input,
-.support-form select,
 .support-form textarea {
   font-family: inherit;
   font-size: var(--mb-font-size-base);
@@ -1145,10 +1144,13 @@
 }
 
 .support-form input:focus,
-.support-form select:focus,
 .support-form textarea:focus {
   border-color: var(--mb-blue-500);
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.support-form app-select {
+  display: block;
 }
 
 @media (max-width: 1100px) {
