@@ -55,6 +55,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Asistenți AI',
     highlight: true,
     items: [
+      // Asistent — orchestrator SUBȚIRE (vezi features/assistant), NU un al
+      // treilea agent: clasifică o întrebare nouă și trimite userul direct
+      // la MaestroAgent sau Support, cu mesajul deja "pus" acolo. Primul în
+      // listă — e intrarea recomandată acum, dar MaestroAgent/Support rămân
+      // exact cum erau, complet neatinse, pentru cine vrea direct pe unul.
+      { label: 'Asistent', route: '/app/assistant', icon: 'sparkles' },
       // MaestroAgent (fost "MaestroAssistent") — funcțional acum (agentul
       // Spending + Forecast, peste GPT-5-mini), deci e o intrare normală
       // de navigare, ca oricare alta — NU mai e un card promo în footer.

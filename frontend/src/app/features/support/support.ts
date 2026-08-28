@@ -175,6 +175,15 @@ export class Support implements OnInit, OnDestroy {
     const presetCategory = this.route.snapshot.queryParamMap.get('category') as TicketCategory | null;
     if (presetCategory) this.category.set(presetCategory);
     if (shouldOpen) this.openModal();
+
+    // Auto-trimite o întrebare venită din pagina "Asistent" (orchestrator
+    // subțire, vezi features/assistant) — vezi Copilot::ngOnInit, același
+    // motiv (userul a scris-o o singură dată acolo, n-o retastează aici).
+    const presetQuestion = this.route.snapshot.queryParamMap.get('q');
+    if (presetQuestion) {
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      this.askAgent(presetQuestion);
+    }
   }
 
   ngOnDestroy(): void {

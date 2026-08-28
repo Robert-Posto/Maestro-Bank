@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { AiCopilotService, ConversationDetail, ConversationSummary, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
@@ -69,6 +70,8 @@ export class Copilot implements OnInit, OnDestroy {
   private readonly copilotApi = inject(AiCopilotService);
   protected readonly speech = inject(SpeechService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
   private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
@@ -117,6 +120,16 @@ export class Copilot implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadConversations();
+
+    // Auto-trimite o întrebare venită din pagina "Asistent" (orchestrator
+    // subțire, vezi features/assistant) — userul a scris-o o singură dată
+    // acolo, n-o retastează aici. Curățăm query param-ul imediat, ca un
+    // refresh al paginii să nu retrimită aceeași întrebare.
+    const presetQuestion = this.route.snapshot.queryParamMap.get('q');
+    if (presetQuestion) {
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      this.ask(presetQuestion);
+    }
   }
 
   ngOnDestroy(): void {

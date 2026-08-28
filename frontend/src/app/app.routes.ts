@@ -105,6 +105,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/copilot/copilot').then((m) => m.Copilot),
       },
       {
+        path: 'assistant',
+        loadComponent: () => import('./features/assistant/assistant').then((m) => m.Assistant),
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
       },
