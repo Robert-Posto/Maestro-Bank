@@ -1,43 +1,48 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { LoanPaymentView, LoanRateView, LoanTermMonths, LoanView, LoansService } from '../../services/loans.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
+import { Icon } from '../../shared/components/icon/icon';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Modal } from '../../shared/components/modal/modal';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
-import { Select } from '../../shared/components/select/select';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { extractErrorMessage } from '../../shared/error-utils';
 
 const TERM_OPTIONS: LoanTermMonths[] = [12, 24, 36, 60];
+const MIN_AMOUNT_RON = 1000;
+const MAX_AMOUNT_RON = 50_000;
 
 /**
- * Credite personale — cerere (sumă + termen), execuție REALĂ prin
- * accounts-service (suma intră imediat în contul curent la aprobare). Rata
- * lunară se calculează cu formula standard de amortizare și se plătește
- * AUTOMAT, lunar, din contul curent — vezi loans-service. Aprobarea
- * verifică REAL eligibilitatea (venitul mediu din istoricul de tranzacții)
- * — o cerere poate fi respinsă, cu motivul exact afișat userului (nu doar
- * un refuz sec). Pagină separată — suprafață comparabilă cu Investițiile
- * (cerere + listă credite + scadențar + istoric plăți + plată anticipată).
+ * Credite personale — simulatorul (sumă + termen) e centrul paginii: userul
+ * vede rata exactă ÎNAINTE să aplice, fără să ghicească. Formula de
+ * amortizare de mai jos (computeInstallmentMinor) e o COPIE exactă a
+ * backend-ului (loans-service/app/rates.py::compute_monthly_installment_minor)
+ * — sigură de duplicat client-side pentru că e matematică publică, nu o
+ * decizie sensibilă (spre deosebire de roata norocului la Puncte, unde
+ * rezultatul NU poate fi calculat pe client). Decizia REALĂ (eligibilitate +
+ * execuție) rămâne 100% pe server, la POST /loans/apply — simulatorul e
+ * doar o previzualizare instantă.
  */
 @Component({
   selector: 'app-loans',
   standalone: true,
-  imports: [FormsModule, DatePipe, PageHeader, ActionButton, LoadingSkeleton, EmptyState, Modal, StatusBadge, Select, MoneyPipe],
+  imports: [FormsModule, DatePipe, DecimalPipe, PageHeader, ActionButton, Icon, LoadingSkeleton, EmptyState, Modal, StatusBadge, MoneyPipe],
   templateUrl: './loans.html',
   styleUrl: './loans.css',
 })
-export class Loans implements OnInit {
+export class Loans implements OnInit, OnDestroy {
   private readonly loansApi = inject(LoansService);
   private readonly toast = inject(ToastService);
 
   protected readonly termOptions = TERM_OPTIONS;
+  protected readonly minAmountRon = MIN_AMOUNT_RON;
+  protected readonly maxAmountRon = MAX_AMOUNT_RON;
 
   protected readonly rates = signal<LoanRateView[]>([]);
   protected readonly ratesLoading = signal(true);
@@ -45,9 +50,28 @@ export class Loans implements OnInit {
   protected readonly loans = signal<LoanView[]>([]);
   protected readonly loansLoading = signal(true);
 
-  protected readonly applyModalOpen = signal(false);
-  protected readonly newLoanAmountRon = signal(5000);
-  protected readonly newLoanTerm = signal<LoanTermMonths>(12);
+  // --- Simulator ----------------------------------------------------------------
+  protected readonly calculatorAmountRon = signal(10_000);
+  protected readonly calculatorTerm = signal<LoanTermMonths>(12);
+  protected readonly calculatorRate = computed(() => this.rateFor(this.calculatorTerm()) ?? 0);
+  protected readonly calculatorInstallmentMinor = computed(() =>
+    this.computeInstallmentMinor(Math.round(this.calculatorAmountRon() * 100), this.calculatorRate(), this.calculatorTerm()),
+  );
+  protected readonly calculatorTotalPaidMinor = computed(() => this.calculatorInstallmentMinor() * this.calculatorTerm());
+  protected readonly calculatorTotalInterestMinor = computed(
+    () => this.calculatorTotalPaidMinor() - Math.round(this.calculatorAmountRon() * 100),
+  );
+  /** Numărul afișat efectiv — animat spre `calculatorInstallmentMinor()` la
+   * fiecare schimbare, ca rezultatul să "prindă viață" în loc să sară brusc. */
+  protected readonly displayedInstallmentMinor = signal(0);
+
+  protected readonly howItWorksOpen = signal(false);
+
+  private animationFrameId: number | null = null;
+  private readonly prefersReducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  protected readonly applyConfirmOpen = signal(false);
   protected readonly applying = signal(false);
 
   protected readonly payoffTarget = signal<LoanView | null>(null);
@@ -57,9 +81,17 @@ export class Loans implements OnInit {
   protected readonly payments = signal<LoanPaymentView[]>([]);
   protected readonly paymentsLoading = signal(false);
 
+  constructor() {
+    effect(() => this.animateInstallmentTo(this.calculatorInstallmentMinor()));
+  }
+
   ngOnInit(): void {
     this.loadRates();
     this.loadLoans();
+  }
+
+  ngOnDestroy(): void {
+    if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
   }
 
   private loadRates(): void {
@@ -88,6 +120,41 @@ export class Loans implements OnInit {
     return this.rates().find((r) => r.term_months === term)?.rate_percent_annual ?? null;
   }
 
+  /** Formula STANDARD de amortizare (annuity) — vezi doc-comment-ul clasei. */
+  private computeInstallmentMinor(amountMinor: number, ratePercentAnnual: number, termMonths: number): number {
+    if (!amountMinor || !ratePercentAnnual || !termMonths) return 0;
+    const monthlyRate = ratePercentAnnual / 12 / 100;
+    if (monthlyRate === 0) return Math.round(amountMinor / termMonths);
+    const factor = Math.pow(1 + monthlyRate, termMonths);
+    return Math.round((amountMinor * monthlyRate * factor) / (factor - 1));
+  }
+
+  private animateInstallmentTo(target: number): void {
+    if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+    if (this.prefersReducedMotion) {
+      this.displayedInstallmentMinor.set(target);
+      return;
+    }
+    const start = this.displayedInstallmentMinor();
+    const startTime = performance.now();
+    const duration = 280;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this.displayedInstallmentMinor.set(Math.round(start + (target - start) * eased));
+      if (t < 1) {
+        this.animationFrameId = requestAnimationFrame(step);
+      } else {
+        this.animationFrameId = null;
+      }
+    };
+    this.animationFrameId = requestAnimationFrame(step);
+  }
+
+  protected setCalculatorAmount(value: number): void {
+    this.calculatorAmountRon.set(Math.min(this.maxAmountRon, Math.max(this.minAmountRon, value || this.minAmountRon)));
+  }
+
   protected loanProgressPercent(loan: LoanView): number {
     if (loan.term_months <= 0) return 0;
     return Math.min(100, Math.max(0, (loan.payments_made / loan.term_months) * 100));
@@ -99,28 +166,26 @@ export class Loans implements OnInit {
     return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
   }
 
-  // --- Cerere de credit ---------------------------------------------------------
+  // --- Cerere de credit (din simulator) -------------------------------------------
 
-  protected openApplyModal(): void {
-    this.newLoanAmountRon.set(5000);
-    this.newLoanTerm.set(12);
-    this.applyModalOpen.set(true);
+  protected openApplyConfirm(): void {
+    this.applyConfirmOpen.set(true);
   }
 
-  protected closeApplyModal(): void {
+  protected closeApplyConfirm(): void {
     if (this.applying()) return;
-    this.applyModalOpen.set(false);
+    this.applyConfirmOpen.set(false);
   }
 
   protected submitApply(): void {
-    const amountMinor = Math.round(this.newLoanAmountRon() * 100);
+    const amountMinor = Math.round(this.calculatorAmountRon() * 100);
     if (amountMinor <= 0) return;
 
     this.applying.set(true);
-    this.loansApi.apply(amountMinor, this.newLoanTerm()).subscribe({
+    this.loansApi.apply(amountMinor, this.calculatorTerm()).subscribe({
       next: () => {
         this.applying.set(false);
-        this.applyModalOpen.set(false);
+        this.applyConfirmOpen.set(false);
         this.toast.success('Creditul a fost aprobat — suma e deja în contul tău curent.');
         this.loadLoans();
       },

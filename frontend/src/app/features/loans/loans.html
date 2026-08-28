@@ -1,21 +1,96 @@
-<app-page-header title="Credite" subtitle="Credit personal, cu dobândă MaestroBank și rată automată lunară din contul curent.">
-  <app-action-button (pressed)="openApplyModal()">Cerere credit nou</app-action-button>
+<app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici.">
+  <app-action-button variant="ghost" (pressed)="howItWorksOpen.set(true)">
+    <app-icon name="info" [size]="16" /> Cum funcționează
+  </app-action-button>
 </app-page-header>
 
-<section class="loans-section">
-  <h2>Dobânzi</h2>
-  @if (ratesLoading()) {
-    <app-loading-skeleton [rows]="1" [height]="70" />
-  } @else {
-    <div class="rates-row">
-      @for (rate of rates(); track rate.term_months) {
-        <div class="rate-chip">
-          <span class="rate-chip__term">{{ rate.term_months }} luni</span>
-          <span class="rate-chip__rate">{{ rate.rate_percent_annual }}%/an</span>
-        </div>
-      }
+<section class="calculator-panel">
+  <div class="calculator-panel__input">
+    <div class="calculator-field">
+      <div class="calculator-field__top">
+        <span>Sumă</span>
+        <span class="calculator-field__amount">{{ calculatorAmountRon() | number }} lei</span>
+      </div>
+      <input
+        type="range"
+        class="calculator-slider"
+        [min]="minAmountRon"
+        [max]="maxAmountRon"
+        step="500"
+        [ngModel]="calculatorAmountRon()"
+        (ngModelChange)="setCalculatorAmount($event)"
+      />
+      <div class="calculator-field__bounds">
+        <span>{{ minAmountRon | number }} lei</span>
+        <input
+          type="number"
+          class="calculator-field__manual"
+          [min]="minAmountRon"
+          [max]="maxAmountRon"
+          [ngModel]="calculatorAmountRon()"
+          (ngModelChange)="setCalculatorAmount($event)"
+        />
+        <span>{{ maxAmountRon | number }} lei</span>
+      </div>
     </div>
-  }
+
+    <div class="calculator-field">
+      <span class="calculator-field__label">Termen</span>
+      <div class="term-pills">
+        @for (term of termOptions; track term) {
+          <button
+            type="button"
+            class="term-pill"
+            [class.term-pill--active]="calculatorTerm() === term"
+            (click)="calculatorTerm.set(term)"
+          >
+            <span>{{ term }} luni</span>
+            <small>{{ rateFor(term) ?? '—' }}%/an</small>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="calculator-panel__result">
+    <span class="calculator-result__label">Rata ta lunară, estimată</span>
+    <strong class="calculator-result__value">{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+    <div class="calculator-result__breakdown">
+      <div>
+        <span>Total plătit</span>
+        <strong>{{ calculatorTotalPaidMinor() | money: 'RON' }}</strong>
+      </div>
+      <div>
+        <span>Din care dobândă</span>
+        <strong>{{ calculatorTotalInterestMinor() | money: 'RON' }}</strong>
+      </div>
+    </div>
+    <app-action-button [fullWidth]="true" (pressed)="openApplyConfirm()">Aplică pentru acest credit</app-action-button>
+    <p class="calculator-result__disclaimer">Estimare — verificăm eligibilitatea reală când aplici.</p>
+  </div>
+</section>
+
+<section class="trust-row">
+  <div class="trust-card">
+    <span class="trust-card__icon"><app-icon name="flash" [size]="18" /></span>
+    <p class="trust-card__title">Aprobare pe loc</p>
+    <p class="trust-card__text">Verificăm venitul tău real, din istoric — nu aștepți zile pentru un răspuns.</p>
+  </div>
+  <div class="trust-card">
+    <span class="trust-card__icon"><app-icon name="check" [size]="18" /></span>
+    <p class="trust-card__title">Fără costuri ascunse</p>
+    <p class="trust-card__text">Rata din simulator e exact ce plătești — fără comisioane suplimentare.</p>
+  </div>
+  <div class="trust-card">
+    <span class="trust-card__icon"><app-icon name="banknote" [size]="18" /></span>
+    <p class="trust-card__title">Plată automată</p>
+    <p class="trust-card__text">Rata se scade singură din cont, lunar — nu ții tu evidența.</p>
+  </div>
+  <div class="trust-card">
+    <span class="trust-card__icon"><app-icon name="unlock" [size]="18" /></span>
+    <p class="trust-card__title">Achiți oricând</p>
+    <p class="trust-card__text">Plată anticipată, fără dobândă suplimentară pentru perioada rămasă.</p>
+  </div>
 </section>
 
 <section class="loans-section">
@@ -23,7 +98,7 @@
   @if (loansLoading()) {
     <app-loading-skeleton [rows]="2" [height]="120" />
   } @else if (loans().length === 0) {
-    <app-empty-state icon="wallet" title="Niciun credit încă" description="Fă o cerere de credit ca să vezi aici scadențarul." />
+    <app-empty-state icon="banknote" title="Niciun credit încă" description="Folosește simulatorul de mai sus ca să vezi rata și să aplici." />
   } @else {
     <div class="loans-list">
       @for (loan of loans(); track loan.id) {
@@ -70,24 +145,61 @@
   }
 </section>
 
-@if (applyModalOpen()) {
-  <app-modal title="Cerere credit nou" (closed)="closeApplyModal()">
-    <div class="loan-form">
-      <label>
-        <span>Sumă (RON)</span>
-        <input type="number" min="1000" max="50000" step="100" [ngModel]="newLoanAmountRon()" (ngModelChange)="newLoanAmountRon.set($event)" />
-      </label>
-      <p class="loan-form__hint">Între 1.000 și 50.000 RON.</p>
+@if (howItWorksOpen()) {
+  <app-modal title="Cum funcționează un credit MaestroBank" [maxWidth]="560" (closed)="howItWorksOpen.set(false)">
+    <ol class="how-it-works">
+      <li>
+        <span class="how-it-works__step">1</span>
+        <div>
+          <p class="how-it-works__title">Alegi suma și termenul</p>
+          <p class="how-it-works__text">Simulatorul de mai sus îți arată rata exactă înainte să aplici — fără surprize.</p>
+        </div>
+      </li>
+      <li>
+        <span class="how-it-works__step">2</span>
+        <div>
+          <p class="how-it-works__title">Verificăm venitul tău real</p>
+          <p class="how-it-works__text">Ne uităm la istoricul tău de tranzacții din ultimele 3 luni, nu la ce declari.</p>
+        </div>
+      </li>
+      <li>
+        <span class="how-it-works__step">3</span>
+        <div>
+          <p class="how-it-works__title">Banii intră imediat în cont</p>
+          <p class="how-it-works__text">Fără așteptare, fără aprobare manuală — dacă eligibilitatea e îndeplinită.</p>
+        </div>
+      </li>
+      <li>
+        <span class="how-it-works__step">4</span>
+        <div>
+          <p class="how-it-works__title">Rata se plătește singură</p>
+          <p class="how-it-works__text">Automat, lunar, din contul curent — sau achiți oricând tot restul, fără cost suplimentar.</p>
+        </div>
+      </li>
+    </ol>
+    <p class="how-it-works__note">
+      Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu
+      lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.
+    </p>
+  </app-modal>
+}
 
-      <label>
+@if (applyConfirmOpen()) {
+  <app-modal title="Confirmă cererea de credit" (closed)="closeApplyConfirm()">
+    <div class="apply-confirm">
+      <div class="apply-confirm__row">
+        <span>Sumă</span>
+        <strong>{{ calculatorAmountRon() | number }} lei</strong>
+      </div>
+      <div class="apply-confirm__row">
         <span>Termen</span>
-        <app-select
-          [options]="termOptions.map(t => ({ value: t.toString(), label: t + ' luni (' + (rateFor(t) ?? '—') + '%/an)' }))"
-          [value]="newLoanTerm().toString()"
-          (changed)="newLoanTerm.set($any(+$event))"
-        />
-      </label>
-
+        <strong>{{ calculatorTerm() }} luni ({{ calculatorRate() }}%/an)</strong>
+      </div>
+      <div class="apply-confirm__row apply-confirm__row--highlight">
+        <span>Rată lunară estimată</span>
+        <strong>{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+      </div>
+      <p class="apply-confirm__hint">Verificăm eligibilitatea reală acum — dacă rata depășește ce-ți poți permite, cererea e respinsă, cu motivul exact.</p>
       <app-action-button [fullWidth]="true" [loading]="applying()" (pressed)="submitApply()">Trimite cererea</app-action-button>
     </div>
   </app-modal>
@@ -108,7 +220,7 @@
     @if (paymentsLoading()) {
       <app-loading-skeleton [rows]="3" [height]="50" />
     } @else if (payments().length === 0) {
-      <app-empty-state icon="wallet" title="Nicio plată încă" description="Prima rată apare aici după ce se debitează automat." />
+      <app-empty-state icon="banknote" title="Nicio plată încă" description="Prima rată apare aici după ce se debitează automat." />
     } @else {
       <div class="payments-table-wrap">
         <table class="payments-table">
