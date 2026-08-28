@@ -13,8 +13,6 @@ export type NotificationKind =
   | 'transfer_hold_cancelled'
   | 'system'
   | 'document_sign'
-  | 'reward_redeemed'
-  | 'raffle_win'
   | 'loan_approved'
   | 'loan_payment'
   | 'loan_payment_missed'

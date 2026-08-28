@@ -14,7 +14,7 @@ nu mai aleagă manual pagina.
 Support Agent rămâne implicit (catch-all) — orice mesaj care NU se
 potrivește clar cu domeniul Spending + Forecast merge la Support, exact
 cum Support e deja domeniul "tot restul" (conturi, carduri, tranzacții,
-transferuri, depozite, investiții, puncte, credite, documente, tichete).
+transferuri, depozite, investiții, credite, documente, tichete).
 """
 
 import re

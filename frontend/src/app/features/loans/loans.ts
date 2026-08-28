@@ -43,10 +43,9 @@ const HOW_IT_WORKS_CARD_KEYS: DeckCardKeys[] = [
  * amortizare de mai jos (computeInstallmentMinor) e o COPIE exactă a
  * backend-ului (loans-service/app/rates.py::compute_monthly_installment_minor)
  * — sigură de duplicat client-side pentru că e matematică publică, nu o
- * decizie sensibilă (spre deosebire de roata norocului la Puncte, unde
- * rezultatul NU poate fi calculat pe client). Decizia REALĂ (eligibilitate +
- * execuție) rămâne 100% pe server, la POST /loans/apply — simulatorul e
- * doar o previzualizare instantă.
+ * decizie sensibilă. Decizia REALĂ (eligibilitate + execuție) rămâne 100%
+ * pe server, la POST /loans/apply — simulatorul e doar o previzualizare
+ * instantă.
  */
 @Component({
   selector: 'app-loans',

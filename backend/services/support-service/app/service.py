@@ -62,9 +62,8 @@ async def get_ticket_for_user(ticket_id: str, user_id: str) -> dict:
 
 
 async def create_notification(payload: NotificationCreate) -> dict:
-    """Apelat DOAR intern, de alte servicii (accounts/loans/points/
-    transactions) — vezi app/routers/notifications.py. Userul nu poate crea
-    notificări direct.
+    """Apelat DOAR intern, de alte servicii (accounts/loans/transactions) —
+    vezi app/routers/notifications.py. Userul nu poate crea notificări direct.
 
     Stocăm `message_key` + `message_params` (brute) — textul se randează în
     limba CITITORULUI la fiecare citire (vezi list_notifications_for_user).
