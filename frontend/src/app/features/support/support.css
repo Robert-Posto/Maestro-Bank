@@ -115,7 +115,7 @@
   color: var(--mb-blue-500);
 }
 
-/* Grupează "Schimbă întrebarea" + dropdown-ul de conversații ca un singur
+/* Grupează "Pune altă întrebare" + dropdown-ul de conversații ca un singur
    bloc în dreapta — vezi copilot.css::.copilot-chat__bar-actions, aceeași
    idee, oglindită aici. */
 .support-chat__bar-actions {
