@@ -25,6 +25,11 @@ export const PROFILE_I18N: Record<string, TranslationEntry> = {
   'profile.passkeysNoneDesc': { ro: 'Niciunul înregistrat încă.', en: 'None registered yet.' },
 
   'profile.documents': { ro: 'Documente', en: 'Documents' },
+  'profile.documentsSectionTitle': { ro: 'Documente de semnat', en: 'Documents to sign' },
+  'profile.documentsPanelDesc': {
+    ro: 'Documente trimise de personalul băncii, de semnat direct de aici.',
+    en: 'Documents sent by bank staff, to sign directly from here.',
+  },
   'profile.documentsPendingDesc': { ro: 'În așteptarea semnăturii tale.', en: 'Awaiting your signature.' },
   'profile.documentsNoneDesc': { ro: 'Nimic de semnat momentan.', en: 'Nothing to sign right now.' },
 

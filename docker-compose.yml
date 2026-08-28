@@ -127,6 +127,7 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8000
       - SUPPORT_SERVICE_URL=http://support-service:8000
       - EXCHANGE_SERVICE_URL=http://exchange-service:8000
+      - POINTS_SERVICE_URL=http://points-service:8000
       # Guardian (app/guardian/) — explicații LLM ale deciziilor motorului
       # de fraudă. Aceleași variabile Azure OpenAI ca ai-orchestrator-service
       # (vezi .env), dar client propriu, izolat — vezi app/guardian/llm_client.py.
@@ -301,6 +302,68 @@ services:
     networks:
       - maestrobank-network
 
+  points-service:
+    build:
+      context: ./backend/services/points-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-points-service
+    restart: unless-stopped
+    ports:
+      - "8011:8000"
+    environment:
+      - MONGO_URL=${MONGODB_URI_BASE}/points_db?appName=maestrobank
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
+    volumes:
+      - ./backend/services/points-service/app:/app/app
+      - ./backend/services/points-service/tests:/app/tests
+      - ./backend/services/points-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      accounts-service:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
+  loans-service:
+    build:
+      context: ./backend/services/loans-service
+      dockerfile: Dockerfile
+    container_name: maestrobank-loans-service
+    restart: unless-stopped
+    ports:
+      - "8012:8000"
+    environment:
+      - MONGO_URL=${MONGODB_URI_BASE}/loans_db?appName=maestrobank
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
+      - TRANSACTIONS_SERVICE_URL=http://transactions-service:8000
+      - SUPPORT_SERVICE_URL=http://support-service:8000
+    volumes:
+      - ./backend/services/loans-service/app:/app/app
+      - ./backend/services/loans-service/tests:/app/tests
+      - ./backend/services/loans-service/pytest.ini:/app/pytest.ini
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      accounts-service:
+        condition: service_healthy
+      transactions-service:
+        condition: service_healthy
+    networks:
+      - maestrobank-network
+
   # --- Verificare identitate (KYC demo) -----------------------------------
   # STATELESS — fără MONGO_URL, nu are bază proprie (vezi app/main.py).
   # Compară buletin vs. selfie cu DeepFace, apoi marchează userul verificat
@@ -357,9 +420,11 @@ services:
     environment:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-development}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
-      # Agentul NU accesează MongoDB — vorbește STRICT prin Gateway,
-      # exact ca un client extern (Angular), propagând JWT-ul userului.
+      # Datele de cont/tranzacții tot vin STRICT prin Gateway (vezi
+      # app/tools/*) — MONGO_URL de mai jos ține DOAR istoricul
+      # conversațiilor (vezi app/database.py), nu date financiare.
       - GATEWAY_URL=http://gateway:8000
+      - MONGO_URL=${MONGODB_URI_BASE}/ai_orchestrator_db?appName=maestrobank
       # Azure OpenAI (GPT-5-mini) — vezi .env.example. Fără credențiale
       # setate, serviciul tot pornește (health check trece), dar orice
       # cerere de chat întoarce 503 până sunt configurate.
@@ -415,6 +480,8 @@ services:
       - EXCHANGE_SERVICE_URL=http://exchange-service:8000
       - DEPOSITS_SERVICE_URL=http://deposits-service:8000
       - INVESTMENTS_SERVICE_URL=http://investments-service:8000
+      - POINTS_SERVICE_URL=http://points-service:8000
+      - LOANS_SERVICE_URL=http://loans-service:8000
       - VERIFICATION_SERVICE_URL=http://verification-service:8000
       - AI_SERVICE_URL=http://ai-orchestrator-service:8000
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8080}

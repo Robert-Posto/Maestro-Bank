@@ -1,0 +1,398 @@
+/* --- Simulator (piesa centrală a paginii) --------------------------------------- */
+
+.calculator-panel {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--mb-space-6);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  padding: var(--mb-space-6);
+  margin-bottom: var(--mb-space-6);
+  box-shadow: var(--mb-shadow-sm);
+}
+
+.calculator-panel__input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-6);
+}
+
+.calculator-field__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-2);
+}
+
+.calculator-field__label {
+  display: block;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-3);
+}
+
+.calculator-field__amount {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+}
+
+.calculator-slider {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-border);
+  cursor: pointer;
+}
+
+.calculator-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--mb-blue-500);
+  border: 3px solid var(--mb-surface);
+  box-shadow: var(--mb-shadow-sm);
+  cursor: pointer;
+}
+
+.calculator-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--mb-blue-500);
+  border: 3px solid var(--mb-surface);
+  box-shadow: var(--mb-shadow-sm);
+  cursor: pointer;
+}
+
+.calculator-field__bounds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  margin-top: var(--mb-space-2);
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.calculator-field__manual {
+  width: 110px;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  text-align: center;
+  padding: 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--mb-border-strong);
+  color: var(--mb-text-primary);
+  outline: none;
+}
+
+.calculator-field__manual:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.term-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mb-space-2);
+}
+
+.term-pill {
+  flex: 1 1 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-family: inherit;
+  background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-3) var(--mb-space-4);
+  cursor: pointer;
+  transition: all var(--mb-transition-fast);
+}
+
+.term-pill span {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+}
+
+.term-pill small {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.term-pill:hover {
+  border-color: var(--mb-blue-500);
+}
+
+.term-pill--active {
+  background: var(--mb-blue-600);
+  border-color: var(--mb-blue-600);
+}
+
+.term-pill--active span,
+.term-pill--active small {
+  color: #fff;
+}
+
+/* --- Panoul de rezultat, "chitanța" simulatorului --------------------------------- */
+
+.calculator-panel__result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--mb-info-bg);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-6);
+}
+
+.calculator-result__label {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-2);
+}
+
+.calculator-result__value {
+  font-size: var(--mb-font-size-2xl);
+  font-weight: var(--mb-font-weight-bold);
+  color: var(--mb-blue-600);
+  margin-bottom: var(--mb-space-5);
+  font-variant-numeric: tabular-nums;
+}
+
+.calculator-result__breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  width: 100%;
+  margin-bottom: var(--mb-space-5);
+}
+
+.calculator-result__breakdown div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--mb-font-size-sm);
+}
+
+.calculator-result__breakdown span {
+  color: var(--mb-text-tertiary);
+}
+
+.calculator-panel__result app-action-button {
+  width: 100%;
+}
+
+.calculator-result__disclaimer {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-top: var(--mb-space-3);
+  text-align: center;
+  width: 100%;
+}
+
+@media (max-width: 800px) {
+  .calculator-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Secțiunea "Cum funcționează", prima de pe pagină ------------------------------ */
+
+.explain-section {
+  margin-bottom: var(--mb-space-8);
+  scroll-margin-top: var(--mb-space-8);
+}
+
+.explain-section h2 {
+  font-size: var(--mb-font-size-base);
+  margin-bottom: var(--mb-space-2);
+}
+
+.explain-section__subtitle {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-5);
+}
+
+/* Cartea glisabilă în sine (.deck-panel, .card-deck, .deck-card etc.) e
+   stilizată chiar în componenta shared/components/swipe-card-deck — aici
+   rămân doar stilurile SPECIFICE acestei pagini (subtitlul secțiunii, CTA-ul
+   proiectat în cartea prin ng-content). */
+
+.card-deck__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: var(--mb-space-4);
+  padding: var(--mb-space-2);
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-blue-600);
+  cursor: pointer;
+}
+
+.card-deck__cta:hover {
+  text-decoration: underline;
+}
+
+/* --- Confirmare cerere ------------------------------------------------------------ */
+
+.apply-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.apply-confirm__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.apply-confirm__row--highlight {
+  padding-top: var(--mb-space-3);
+  border-top: 1px solid var(--mb-border);
+  font-size: var(--mb-font-size-base);
+  color: var(--mb-text-primary);
+}
+
+.apply-confirm__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-2);
+}
+
+/* --- Secțiunea de credite existente ---------------------------------------------- */
+
+.loans-section h2 {
+  font-size: var(--mb-font-size-base);
+  margin-bottom: var(--mb-space-3);
+}
+
+.loans-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--mb-space-4);
+}
+
+.loan-card {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-xs);
+  padding: var(--mb-space-5);
+}
+
+.loan-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--mb-space-4);
+}
+
+.loan-card__amount {
+  font-size: var(--mb-font-size-lg);
+  font-weight: var(--mb-font-weight-semibold);
+}
+
+.loan-card__meta {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.loan-card__bar {
+  height: 6px;
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-border);
+  overflow: hidden;
+  margin-bottom: var(--mb-space-2);
+}
+
+.loan-card__bar-fill {
+  height: 100%;
+  background: var(--mb-blue-500);
+  border-radius: var(--mb-radius-pill);
+  transition: width var(--mb-transition-base);
+}
+
+.loan-card__progress-label {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: var(--mb-space-4);
+}
+
+.loan-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--mb-space-3);
+  margin-bottom: var(--mb-space-4);
+}
+
+.loan-card__stat-label {
+  display: block;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  margin-bottom: 2px;
+}
+
+.loan-card__actions {
+  display: flex;
+  gap: var(--mb-space-2);
+  flex-wrap: wrap;
+}
+
+.payoff-confirm__text {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  margin-bottom: var(--mb-space-5);
+}
+
+/* --- Istoric plăți --------------------------------------------------------------- */
+
+.payments-table-wrap {
+  overflow-x: auto;
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payments-table th {
+  text-align: left;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  font-weight: var(--mb-font-weight-medium);
+  padding: var(--mb-space-3);
+  border-bottom: 1px solid var(--mb-border);
+  white-space: nowrap;
+}
+
+.payments-table td {
+  padding: var(--mb-space-3);
+  border-bottom: 1px solid var(--mb-border);
+  font-size: var(--mb-font-size-sm);
+  white-space: nowrap;
+}
+
+.payments-table tr:last-child td {
+  border-bottom: none;
+}

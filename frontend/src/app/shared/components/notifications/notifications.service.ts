@@ -11,7 +11,13 @@ export type NotificationKind =
   | 'transfer_hold'
   | 'transfer_hold_cancelled'
   | 'system'
-  | 'document_sign';
+  | 'document_sign'
+  | 'reward_redeemed'
+  | 'raffle_win'
+  | 'loan_approved'
+  | 'loan_payment'
+  | 'loan_payment_missed'
+  | 'loan_paid_off';
 
 export interface AppNotification {
   id: string;
@@ -19,6 +25,10 @@ export interface AppNotification {
   text: string;
   read: boolean;
   createdAt: Date;
+  /** Id-ul resursei la care se referă (ex. id-ul tranzacției) — absent pe
+   * notificările create înainte de acest câmp, sau pe tipuri fără o
+   * resursă anume (ex. "system"). Vezi Topbar::openNotification. */
+  referenceId?: string;
 }
 
 interface NotificationApiView {
@@ -27,6 +37,7 @@ interface NotificationApiView {
   text: string;
   read: boolean;
   created_at: string;
+  reference_id?: string | null;
 }
 
 /**
@@ -93,5 +104,6 @@ function toAppNotification(view: NotificationApiView): AppNotification {
     text: view.text,
     read: view.read,
     createdAt: new Date(view.created_at),
+    referenceId: view.reference_id ?? undefined,
   };
 }

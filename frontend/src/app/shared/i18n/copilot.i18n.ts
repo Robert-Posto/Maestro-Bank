@@ -78,4 +78,8 @@ export const COPILOT_I18N: Record<string, TranslationEntry> = {
     en: 'How much do you estimate I will have left at the end of the month?',
   },
   'copilot.suggestedQ4': { ro: 'Pe ce categorie cheltuiesc cel mai mult?', en: 'Which category do I spend the most on?' },
+  'copilot.identitySubtitle': { ro: 'Spending + Forecast Agent', en: 'Spending + Forecast Agent' },
+  'copilot.newConversation': { ro: 'Conversație nouă', en: 'New conversation' },
+  'copilot.noConversationsSaved': { ro: 'Nicio conversație salvată încă.', en: 'No conversations saved yet.' },
+  'copilot.deleteConversation': { ro: 'Șterge conversația', en: 'Delete conversation' },
 };

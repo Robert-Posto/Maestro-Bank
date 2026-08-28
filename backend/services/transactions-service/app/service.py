@@ -427,6 +427,7 @@ async def create_transfer(
                 currency=source["currency"],
                 iban=payload.to_iban,
             ),
+            reference_id=str(insert_result.inserted_id),
         )
     else:
         # NU returnăm "completed" înainte ca accounts-service să fi confirmat.
@@ -446,6 +447,7 @@ async def create_transfer(
                     currency=source["currency"],
                     iban=payload.to_iban,
                 ),
+                reference_id=str(insert_result.inserted_id),
             )
 
         # Destinatarul primea bani fără NICIO notificare — doar expeditorul
@@ -464,6 +466,7 @@ async def create_transfer(
                         currency=source["currency"],
                         name=from_name or source["iban"],
                     ),
+                    reference_id=str(insert_result.inserted_id),
                 )
 
         # Profilul fraud (percentile/istoric categorii/țări cunoscute) se
@@ -478,6 +481,13 @@ async def create_transfer(
                 "transactions-service: record_completed_transfer_for_profile a scăpat o excepție netratată (tx_id=%s)",
                 insert_result.inserted_id,
             )
+
+        # Puncte de loialitate — DOAR pentru plăți către un cont fără user
+        # MaestroBank real (to_name is None), niciodată pentru transferuri
+        # între useri reali. Best-effort, ca mai sus.
+        await _credit_points_for_transaction(
+            user_id, payload.category, payload.amount_minor, is_merchant_payment=to_name is None
+        )
 
     final_doc = await db.transactions.find_one({"_id": insert_result.inserted_id})
     view = to_transaction_view(final_doc, viewer_account_id=source["id"])
@@ -515,24 +525,56 @@ async def cancel_own_hold(transaction_id: str, user_id: str) -> dict:
     updated_doc = await holds.cancel_hold(transaction_id)
     logger.info("transactions-service: hold anulat de client (tx_id=%s)", transaction_id)
     await _notify_user(
-        user_id, "transfer_hold_cancelled", translate("transferHoldCancelledNotification")
+        user_id,
+        "transfer_hold_cancelled",
+        translate("transferHoldCancelledNotification"),
+        reference_id=transaction_id,
     )
     return to_transaction_view(updated_doc, viewer_account_id=source["id"])
 
 
-async def _notify_user(user_id: str, kind: str, text: str) -> None:
+async def _notify_user(user_id: str, kind: str, text: str, reference_id: str | None = None) -> None:
     """Trimite o notificare persistentă către support-service. NU blochează
     și NU eșuează operația principală dacă support-service e indisponibil —
     la fel ca provisioning-ul de cont din auth-service, o notificare
-    pierdută nu trebuie să strice fluxul de bani."""
+    pierdută nu trebuie să strice fluxul de bani.
+
+    `reference_id` (id-ul tranzacției) e opțional — folosit de frontend ca
+    să deschidă direct tranzacția respectivă la click pe notificare, în loc
+    de doar pagina generică de Tranzacții (vezi Topbar::openNotification)."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(
                 f"{settings.support_service_url}/internal/notifications",
-                json={"user_id": user_id, "kind": kind, "text": text},
+                json={"user_id": user_id, "kind": kind, "text": text, "reference_id": reference_id},
             )
     except httpx.HTTPError:
         logger.warning("transactions-service: notificare eșuată (user_id=%s, kind=%s)", user_id, kind)
+
+
+async def _credit_points_for_transaction(user_id: str, category: str, amount_minor: int, is_merchant_payment: bool) -> None:
+    """Raportează un transfer FINALIZAT către points-service, best-effort —
+    la fel ca _notify_user, un eșec aici NU strică transferul deja executat.
+    points-service decide singur eligibilitatea/rata (vezi
+    points-service/app/earn_rates.py) — aici doar raportăm faptele brute.
+
+    `is_merchant_payment` = to_name is None — semnalul deja folosit în acest
+    fișier pentru "plată către un cont fără user MaestroBank real atașat"
+    (vezi TransactionOut.counterparty_name). Un transfer către alt user
+    MaestroBank real NU dă niciodată puncte, indiferent de categorie/sumă."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{settings.points_service_url}/internal/points/credit-for-transaction",
+                json={
+                    "user_id": user_id,
+                    "category": category,
+                    "amount_minor": amount_minor,
+                    "is_merchant_payment": is_merchant_payment,
+                },
+            )
+    except httpx.HTTPError:
+        logger.warning("transactions-service: raportare puncte eșuată (user_id=%s)", user_id)
 
 
 # --- Transferuri programate/recurente ---------------------------------------

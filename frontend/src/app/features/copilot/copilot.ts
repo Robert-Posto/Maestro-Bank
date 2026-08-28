@@ -1,7 +1,8 @@
-import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { AiCopilotService, ChatHistoryMessage, SpendingForecastResponse } from '../../services/ai-copilot.service';
+import { AiCopilotService, ConversationDetail, ConversationSummary, SpendingForecastResponse } from '../../services/ai-copilot.service';
 import { SpeechService, stripMarkdownForSpeech } from '../../services/speech.service';
 import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
@@ -10,10 +11,23 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { MarkdownLitePipe } from '../../shared/pipes/markdown-lite.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { extractErrorMessage } from '../../shared/error-utils';
+import { ToastService } from '../../shared/components/toast/toast.service';
 
 /** Chei i18n (nu text direct) — vezi `suggestedQuestions` mai jos, un
  * `computed` care le traduce după limba activă (mirror pe support.ts::faqItems). */
 const SUGGESTED_QUESTION_KEYS = ['copilot.suggestedQ1', 'copilot.suggestedQ2', 'copilot.suggestedQ3', 'copilot.suggestedQ4'];
+
+/** Cuvinte care se rotesc cât timp agentul lucrează — stil Claude
+ * ("Pondering...", "Noodling..."): jocuri de cuvinte, nu descrieri reale a
+ * ce face agentul în spate. */
+const THINKING_WORDS = [
+  'Maestroing',
+  'Bănuind',
+  'Cifrometrând',
+  'Leuind',
+  'Buzunărind',
+  'Chibzuind',
+];
 
 type PendingActionState = 'pending' | 'confirming' | 'done' | 'cancelled' | 'error';
 
@@ -46,15 +60,17 @@ function formatChatTime(date: Date): string {
 @Component({
   selector: 'app-copilot',
   standalone: true,
-  imports: [FormsModule, PageHeader, Icon, MoneyPipe, MarkdownLitePipe, TranslatePipe],
+  imports: [FormsModule, DatePipe, PageHeader, Icon, MoneyPipe, MarkdownLitePipe, TranslatePipe],
   templateUrl: './copilot.html',
   styleUrl: './copilot.css',
 })
-export class Copilot implements OnDestroy {
+export class Copilot implements OnInit, OnDestroy {
   private readonly copilotApi = inject(AiCopilotService);
   protected readonly speech = inject(SpeechService);
   private readonly language = inject(LanguageService);
+  private readonly toast = inject(ToastService);
   private readonly messagesEl = viewChild<ElementRef<HTMLDivElement>>('messagesEl');
+  private readonly conversationsMenuEl = viewChild<ElementRef<HTMLDivElement>>('conversationsMenuEl');
 
   protected readonly suggestedQuestions = computed(() => SUGGESTED_QUESTION_KEYS.map((k) => this.language.t(k)));
   protected readonly chatInput = signal('');
@@ -64,7 +80,20 @@ export class Copilot implements OnDestroy {
    * să știe că nu s-a blocat, doar durează mai mult ca de obicei. */
   protected readonly sendingSlow = signal(false);
   protected readonly chatMessages = signal<ChatMessage[]>([]);
+  protected readonly conversations = signal<ConversationSummary[]>([]);
+  protected readonly activeConversationId = signal<string | null>(null);
+  protected readonly conversationsMenuOpen = signal(false);
+  protected readonly thinkingWord = signal(THINKING_WORDS[0]);
   private slowTimer?: ReturnType<typeof setTimeout>;
+  private thinkingWordTimer?: ReturnType<typeof setInterval>;
+
+  /** Titlul afișat pe trigger-ul dropdown-ului de conversații — vezi
+   * copilot.html header-ul chat-ului. */
+  protected readonly activeConversationTitle = computed(() => {
+    const id = this.activeConversationId();
+    if (!id) return 'Conversație nouă';
+    return this.conversations().find((c) => c.id === id)?.title ?? 'Conversație nouă';
+  });
 
   /** Ultimul răspuns reușit — alimentează "Context financiar" din sidebar,
    * ca să rămână vizibil chiar și după ce userul pune o altă întrebare. */
@@ -86,11 +115,79 @@ export class Copilot implements OnDestroy {
     });
   }
 
+  ngOnInit(): void {
+    this.loadConversations();
+  }
+
   ngOnDestroy(): void {
     // Nu lăsăm vocea să continue să citească un mesaj după ce userul a
     // plecat de pe pagină (ex. a navigat spre Transferuri în timp ce
     // MaestroAssistent încă citea un răspuns).
     this.speech.stopSpeaking();
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  private loadConversations(): void {
+    this.copilotApi.listConversations().subscribe({
+      next: (list) => this.conversations.set(list),
+    });
+  }
+
+  protected toggleConversationsMenu(): void {
+    this.conversationsMenuOpen.update((open) => !open);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.conversationsMenuOpen()) return;
+    const menu = this.conversationsMenuEl()?.nativeElement;
+    if (menu && !menu.contains(event.target as Node)) {
+      this.conversationsMenuOpen.set(false);
+    }
+  }
+
+  protected startNewConversation(): void {
+    this.conversationsMenuOpen.set(false);
+    this.activeConversationId.set(null);
+    this.chatMessages.set([]);
+  }
+
+  protected openConversation(id: string): void {
+    this.conversationsMenuOpen.set(false);
+    if (id === this.activeConversationId()) return;
+    this.copilotApi.getConversation(id).subscribe({
+      next: (detail: ConversationDetail) => {
+        this.activeConversationId.set(detail.id);
+        this.chatMessages.set(
+          detail.messages.map((m, index) => ({
+            id: index,
+            role: m.role,
+            text: m.content,
+            time: formatChatTime(new Date(m.created_at)),
+            response: m.response ?? undefined,
+            // Niciodată 'pending' la reîncărcarea unei conversații vechi —
+            // altfel un buton "Confirmă" pentru o acțiune propusă demult
+            // reapare ca activ/clickabil, deși contextul ei (ex. un buget
+            // care între timp s-a schimbat) nu mai e cel din momentul
+            // propunerii. Doar mesajele DIN sesiunea curentă, live, pot
+            // ajunge 'pending' (vezi sendMessage mai jos).
+            actionState: undefined,
+          })),
+        );
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut încărca conversația.')),
+    });
+  }
+
+  protected deleteConversation(event: Event, id: string): void {
+    event.stopPropagation();
+    this.copilotApi.deleteConversation(id).subscribe({
+      next: () => {
+        this.conversations.update((list) => list.filter((c) => c.id !== id));
+        if (this.activeConversationId() === id) this.startNewConversation();
+      },
+      error: (err) => this.toast.error(extractErrorMessage(err, 'Nu am putut șterge conversația.')),
+    });
   }
 
   protected sendMessage(): void {
@@ -132,20 +229,21 @@ export class Copilot implements OnDestroy {
   }
 
   private ask(message: string): void {
-    // Istoricul se construiește ÎNAINTE de a adăuga mesajul nou al
-    // userului în chat (altfel ar apărea de 2 ori — o dată în istoric, o
-    // dată ca `message`) — vezi ai-copilot.service.ts::ChatHistoryMessage.
-    const history = this.buildHistory();
     this.pushMessage({ id: Date.now(), role: 'user', text: message, time: formatChatTime(new Date()) });
     this.sending.set(true);
     this.sendingSlow.set(false);
     // Majoritatea răspunsurilor vin în 10-20s — dacă trece mai mult,
     // arătăm un indiciu, ca să nu pară că s-a blocat.
     this.slowTimer = setTimeout(() => this.sendingSlow.set(true), 15_000);
+    this.startThinkingWords();
 
-    this.copilotApi.sendMessage(message, history).subscribe({
+    this.copilotApi.sendMessage(message, this.activeConversationId()).subscribe({
       next: (response) => {
         this.stopSending();
+        if (!this.activeConversationId()) {
+          this.activeConversationId.set(response.conversation_id);
+          this.loadConversations();
+        }
         this.pushMessage({
           id: Date.now(),
           role: 'assistant',
@@ -167,18 +265,24 @@ export class Copilot implements OnDestroy {
     this.sending.set(false);
     this.sendingSlow.set(false);
     clearTimeout(this.slowTimer);
+    clearInterval(this.thinkingWordTimer);
+  }
+
+  /** Pornește rotația de cuvinte "gândește" (vezi THINKING_WORDS) — un
+   * cuvânt nou, mereu diferit de cel curent, la fiecare ~1.8s cât timp
+   * așteptăm răspunsul. */
+  private startThinkingWords(): void {
+    this.thinkingWord.set(THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]);
+    this.thinkingWordTimer = setInterval(() => {
+      this.thinkingWord.update((current) => {
+        const options = THINKING_WORDS.filter((w) => w !== current);
+        return options[Math.floor(Math.random() * options.length)];
+      });
+    }, 1800);
   }
 
   private pushMessage(message: ChatMessage): void {
     this.chatMessages.update((messages) => [...messages, message]);
-  }
-
-  /** Istoricul conversației, în forma cerută de backend — exclude bulele
-   * de eroare (nu au conținut relevant de reținut). */
-  private buildHistory(): ChatHistoryMessage[] {
-    return this.chatMessages()
-      .filter((m) => !m.errorText && m.text)
-      .map((m) => ({ role: m.role, content: m.text }));
   }
 
   /** Execută REAL acțiunea propusă (creare/modificare/ștergere buget) —

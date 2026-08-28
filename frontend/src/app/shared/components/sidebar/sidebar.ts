@@ -37,6 +37,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'nav.transfers', route: '/app/transfers', icon: 'transfer' },
       { label: 'nav.exchange', route: '/app/exchange', icon: 'exchange' },
       { label: 'nav.investments', route: '/app/investments', icon: 'trending-up' },
+      { label: 'nav.points', route: '/app/points', icon: 'gift' },
+      { label: 'nav.loans', route: '/app/loans', icon: 'banknote' },
     ],
   },
   {

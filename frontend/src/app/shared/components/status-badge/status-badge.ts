@@ -21,6 +21,7 @@ const STATUS_TONE_MAP: Record<string, BadgeTone> = {
   matured_renewed: 'info',
   liquidated_early: 'warning',
   closed_paid_out: 'neutral',
+  paid_off: 'neutral',
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -44,6 +45,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   matured_renewed: 'Reînnoit automat',
   liquidated_early: 'Lichidat anticipat',
   closed_paid_out: 'Plătit la scadență',
+  paid_off: 'Achitat',
 };
 
 const STATUS_LABEL_MAP_EN: Record<string, string> = {

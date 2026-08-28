@@ -26,10 +26,10 @@ class ChatHistoryMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
-    # Limitat și aici (nu doar server-side în agent) — vezi
-    # app/agents/spending_forecast.py::_MAX_HISTORY_MESSAGES pentru
-    # trunchierea finală, defensivă indiferent ce trimite frontend-ul.
-    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=40)
+    # Istoricul nu mai vine de la client (vezi conversation_id) — serverul
+    # îl încarcă din Mongo, prin app/services/conversation_service.py.
+    # None = pornește o conversație nouă (titlu din acest mesaj).
+    conversation_id: str | None = None
 
 
 class Analysis(BaseModel):
@@ -102,6 +102,10 @@ class SpendingForecastResponse(BaseModel):
     answer: str
     affordable: bool | None = None
     requested_amount_minor: int | None = None
+
+    # Setat de router DUPĂ ce agent.handle_message întoarce (vezi
+    # routers/spending_forecast.py) — niciodată de agentul însuși.
+    conversation_id: str = ""
 
     analysis: Analysis
     recurring_payments: RecurringPayments

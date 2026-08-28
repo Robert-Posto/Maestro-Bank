@@ -107,6 +107,23 @@ export class Transactions implements OnInit {
       this.search.set(searchParam);
     }
     this.load();
+
+    // Venit de la o notificare (vezi Topbar::openNotification) — deschidem
+    // direct tranzacția vizată, indiferent dacă apare sau nu în pagina
+    // curentă/filtrele active (de-aia o cerem separat, prin id, nu doar
+    // căutăm în lista deja încărcată).
+    const highlightId = this.route.snapshot.queryParamMap.get('highlight');
+    if (highlightId) {
+      this.transactionsApi.getById(highlightId).subscribe({
+        next: (tx) => {
+          this.transactions.update((list) => (list.some((t) => t.id === tx.id) ? list : [tx, ...list]));
+          this.openDetails(tx.id);
+        },
+        // Tranzacție ștearsă/inexistentă/a altcuiva — eșuăm tăcut, fără
+        // toast; userul tot ajunge pe pagina de Tranzacții, doar fără panoul deschis.
+        error: () => {},
+      });
+    }
   }
 
   private currentFilters(): TransactionFilters {

@@ -71,6 +71,7 @@ async def create_notification(payload: NotificationCreate) -> dict:
         "text": payload.text,
         "read": False,
         "created_at": datetime.now(timezone.utc),
+        "reference_id": payload.reference_id,
     }
     result = await db.notifications.insert_one(doc)
     logger.info("support-service: notificare creată (user_id=%s, kind=%s)", payload.user_id, payload.kind)

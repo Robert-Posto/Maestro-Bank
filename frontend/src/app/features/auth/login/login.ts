@@ -28,6 +28,10 @@ export class Login {
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly isSubmitting = signal(false);
+  /** Parola vizibilă în clar — pornește mereu ascunsă la fiecare intrare pe
+   * ecran; nu reținem preferința nicăieri, ca o parolă să nu ajungă vizibilă
+   * din start pe un ecran pe care se poate uita altcineva. */
+  protected readonly passwordVisible = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly sessionExpired = this.route.snapshot.queryParamMap.get('sessionExpired') === '1';
 
@@ -46,6 +50,10 @@ export class Login {
 
   protected readonly passkeySupported = this.webauthn.isSupported();
   protected readonly passkeyBusy = signal(false);
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
+  }
 
   submit(): void {
     this.error.set(null);

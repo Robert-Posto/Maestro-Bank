@@ -150,10 +150,48 @@
     }
   </section>
 
-  <section class="profile-panel">
-    <div class="profile-panel__header">
-      <h3>{{ 'profile.changePasswordTitle' | translate }}</h3>
-    </div>
+  <section class="profile-panel profile-panel--wide" id="documente-de-semnat">
+    <h2>{{ 'profile.documentsSectionTitle' | translate }}</h2>
+    <p class="profile-panel__desc">{{ 'profile.documentsPanelDesc' | translate }}</p>
+
+    @if (documentsLoading()) {
+      <app-loading-skeleton [rows]="2" [height]="50" />
+    } @else if (documents().length === 0) {
+      <app-empty-state
+        icon="receipt"
+        [title]="'profile.noDocumentsTitle' | translate"
+        [description]="'profile.noDocumentsDesc' | translate"
+      />
+    } @else {
+      <ul class="profile-document-list">
+        @for (doc of documents(); track doc.id) {
+          <li class="profile-document-row">
+            <app-icon name="receipt" [size]="18" />
+            <div class="profile-document-row__info">
+              <p class="profile-document-row__title">{{ doc.title }}</p>
+              <p class="profile-document-row__meta">
+                {{ 'profile.receivedOn' | translate }} {{ doc.created_at | date: 'dd MMM yyyy' }}
+                @if (doc.signed_at) {
+                  · {{ 'profile.signedOn' | translate }} {{ doc.signed_at | date: 'dd MMM yyyy' }}
+                }
+              </p>
+            </div>
+            <app-status-badge
+              [status]="doc.status"
+              [toneOverride]="documentStatusTone(doc.status)"
+              [labelOverride]="documentStatusLabel(doc.status)"
+            />
+            <app-action-button variant="ghost" (pressed)="openDocument(doc)">
+              {{ (doc.status === 'pending' ? 'profile.viewAndSign' : 'profile.view') | translate }}
+            </app-action-button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="profile-panel profile-panel--wide">
+    <h2>{{ 'profile.changePasswordTitle' | translate }}</h2>
     <form class="profile-password-form" (ngSubmit)="changePassword()">
       <label>
         <span>{{ 'profile.currentPassword' | translate }}</span>
@@ -179,46 +217,6 @@
     </form>
   </section>
 </div>
-
-<h2 class="profile-section-title"><app-icon name="receipt" [size]="16" /> {{ 'profile.documents' | translate }}</h2>
-<section class="profile-panel">
-  @if (documentsLoading()) {
-    <app-loading-skeleton [rows]="2" [height]="56" />
-  } @else if (documents().length === 0) {
-    <app-empty-state
-      icon="receipt"
-      [title]="'profile.noDocumentsTitle' | translate"
-      [description]="'profile.noDocumentsDesc' | translate"
-    />
-  } @else {
-    <ul class="profile-document-list">
-      @for (doc of documents(); track doc.id) {
-        <li class="profile-document-row">
-          <span class="profile-document-row__icon" [class.profile-document-row__icon--signed]="doc.status === 'signed'">
-            <app-icon name="receipt" [size]="18" />
-          </span>
-          <div class="profile-document-row__info">
-            <p class="profile-document-row__title">{{ doc.title }}</p>
-            <p class="profile-document-row__meta">
-              {{ 'profile.receivedOn' | translate }} {{ doc.created_at | date: 'dd MMM yyyy' }}
-              @if (doc.signed_at) {
-                · {{ 'profile.signedOn' | translate }} {{ doc.signed_at | date: 'dd MMM yyyy' }}
-              }
-            </p>
-          </div>
-          <app-status-badge
-            [status]="doc.status"
-            [toneOverride]="documentStatusTone(doc.status)"
-            [labelOverride]="documentStatusLabel(doc.status)"
-          />
-          <app-action-button variant="ghost" (pressed)="openDocument(doc)">
-            {{ doc.status === 'pending' ? ('profile.viewAndSign' | translate) : ('profile.view' | translate) }}
-          </app-action-button>
-        </li>
-      }
-    </ul>
-  }
-</section>
 
 @if (pendingRevoke(); as p) {
   <app-confirm-dialog

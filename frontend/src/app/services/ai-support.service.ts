@@ -27,17 +27,39 @@ export interface AiRecommendedAction {
 
 export interface AiChatRequest {
   message: string;
-  history?: AiChatMessage[];
+  conversation_id?: string | null;
   pending_action?: AiPendingAction | null;
 }
 
 export interface AiChatResponse {
   answer: string;
+  conversation_id: string;
   intent: string;
   context: Record<string, unknown>;
   recommended_actions: AiRecommendedAction[];
   requires_confirmation: boolean;
   metadata: Record<string, unknown>;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  response: AiChatResponse | null;
+  created_at: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ConversationMessage[];
 }
 
 /** ai-orchestrator-service (Support Agent), prin /api/ai/support. */
@@ -47,5 +69,17 @@ export class AiSupportService {
 
   chat(payload: AiChatRequest): Observable<AiChatResponse> {
     return this.http.post<AiChatResponse>(`${API_BASE_URL}/ai/support`, payload);
+  }
+
+  listConversations(): Observable<ConversationSummary[]> {
+    return this.http.get<ConversationSummary[]>(`${API_BASE_URL}/ai/support/conversations`);
+  }
+
+  getConversation(id: string): Observable<ConversationDetail> {
+    return this.http.get<ConversationDetail>(`${API_BASE_URL}/ai/support/conversations/${id}`);
+  }
+
+  deleteConversation(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/ai/support/conversations/${id}`);
   }
 }

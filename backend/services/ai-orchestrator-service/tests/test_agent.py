@@ -15,6 +15,7 @@ from httpx import AsyncClient
 from app.config import settings
 from app.services import moderation_service, safety_guard
 from app.tools.errors import ToolError
+from tests.conftest import ACCOUNT, BUDGETS, CASH_FLOW, FORECAST, SPENDING_SUMMARY, SUBSCRIPTIONS
 
 pytestmark = pytest.mark.asyncio
 
@@ -23,48 +24,6 @@ def make_token(user_id: str = "68a0f0f0f0f0f0f0f0f0f0f0") -> str:
     now = datetime.now(timezone.utc)
     payload = {"sub": user_id, "email": "test@example.com", "iat": now, "exp": now + timedelta(minutes=5)}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-ACCOUNT = {
-    "id": "acc1",
-    "user_id": "68a0f0f0f0f0f0f0f0f0f0f0",
-    "iban": "RO69MAES0244110069180888",
-    "currency": "RON",
-    "balance_minor": 586043,
-    "status": "active",
-    "account_type": "current",
-}
-SPENDING_SUMMARY = {
-    "month": "2026-08",
-    "total_spent_minor": 112000,
-    "average_daily_spending_minor": 3733,
-    "by_category": [
-        {"category": "groceries", "amount_minor": 60000, "percentage": 53.6},
-        {"category": "restaurants", "amount_minor": 52000, "percentage": 46.4},
-    ],
-}
-FORECAST = {
-    "current_balance_minor": 586043,
-    "expected_expenses_minor": 176000,
-    "upcoming_obligations": [{"name": "Netflix", "amount_minor": 4999, "billing_day": 25}],
-    "estimated_end_of_month_balance_minor": 458861,
-    "days_remaining_in_month": 15,
-}
-SUBSCRIPTIONS = [
-    {
-        "id": "s1",
-        "name": "Netflix",
-        "amount_minor": 4999,
-        "currency": "RON",
-        "billing_day": 25,
-        "category": "subscriptions",
-        "active": True,
-        "created_at": "2026-08-01T00:00:00Z",
-    }
-]
-CASH_FLOW = {"period_days": 30, "points": []}
-BUDGETS = [
-    {"id": "bud1", "name": "Restaurante", "category": "restaurants", "limit_minor": 90000, "period": "monthly", "active": True},
-]
 
 
 class FakeFunction:
@@ -102,51 +61,6 @@ def _make_fake_chat_completion(responses: list[FakeMessage], captured_messages: 
         return remaining.pop(0)
 
     return fake
-
-
-@pytest.fixture(autouse=True)
-def mock_tools(monkeypatch):
-    received_headers: list[str] = []
-
-    async def fake_account(auth_header):
-        received_headers.append(auth_header)
-        return ACCOUNT
-
-    async def fake_spending(auth_header):
-        received_headers.append(auth_header)
-        return SPENDING_SUMMARY
-
-    async def fake_forecast(auth_header):
-        received_headers.append(auth_header)
-        return FORECAST
-
-    async def fake_cash_flow(auth_header, days=30):
-        received_headers.append(auth_header)
-        return CASH_FLOW
-
-    async def fake_subscriptions(auth_header):
-        received_headers.append(auth_header)
-        return SUBSCRIPTIONS
-
-    async def fake_budgets(auth_header):
-        received_headers.append(auth_header)
-        return BUDGETS
-
-    monkeypatch.setattr("app.tools.accounts_tools.get_account_balance", fake_account)
-    monkeypatch.setattr("app.tools.transactions_tools.get_spending_summary", fake_spending)
-    monkeypatch.setattr("app.tools.transactions_tools.get_forecast", fake_forecast)
-    monkeypatch.setattr("app.tools.transactions_tools.get_recent_cash_flow", fake_cash_flow)
-    monkeypatch.setattr("app.tools.budgets_tools.get_upcoming_subscriptions", fake_subscriptions)
-    monkeypatch.setattr("app.tools.budgets_tools.get_budgets", fake_budgets)
-
-    # Testele astea verifică orchestrarea agentului, nu RAG-ul în sine
-    # (vezi test_rag_retrieval.py pentru asta) — forțăm fallback-ul TF-IDF
-    # local, ca să rămână rapide/deterministe/fără rețea, indiferent ce e
-    # configurat în mediul containerului.
-    monkeypatch.setattr("app.rag.retriever.settings.azure_openai_embedding_endpoint", "")
-    monkeypatch.setattr("app.rag.retriever.settings.azure_openai_embedding_api_key", "")
-
-    return received_headers
 
 
 async def test_general_question_does_not_call_affordability(client: AsyncClient, monkeypatch, mock_tools):
@@ -258,23 +172,27 @@ async def test_non_numeric_amount_from_model_does_not_crash(client: AsyncClient,
 
 
 async def test_conversation_history_is_forwarded_to_the_model(client: AsyncClient, monkeypatch, mock_tools):
-    """Istoricul trimis de frontend ajunge efectiv în mesajele către GPT —
-    fără el, agentul "uită" tot ce s-a discutat anterior (feedback userului)."""
-    captured: list = []
-    responses = [FakeMessage(content="Da, ține minte.")]
-    monkeypatch.setattr(
-        "app.agents.spending_forecast.chat_completion", _make_fake_chat_completion(responses, captured)
+    """Istoricul dintr-o conversație salvată ajunge efectiv în mesajele
+    către GPT — fără el, agentul "uită" tot ce s-a discutat anterior.
+    Istoricul vine acum din Mongo, nu din request body — simulăm asta cu
+    un prim tur real, apoi al doilea cu `conversation_id` din primul."""
+    first_responses = [FakeMessage(content="Estimăm că rămâi cu 26.487,90 lei.")]
+    monkeypatch.setattr("app.agents.spending_forecast.chat_completion", _make_fake_chat_completion(first_responses))
+    first = await client.post(
+        "/spending-forecast/chat",
+        json={"message": "Cu cât estimezi că rămân la finalul lunii?"},
+        headers={"Authorization": f"Bearer {make_token()}"},
     )
+    conversation_id = first.json()["conversation_id"]
 
+    captured: list = []
+    monkeypatch.setattr(
+        "app.agents.spending_forecast.chat_completion",
+        _make_fake_chat_completion([FakeMessage(content="Da, ține minte.")], captured),
+    )
     response = await client.post(
         "/spending-forecast/chat",
-        json={
-            "message": "Deci cât mi-ai zis că rămâne?",
-            "history": [
-                {"role": "user", "content": "Cu cât estimezi că rămân la finalul lunii?"},
-                {"role": "assistant", "content": "Estimăm că rămâi cu 26.487,90 lei."},
-            ],
-        },
+        json={"message": "Deci cât mi-ai zis că rămâne?", "conversation_id": conversation_id},
         headers={"Authorization": f"Bearer {make_token()}"},
     )
 
@@ -282,33 +200,41 @@ async def test_conversation_history_is_forwarded_to_the_model(client: AsyncClien
     sent_messages = captured[0]
     contents = [m["content"] for m in sent_messages]
     assert any("26.487,90 lei" in c for c in contents), "istoricul trebuie să ajungă în promptul trimis modelului"
-    # ordinea contează: istoricul înainte de mesajul nou al userului
     assert contents[-1] == "Deci cât mi-ai zis că rămâne?"
 
 
 async def test_conversation_history_is_truncated_defensively(client: AsyncClient, monkeypatch, mock_tools):
-    """Chiar dacă frontend-ul ar trimite un istoric foarte lung, serverul
-    trunchiază la ultimele mesaje — nu lasă contextul să crească nemărginit."""
-    captured: list = []
-    responses = [FakeMessage(content="OK")]
-    monkeypatch.setattr(
-        "app.agents.spending_forecast.chat_completion", _make_fake_chat_completion(responses, captured)
-    )
+    """Chiar dacă o conversație salvată ar acumula foarte multe mesaje,
+    serverul trunchiază la ultimele — nu lasă contextul să crească
+    nemărginit. Populăm o conversație lungă direct prin conversation_service
+    (mai simplu decât 39 de tururi HTTP reale), apoi verificăm turul următor."""
+    from app.services import conversation_service
 
-    long_history = [{"role": "user", "content": f"mesaj {i}"} for i in range(40)]
+    conversation = await conversation_service.create_conversation(
+        "68a0f0f0f0f0f0f0f0f0f0f0", "spending_forecast", "mesaj 0"
+    )
+    for i in range(1, 40):
+        await conversation_service.append_turn(
+            conversation["_id"], f"mesaj {i}", f"răspuns {i}", {"answer": f"răspuns {i}"}
+        )
+
+    captured: list = []
+    monkeypatch.setattr(
+        "app.agents.spending_forecast.chat_completion", _make_fake_chat_completion([FakeMessage(content="OK")], captured)
+    )
     response = await client.post(
         "/spending-forecast/chat",
-        json={"message": "ultima întrebare", "history": long_history},
+        json={"message": "ultima întrebare", "conversation_id": str(conversation["_id"])},
         headers={"Authorization": f"Bearer {make_token()}"},
     )
 
     assert response.status_code == 200
     sent_messages = captured[0]
-    # system + (poate) rag + istoric trunchiat + mesajul nou — verificăm doar
-    # că nu apar toate cele 40 de mesaje vechi, ci un subset recent.
-    history_contents = [m["content"] for m in sent_messages if m["content"].startswith("mesaj ")]
-    assert len(history_contents) < 40
-    assert history_contents[-1] == "mesaj 39"  # cel mai recent, păstrat
+    history_contents = [
+        m["content"] for m in sent_messages if m["content"].startswith("mesaj ") or m["content"].startswith("răspuns ")
+    ]
+    assert len(history_contents) < 78  # 39 tururi × 2 mesaje = 78 dacă n-ar trunchia deloc
+    assert history_contents[-1] == "răspuns 39"  # cel mai recent, păstrat
 
 
 async def test_user_isolation_propagates_the_caller_token(client: AsyncClient, monkeypatch, mock_tools):

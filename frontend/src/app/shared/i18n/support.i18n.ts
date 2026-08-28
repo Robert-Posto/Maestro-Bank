@@ -5,6 +5,10 @@ export const SUPPORT_I18N: Record<string, TranslationEntry> = {
   'support.subtitle': { ro: 'Suntem aici să te ajutăm.', en: "We're here to help." },
   'support.chatAriaLabel': { ro: 'Chat cu Support Agent', en: 'Chat with Support Agent' },
   'support.agentName': { ro: 'Support Agent', en: 'Support Agent' },
+  'support.identitySubtitle': { ro: 'Cont, card, tranzacții și tichete', en: 'Account, card, transactions and tickets' },
+  'support.newConversation': { ro: 'Conversație nouă', en: 'New conversation' },
+  'support.noConversationsSaved': { ro: 'Nicio conversație salvată încă.', en: 'No conversations saved yet.' },
+  'support.deleteConversation': { ro: 'Șterge conversația', en: 'Delete conversation' },
   'support.welcomeTitle': { ro: 'Cu ce te pot ajuta?', en: 'How can I help you?' },
   'support.welcomeDescription': {
     ro: 'Răspund despre contul, cardul, tranzacțiile și tichetele tale, cu date reale din contul tău.',

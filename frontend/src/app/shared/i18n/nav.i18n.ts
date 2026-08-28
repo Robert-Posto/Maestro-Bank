@@ -14,6 +14,8 @@ export const NAV_I18N: Record<string, TranslationEntry> = {
   'nav.transfers': { ro: 'Plăți & Transferuri', en: 'Payments & Transfers' },
   'nav.exchange': { ro: 'Schimb valutar', en: 'Currency exchange' },
   'nav.investments': { ro: 'Investiții', en: 'Investments' },
+  'nav.points': { ro: 'Puncte & Recompense', en: 'Points & Rewards' },
+  'nav.loans': { ro: 'Credite', en: 'Loans' },
   'nav.budgets': { ro: 'Bugete', en: 'Budgets' },
   'nav.forecast': { ro: 'Spending & Forecast', en: 'Spending & Forecast' },
   'nav.copilot': { ro: 'MaestroAgent', en: 'MaestroAgent' },

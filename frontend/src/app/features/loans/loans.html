@@ -1,0 +1,197 @@
+<app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici." />
+
+<section class="explain-section" id="how-it-works">
+  <h2>Cum funcționează, pas cu pas</h2>
+  <p class="explain-section__subtitle">Glisează stânga-dreapta prin cărți — de la sumă la rată automată.</p>
+
+  <app-swipe-card-deck
+    [cards]="howItWorksCards"
+    note="Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite."
+  >
+    <button type="button" class="card-deck__cta" (click)="scrollToCalculator()">Simulează rata ta →</button>
+  </app-swipe-card-deck>
+</section>
+
+<section class="calculator-panel" id="calculator">
+  <div class="calculator-panel__input">
+    <div class="calculator-field">
+      <div class="calculator-field__top">
+        <span>Sumă</span>
+        <span class="calculator-field__amount">{{ calculatorAmountRon() | number }} lei</span>
+      </div>
+      <input
+        type="range"
+        class="calculator-slider"
+        [min]="minAmountRon"
+        [max]="maxAmountRon"
+        step="500"
+        [ngModel]="calculatorAmountRon()"
+        (ngModelChange)="setCalculatorAmount($event)"
+      />
+      <div class="calculator-field__bounds">
+        <span>{{ minAmountRon | number }} lei</span>
+        <input
+          type="number"
+          class="calculator-field__manual"
+          [min]="minAmountRon"
+          [max]="maxAmountRon"
+          [ngModel]="calculatorAmountRon()"
+          (ngModelChange)="setCalculatorAmount($event)"
+        />
+        <span>{{ maxAmountRon | number }} lei</span>
+      </div>
+    </div>
+
+    <div class="calculator-field">
+      <span class="calculator-field__label">Termen</span>
+      <div class="term-pills">
+        @for (term of termOptions; track term) {
+          <button
+            type="button"
+            class="term-pill"
+            [class.term-pill--active]="calculatorTerm() === term"
+            (click)="calculatorTerm.set(term)"
+          >
+            <span>{{ term }} luni</span>
+            <small>{{ rateFor(term) ?? '—' }}%/an</small>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="calculator-panel__result">
+    <span class="calculator-result__label">Rata ta lunară, estimată</span>
+    <strong class="calculator-result__value">{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+    <div class="calculator-result__breakdown">
+      <div>
+        <span>Total plătit</span>
+        <strong>{{ calculatorTotalPaidMinor() | money: 'RON' }}</strong>
+      </div>
+      <div>
+        <span>Din care dobândă</span>
+        <strong>{{ calculatorTotalInterestMinor() | money: 'RON' }}</strong>
+      </div>
+    </div>
+    <app-action-button [fullWidth]="true" (pressed)="openApplyConfirm()">Aplică pentru acest credit</app-action-button>
+    <p class="calculator-result__disclaimer">Estimare — verificăm eligibilitatea reală când aplici.</p>
+  </div>
+</section>
+
+<section class="loans-section">
+  <h2>Creditele tale</h2>
+  @if (loansLoading()) {
+    <app-loading-skeleton [rows]="2" [height]="120" />
+  } @else if (loans().length === 0) {
+    <app-empty-state icon="banknote" title="Niciun credit încă" description="Folosește simulatorul de mai sus ca să vezi rata și să aplici." />
+  } @else {
+    <div class="loans-list">
+      @for (loan of loans(); track loan.id) {
+        <div class="loan-card">
+          <div class="loan-card__top">
+            <div>
+              <p class="loan-card__amount">{{ loan.principal_minor | money: 'RON' }}</p>
+              <p class="loan-card__meta">{{ loan.term_months }} luni · {{ loan.rate_percent_annual }}%/an</p>
+            </div>
+            <app-status-badge [status]="loan.status" />
+          </div>
+
+          <div class="loan-card__bar">
+            <div class="loan-card__bar-fill" [style.width.%]="loanProgressPercent(loan)"></div>
+          </div>
+          <p class="loan-card__progress-label">{{ loan.payments_made }} din {{ loan.term_months }} rate plătite</p>
+
+          <div class="loan-card__stats">
+            <div>
+              <span class="loan-card__stat-label">Rată lunară</span>
+              <strong>{{ loan.monthly_installment_minor | money: 'RON' }}</strong>
+            </div>
+            <div>
+              <span class="loan-card__stat-label">Rest de plată</span>
+              <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong>
+            </div>
+            @if (loan.status === 'active' && daysUntilDue(loan) !== null) {
+              <div>
+                <span class="loan-card__stat-label">Următoarea rată</span>
+                <strong>peste {{ daysUntilDue(loan) }} zile</strong>
+              </div>
+            }
+          </div>
+
+          <div class="loan-card__actions">
+            <app-action-button variant="ghost" (pressed)="openPayments(loan)">Istoric plăți</app-action-button>
+            @if (loan.status === 'active') {
+              <app-action-button variant="secondary" (pressed)="requestPayoff(loan)">Plată anticipată</app-action-button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+@if (applyConfirmOpen()) {
+  <app-modal title="Confirmă cererea de credit" (closed)="closeApplyConfirm()">
+    <div class="apply-confirm">
+      <div class="apply-confirm__row">
+        <span>Sumă</span>
+        <strong>{{ calculatorAmountRon() | number }} lei</strong>
+      </div>
+      <div class="apply-confirm__row">
+        <span>Termen</span>
+        <strong>{{ calculatorTerm() }} luni ({{ calculatorRate() }}%/an)</strong>
+      </div>
+      <div class="apply-confirm__row apply-confirm__row--highlight">
+        <span>Rată lunară estimată</span>
+        <strong>{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+      </div>
+      <p class="apply-confirm__hint">Verificăm eligibilitatea reală acum — dacă rata depășește ce-ți poți permite, cererea e respinsă, cu motivul exact.</p>
+      <app-action-button [fullWidth]="true" [loading]="applying()" (pressed)="submitApply()">Trimite cererea</app-action-button>
+    </div>
+  </app-modal>
+}
+
+@if (payoffTarget(); as loan) {
+  <app-modal title="Plată anticipată" (closed)="cancelPayoff()">
+    <p class="payoff-confirm__text">
+      Achiți acum <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong> (restul de principal, fără dobândă
+      suplimentară) și creditul se închide. Confirmi?
+    </p>
+    <app-action-button [fullWidth]="true" [loading]="payingOff()" (pressed)="confirmPayoff()">Confirmă plata</app-action-button>
+  </app-modal>
+}
+
+@if (paymentsModalLoan(); as loan) {
+  <app-modal title="Istoric plăți" [maxWidth]="600" (closed)="closePayments()">
+    @if (paymentsLoading()) {
+      <app-loading-skeleton [rows]="3" [height]="50" />
+    } @else if (payments().length === 0) {
+      <app-empty-state icon="banknote" title="Nicio plată încă" description="Prima rată apare aici după ce se debitează automat." />
+    } @else {
+      <div class="payments-table-wrap">
+        <table class="payments-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Sumă</th>
+              <th>Dobândă</th>
+              <th>Principal</th>
+              <th>Rest</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (payment of payments(); track payment.id) {
+              <tr>
+                <td>{{ payment.paid_at | date: 'dd MMM yyyy' }}</td>
+                <td>{{ payment.amount_minor | money: 'RON' }}</td>
+                <td>{{ payment.interest_portion_minor | money: 'RON' }}</td>
+                <td>{{ payment.principal_portion_minor | money: 'RON' }}</td>
+                <td>{{ payment.outstanding_after_minor | money: 'RON' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </app-modal>
+}
