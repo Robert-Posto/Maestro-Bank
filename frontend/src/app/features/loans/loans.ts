@@ -271,8 +271,8 @@ export class Loans implements OnInit, OnDestroy {
     this.dragPointerId = null;
   }
 
-  protected scrollToHowItWorks(): void {
-    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  protected scrollToCalculator(): void {
+    document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   protected loanProgressPercent(loan: LoanView): number {

@@ -207,10 +207,9 @@
   }
 }
 
-/* --- Secțiunea "Cum funcționează", jos de tot pe pagină --------------------------- */
+/* --- Secțiunea "Cum funcționează", prima de pe pagină ------------------------------ */
 
 .explain-section {
-  margin-top: var(--mb-space-10);
   margin-bottom: var(--mb-space-8);
   scroll-margin-top: var(--mb-space-8);
 }
@@ -255,6 +254,7 @@
   border: 1px solid var(--mb-border);
   background: var(--mb-surface);
   color: var(--mb-text-secondary);
+  box-shadow: var(--mb-shadow-xs);
   cursor: pointer;
   transition: all var(--mb-transition-fast);
 }
@@ -262,12 +262,17 @@
 .card-deck__nav:hover {
   border-color: var(--mb-blue-500);
   color: var(--mb-blue-600);
+  box-shadow: var(--mb-shadow-sm);
+  transform: translateY(-1px);
 }
 
 .card-deck__viewport {
   flex: 1;
   overflow: hidden;
-  border-radius: var(--mb-radius-lg);
+  /* Padding-ul, nu chenarul, dă loc umbrelor cardurilor să respire fără să
+     fie tăiate de overflow:hidden (necesar totuși, ca să ascundă cardurile
+     din stânga/dreapta în timpul swipe-ului). */
+  padding: var(--mb-space-3) 0;
   touch-action: pan-y;
   cursor: grab;
 }
@@ -302,11 +307,18 @@
   gap: var(--mb-space-3);
   padding: var(--mb-space-8) var(--mb-space-6);
   background: var(--mb-surface-muted);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-md);
   user-select: none;
 }
 
 .deck-card--cover {
-  background: var(--mb-info-bg);
+  background: linear-gradient(160deg, var(--mb-info-bg) 0%, var(--mb-surface-muted) 100%);
+  border-color: var(--mb-blue-500);
+  box-shadow:
+    0 10px 28px rgba(47, 111, 237, 0.16),
+    var(--mb-shadow-md);
 }
 
 .deck-card--cover .deck-card__title {
@@ -386,6 +398,27 @@
   background: var(--mb-surface-muted);
   border-radius: var(--mb-radius-md);
   padding: var(--mb-space-4);
+}
+
+.card-deck__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: var(--mb-space-4);
+  padding: var(--mb-space-2);
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-blue-600);
+  cursor: pointer;
+}
+
+.card-deck__cta:hover {
+  text-decoration: underline;
 }
 
 /* --- Confirmare cerere ------------------------------------------------------------ */

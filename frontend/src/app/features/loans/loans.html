@@ -1,10 +1,66 @@
-<app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici.">
-  <app-action-button variant="ghost" (pressed)="scrollToHowItWorks()">
-    <app-icon name="info" [size]="16" /> Cum funcționează
-  </app-action-button>
-</app-page-header>
+<app-page-header title="Credite" subtitle="Vezi exact cât te costă un credit, înainte să aplici." />
 
-<section class="calculator-panel">
+<section class="explain-section" id="how-it-works">
+  <h2>Cum funcționează, pas cu pas</h2>
+  <p class="explain-section__subtitle">Glisează stânga-dreapta prin cărți — de la sumă la rată automată.</p>
+
+  <div class="card-deck-panel">
+    <div class="card-deck" tabindex="0" (keydown.arrowleft)="prevCard()" (keydown.arrowright)="nextCard()">
+      <button type="button" class="card-deck__nav" aria-label="Cardul anterior" (click)="prevCard()">
+        <app-icon name="chevron-left" [size]="18" />
+      </button>
+
+      <div
+        class="card-deck__viewport"
+        (pointerdown)="onCardPointerDown($event)"
+        (pointermove)="onCardPointerMove($event)"
+        (pointerup)="onCardPointerUp()"
+        (pointercancel)="onCardPointerUp()"
+      >
+        <div class="card-deck__track" [class.card-deck__track--dragging]="isDragging()" [style.transform]="trackTransform()">
+          @for (card of howItWorksCards; track $index) {
+            <div class="deck-card" [class.deck-card--cover]="card.kind === 'cover'">
+              @if (card.kind === 'step') {
+                <span class="deck-card__step">{{ card.step }}</span>
+              } @else if (card.kind === 'benefit') {
+                <span class="deck-card__icon"><app-icon [name]="card.icon!" [size]="22" /></span>
+              }
+              <p class="deck-card__title">{{ card.title }}</p>
+              <p class="deck-card__text">{{ card.text }}</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <button type="button" class="card-deck__nav" aria-label="Cardul următor" (click)="nextCard()">
+        <app-icon name="chevron-right" [size]="18" />
+      </button>
+    </div>
+
+    <div class="card-deck__dots">
+      @for (card of howItWorksCards; track $index; let i = $index) {
+        <button
+          type="button"
+          class="card-deck__dot"
+          [class.card-deck__dot--active]="activeCardIndex() === i"
+          [attr.aria-label]="'Cardul ' + (i + 1)"
+          (click)="goToCard(i)"
+        ></button>
+      }
+    </div>
+
+    <p class="how-it-works__note">
+      Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu
+      lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.
+    </p>
+
+    <button type="button" class="card-deck__cta" (click)="scrollToCalculator()">
+      Simulează rata ta <app-icon name="chevron-right" [size]="14" />
+    </button>
+  </div>
+</section>
+
+<section class="calculator-panel" id="calculator">
   <div class="calculator-panel__input">
     <div class="calculator-field">
       <div class="calculator-field__top">
@@ -120,62 +176,6 @@
       }
     </div>
   }
-</section>
-
-<section class="explain-section" id="how-it-works">
-  <h2>Cum funcționează, pas cu pas</h2>
-  <p class="explain-section__subtitle">Glisează stânga-dreapta prin cărți — de la sumă la rată automată.</p>
-
-  <div class="card-deck-panel">
-    <div class="card-deck" tabindex="0" (keydown.arrowleft)="prevCard()" (keydown.arrowright)="nextCard()">
-      <button type="button" class="card-deck__nav" aria-label="Cardul anterior" (click)="prevCard()">
-        <app-icon name="chevron-left" [size]="18" />
-      </button>
-
-      <div
-        class="card-deck__viewport"
-        (pointerdown)="onCardPointerDown($event)"
-        (pointermove)="onCardPointerMove($event)"
-        (pointerup)="onCardPointerUp()"
-        (pointercancel)="onCardPointerUp()"
-      >
-        <div class="card-deck__track" [class.card-deck__track--dragging]="isDragging()" [style.transform]="trackTransform()">
-          @for (card of howItWorksCards; track $index) {
-            <div class="deck-card" [class.deck-card--cover]="card.kind === 'cover'">
-              @if (card.kind === 'step') {
-                <span class="deck-card__step">{{ card.step }}</span>
-              } @else if (card.kind === 'benefit') {
-                <span class="deck-card__icon"><app-icon [name]="card.icon!" [size]="22" /></span>
-              }
-              <p class="deck-card__title">{{ card.title }}</p>
-              <p class="deck-card__text">{{ card.text }}</p>
-            </div>
-          }
-        </div>
-      </div>
-
-      <button type="button" class="card-deck__nav" aria-label="Cardul următor" (click)="nextCard()">
-        <app-icon name="chevron-right" [size]="18" />
-      </button>
-    </div>
-
-    <div class="card-deck__dots">
-      @for (card of howItWorksCards; track $index; let i = $index) {
-        <button
-          type="button"
-          class="card-deck__dot"
-          [class.card-deck__dot--active]="activeCardIndex() === i"
-          [attr.aria-label]="'Cardul ' + (i + 1)"
-          (click)="goToCard(i)"
-        ></button>
-      }
-    </div>
-
-    <p class="how-it-works__note">
-      Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu
-      lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.
-    </p>
-  </div>
 </section>
 
 @if (applyConfirmOpen()) {
