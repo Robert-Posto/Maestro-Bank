@@ -115,6 +115,55 @@
   color: var(--mb-blue-500);
 }
 
+/* Grupează "Schimbă întrebarea" + dropdown-ul de conversații ca un singur
+   bloc în dreapta — vezi copilot.css::.copilot-chat__bar-actions, aceeași
+   idee, oglindită aici. */
+.support-chat__bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-2);
+  flex: 0 0 auto;
+}
+
+/* Vizibil DOAR după primul mesaj (vezi isConfirmedSupport) — înainte de
+   asta n-ai ce "schimba", conversația e deja goală. Pornește pur și simplu
+   o conversație nouă (ca "Conversație nouă" din dropdown), care face ca
+   următoarea întrebare să fie reclasificată de la zero (vezi askAgent). */
+.support-chat__back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--mb-border-strong);
+  border-radius: var(--mb-radius-pill);
+  background: var(--mb-surface-muted);
+  color: var(--mb-text-secondary);
+  font: inherit;
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--mb-transition-fast), background var(--mb-transition-fast), color var(--mb-transition-fast);
+}
+
+.support-chat__back-btn app-icon {
+  flex-shrink: 0;
+  color: var(--mb-text-tertiary);
+}
+
+.support-chat__back-btn:hover {
+  border-color: var(--mb-blue-500);
+  background: var(--mb-surface);
+  color: var(--mb-text-primary);
+}
+
+@media (max-width: 640px) {
+  /* Pe ecrane mici, doar iconița — vezi copilot.css, același motiv. */
+  .support-chat__back-btn span {
+    display: none;
+  }
+}
+
 .support-chat__identity-text span {
   overflow: hidden;
   font-size: var(--mb-font-size-xs);

@@ -20,44 +20,58 @@
         </div>
       </div>
 
-      <div class="support-chat__conversations" #conversationsMenuEl>
-        <button
-          type="button"
-          class="support-chat__conversations-trigger"
-          [class.support-chat__conversations-trigger--open]="conversationsMenuOpen()"
-          (click)="toggleConversationsMenu()"
-        >
-          <span>{{ activeConversationTitle() }}</span>
-          <app-icon name="chevron-down" [size]="14" />
-        </button>
-
-        @if (conversationsMenuOpen()) {
-          <div class="support-chat__conversations-menu">
-            <button type="button" class="support-conversations__new" (click)="startNewConversation()">
-              <app-icon name="plus" [size]="14" /> Conversație nouă
-            </button>
-            @if (conversations().length === 0) {
-              <p class="support-conversations__empty">Nicio conversație salvată încă.</p>
-            } @else {
-              <div class="support-conversations__list">
-                @for (conversation of conversations(); track conversation.id) {
-                  <button
-                    type="button"
-                    class="support-conversations__item"
-                    [class.support-conversations__item--active]="conversation.id === activeConversationId()"
-                    (click)="openConversation(conversation.id)"
-                  >
-                    <span class="support-conversations__item-title">{{ conversation.title }}</span>
-                    <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
-                    <span class="support-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
-                      <app-icon name="trash" [size]="13" />
-                    </span>
-                  </button>
-                }
-              </div>
-            }
-          </div>
+      <div class="support-chat__bar-actions">
+        @if (isConfirmedSupport()) {
+          <button
+            type="button"
+            class="support-chat__back-btn"
+            title="Pornește o conversație nouă — schimbă întrebarea"
+            (click)="startNewConversation()"
+          >
+            <app-icon name="chevron-left" [size]="14" />
+            <span>Schimbă întrebarea</span>
+          </button>
         }
+
+        <div class="support-chat__conversations" #conversationsMenuEl>
+          <button
+            type="button"
+            class="support-chat__conversations-trigger"
+            [class.support-chat__conversations-trigger--open]="conversationsMenuOpen()"
+            (click)="toggleConversationsMenu()"
+          >
+            <span>{{ activeConversationTitle() }}</span>
+            <app-icon name="chevron-down" [size]="14" />
+          </button>
+
+          @if (conversationsMenuOpen()) {
+            <div class="support-chat__conversations-menu">
+              <button type="button" class="support-conversations__new" (click)="startNewConversation()">
+                <app-icon name="plus" [size]="14" /> Conversație nouă
+              </button>
+              @if (conversations().length === 0) {
+                <p class="support-conversations__empty">Nicio conversație salvată încă.</p>
+              } @else {
+                <div class="support-conversations__list">
+                  @for (conversation of conversations(); track conversation.id) {
+                    <button
+                      type="button"
+                      class="support-conversations__item"
+                      [class.support-conversations__item--active]="conversation.id === activeConversationId()"
+                      (click)="openConversation(conversation.id)"
+                    >
+                      <span class="support-conversations__item-title">{{ conversation.title }}</span>
+                      <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
+                      <span class="support-conversations__item-delete" (click)="deleteConversation($event, conversation.id)">
+                        <app-icon name="trash" [size]="13" />
+                      </span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     </header>
 
