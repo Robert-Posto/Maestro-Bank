@@ -24,7 +24,7 @@ potrivește clar cu domeniul Spending + Forecast merge la Support (fie prin
 calea rapidă absentă, fie prin decizia LLM-ului, fie ca fallback dacă
 apelul LLM eșuează), exact cum Support e deja domeniul "tot restul" (conturi,
 carduri, tranzacții, transferuri, schimb valutar, depozite, investiții,
-puncte, credite, documente, tichete).
+credite, documente, tichete).
 """
 
 from __future__ import annotations
@@ -83,8 +83,8 @@ _CLASSIFY_TOOL = {
                         "'spending_forecast' DOAR când mesajul e clar despre buget, cheltuieli, "
                         "economii, ce-și poate permite userul, prognoză financiară sau abonamente "
                         "recurente. 'support' pentru absolut orice altceva — cont, card, "
-                        "tranzacții, transferuri, schimb valutar, depozite, investiții, puncte/"
-                        "recompense, credite, documente, tichete — sau orice mesaj ambiguu, "
+                        "tranzacții, transferuri, schimb valutar, depozite, investiții, "
+                        "credite, documente, tichete — sau orice mesaj ambiguu, "
                         "general, un salut, sau care nu se încadrează clar în prima categorie."
                     ),
                 },

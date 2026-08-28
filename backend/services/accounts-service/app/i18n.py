@@ -98,8 +98,8 @@ T: dict[str, dict[Language, str]] = {
     "invalidPocketId": {"ro": "ID de obiectiv invalid.", "en": "Invalid goal ID."},
     "pocketNotFound": {"ro": "Obiectivul nu există.", "en": "This goal does not exist."},
     "amountExceedsAvailableBalance": {
-        "ro": "Suma depășește soldul disponibil (neluat deja de alte obiective).",
-        "en": "The amount exceeds the available balance (not already allocated to other goals).",
+        "ro": "Suma depășește soldul disponibil în contul curent.",
+        "en": "The amount exceeds the available balance in your current account.",
     },
     "cannotWithdrawMoreThanSaved": {
         "ro": "Nu poți retrage mai mult decât ai economisit.",

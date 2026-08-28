@@ -101,13 +101,21 @@ export class Accounts implements OnInit {
     return CREATABLE_ACCOUNT_TYPES.filter((t) => !owned.has(t)).map((t) => this.catalog[t]);
   });
 
-  protected readonly totalBalanceMinor = computed(() => this.accounts().reduce((sum, a) => sum + a.balance_minor, 0));
+  // Banii alocați în obiective sunt debitați REAL din contul curent (vezi
+  // accounts-service::deposit_to_pocket) — deci nu mai sunt în `balance_minor`.
+  // Îi adăugăm înapoi la "Sold total" (sunt tot banii userului) și la "Pus
+  // deoparte" (exact acolo îi vede userul acum).
+  protected readonly totalBalanceMinor = computed(
+    () => this.accounts().reduce((sum, a) => sum + a.balance_minor, 0) + this.totalAllocatedMinor(),
+  );
   protected readonly currentAccount = computed(() => this.accounts().find((a) => a.account_type === 'current') ?? null);
   protected readonly setAsideMinor = computed(
     () =>
       this.accounts()
         .filter((a) => a.account_type === 'savings' || a.account_type === 'deposit')
-        .reduce((sum, a) => sum + a.balance_minor, 0) + this.lockedInRonDepositsMinor(),
+        .reduce((sum, a) => sum + a.balance_minor, 0) +
+      this.lockedInRonDepositsMinor() +
+      this.totalAllocatedMinor(),
   );
 
   // --- Pockets (obiective de economisire, în contul curent) ---------------
@@ -241,6 +249,7 @@ export class Accounts implements OnInit {
     this.banking.depositToPocket(pocket.id, amountMinor).subscribe({
       next: (updated) => {
         this.pockets.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+        this.load(); // soldul contului curent a scăzut real — reîncarcă-l
         this.depositBusy.set(false);
         this.depositModalPocket.set(null);
         this.toast.success(this.language.t('accounts.amountAllocated'));
@@ -257,6 +266,7 @@ export class Accounts implements OnInit {
     this.banking.withdrawFromPocket(pocket.id, pocket.saved_minor).subscribe({
       next: (updated) => {
         this.pockets.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+        this.load(); // banii s-au întors în contul curent — reîncarcă soldul
         this.toast.success(this.language.t('accounts.amountReleased'));
       },
       error: (err) => this.toast.error(extractErrorMessage(err, this.language.t('accounts.withdrawalFailed'))),
@@ -374,6 +384,7 @@ export class Accounts implements OnInit {
       .subscribe({
         next: (deposit) => {
           this.termDeposits.update((list) => [deposit, ...list]);
+          this.load(); // principalul a fost debitat din contul sursă — reîncarcă soldul
           this.creatingTermDeposit.set(false);
           this.depositCreateModalOpen.set(false);
           this.toast.success(this.language.t('accounts.depositOpenedSuccessfully'));
@@ -397,6 +408,7 @@ export class Accounts implements OnInit {
     this.depositsApi.liquidate(deposit.id).subscribe({
       next: (updated) => {
         this.termDeposits.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.load(); // principalul s-a întors în contul sursă — reîncarcă soldul
         this.liquidatingDeposit.set(false);
         this.pendingLiquidateDeposit.set(null);
         this.toast.success(this.language.t('accounts.depositLiquidated'));

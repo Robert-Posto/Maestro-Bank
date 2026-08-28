@@ -666,12 +666,14 @@ async def verify_card_pin_internal(card_id: str, pin: str) -> bool:
 
 # --- Pockets (obiective de economisire) -----------------------------------
 #
-# Un pocket NU mută bani pe alt cont/IBAN — e doar o rezervare/etichetare
-# a unei părți din soldul contului RON existent (ca la Revolut Vaults).
-# Regula de integritate: suma `saved_minor` a TUTUROR pocket-urilor unui
-# user nu poate depăși niciodată `balance_minor` al contului lui — verificat
-# la fiecare depunere, nu doar la creare (soldul se poate schimba între timp
-# prin transferuri).
+# Alocarea către un obiectiv MUTĂ efectiv banii: debitează `balance_minor`
+# al contului curent RON și îi contabilizează în `pocket.saved_minor`
+# (retragerea face exact invers). Un obiectiv e un "sub-cont" logic al
+# contului curent — nu are IBAN propriu și nu e un document
+# accounts_db.accounts separat — dar soldul lichid al contului scade REAL
+# când aloci. Aceeași atomicitate condiționată ca `debit_account` /
+# `apply_internal_transfer` (MongoDB standalone, fără tranzacții
+# multi-document reale — vezi nota completă de la apply_internal_transfer).
 
 
 def to_pocket_out(pocket: dict) -> PocketOut:
@@ -723,14 +725,27 @@ async def deposit_to_pocket(pocket_id: str, user_id: str, amount_minor: int) -> 
     pocket = await _get_pocket_for_user(pocket_id, user_id)
     account = await get_account_for_user(user_id)
 
-    already_allocated = await _total_allocated_for_user(user_id)
-    if already_allocated + amount_minor > account["balance_minor"]:
+    # Debit CONDIȚIONAT pe contul curent — dacă soldul lichid nu acoperă
+    # suma, 409 și nu atingem deloc obiectivul.
+    debited = await db.accounts.find_one_and_update(
+        {"_id": account["_id"], "status": "active", "balance_minor": {"$gte": amount_minor}},
+        {"$inc": {"balance_minor": -amount_minor}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if debited is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=translate("amountExceedsAvailableBalance"),
         )
 
-    await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": amount_minor}})
+    try:
+        await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": amount_minor}})
+    except Exception:
+        # Rollback best-effort al debitului dacă incrementul pe obiectiv a
+        # eșuat — aceeași strategie ca la apply_internal_transfer.
+        await db.accounts.update_one({"_id": account["_id"]}, {"$inc": {"balance_minor": amount_minor}})
+        raise
+
     return await db.pockets.find_one({"_id": pocket["_id"]})
 
 
@@ -738,11 +753,22 @@ async def withdraw_from_pocket(pocket_id: str, user_id: str, amount_minor: int) 
     db = get_database()
     pocket = await _get_pocket_for_user(pocket_id, user_id)
 
-    if amount_minor > pocket["saved_minor"]:
+    # Decrement CONDIȚIONAT pe obiectiv — dacă n-are atâția bani puși
+    # deoparte, 409, fără să crediteze contul.
+    reduced = await db.pockets.find_one_and_update(
+        {"_id": pocket["_id"], "saved_minor": {"$gte": amount_minor}},
+        {"$inc": {"saved_minor": -amount_minor}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if reduced is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("cannotWithdrawMoreThanSaved"))
 
-    await db.pockets.update_one({"_id": pocket["_id"]}, {"$inc": {"saved_minor": -amount_minor}})
-    return await db.pockets.find_one({"_id": pocket["_id"]})
+    # Creditează înapoi contul curent (un credit pe un cont activ nu poate
+    # „eșua" — vezi credit_account).
+    await db.accounts.update_one(
+        {"_id": pocket["account_id"], "status": "active"}, {"$inc": {"balance_minor": amount_minor}}
+    )
+    return reduced
 
 
 async def delete_pocket(pocket_id: str, user_id: str) -> None:
@@ -754,14 +780,6 @@ async def delete_pocket(pocket_id: str, user_id: str) -> None:
             detail=translate("withdrawSavingsBeforeDelete"),
         )
     await db.pockets.delete_one({"_id": pocket["_id"]})
-
-
-async def _total_allocated_for_user(user_id: str) -> int:
-    db = get_database()
-    total = 0
-    async for doc in db.pockets.find({"user_id": user_id}, {"saved_minor": 1}):
-        total += doc["saved_minor"]
-    return total
 
 
 # --- Beneficiari (transfer către IBAN salvat) -----------------------------

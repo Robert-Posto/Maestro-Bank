@@ -39,8 +39,8 @@ export const ACCOUNTS_I18N: Record<string, TranslationEntry> = {
 
   'accounts.savingsGoals': { ro: 'Obiective de economisire', en: 'Savings goals' },
   'accounts.savingsGoalsSubtitle': {
-    ro: 'Bani rezervați din contul tău RON — rămân disponibili instant, doar etichetați pentru un scop.',
-    en: 'Money set aside from your RON account — stays available instantly, just labeled for a purpose.',
+    ro: 'Bani puși deoparte din contul tău RON — se scad din soldul curent și îi retragi înapoi oricând, instant.',
+    en: 'Money set aside from your RON account — deducted from your current balance, withdrawable back anytime, instantly.',
   },
   'accounts.newGoal': { ro: 'Obiectiv nou', en: 'New goal' },
   'accounts.noGoalsYet': { ro: 'Niciun obiectiv încă', en: 'No goals yet' },

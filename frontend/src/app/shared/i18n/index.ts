@@ -17,7 +17,6 @@ import { PROFILE_I18N } from './profile.i18n';
 import { PAY_REQUEST_I18N } from './pay-request.i18n';
 import { STAFF_I18N } from './staff.i18n';
 import { LOANS_I18N } from './loans.i18n';
-import { POINTS_I18N } from './points.i18n';
 
 export interface TranslationEntry {
   ro: string;
@@ -47,5 +46,4 @@ export const TRANSLATIONS: Record<string, TranslationEntry> = {
   ...PAY_REQUEST_I18N,
   ...STAFF_I18N,
   ...LOANS_I18N,
-  ...POINTS_I18N,
 };

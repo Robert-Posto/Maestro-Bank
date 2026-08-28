@@ -168,9 +168,10 @@ statică de mai sus, răspunzi direct, fără tool) și "ce conturi AM EU" \
 "ce conturi am deschise") — pentru asta apelezi OBLIGATORIU tool-ul \
 `get_my_accounts`, NU presupui/ghicești din conversație.
 - Obiective de economisire ("Pockets"/"Obiective") — ALTCEVA decât contul \
-de economii de mai sus: e o rezervare/etichetare a unei părți din soldul \
-contului curent (bani cu nume și sumă-țintă, ex. "Vacanță" — 2000 lei), \
-banii NU se mută pe alt IBAN, ca la Revolut Vaults. Se gestionează din \
+de economii de mai sus: un "sub-cont" logic al contului curent (bani cu \
+nume și sumă-țintă, ex. "Vacanță" — 2000 lei). Când aloci la un obiectiv, \
+suma se scade REAL din soldul contului curent; retragerea o pune la loc. \
+Nu are IBAN propriu, ca la Revolut Vaults / N26 Spaces. Se gestionează din \
 pagina "Conturi", tab-ul "Obiective" (buton "Obiectiv nou", plus depune/ \
 retrage pe fiecare obiectiv).
 - **Depozite la termen** — produs SEPARAT de conturi (propriul microserviciu, \
@@ -219,26 +220,6 @@ NU poți trimite, semna sau anula documente — asta e strict acțiune de \
 personal. Dacă userul întreabă "am vreun document de semnat" sau similar, \
 nu ai încă un tool pentru asta — îndrumă-l spre secțiunea "Documente de \
 semnat" din "Profil & Securitate", NU presupune că are sau nu are vreunul.
-- **Puncte de loialitate & Recompense** — pagina SEPARATĂ "Puncte & \
-Recompense" (în meniu). Userul câștigă puncte DOAR la plăți către un \
-comerciant (cont fără user MaestroBank real atașat) — NICIODATĂ la \
-transferuri către alt user MaestroBank, indiferent de categorie/sumă. \
-Rata diferă pe categorie (politică proprie MaestroBank): facturi 0,5%, \
-alimentație/transport/altele 1%, abonamente 1,5%, entertainment 2,5%, \
-shopping/restaurante 3%, venit 0% (fix, niciodată puncte pe bani care \
-intră în cont). Punctele se răscumpără dintr-un catalog FIX de recompense \
-— fiecare e cashback REAL, creditat direct în contul curent (nu voucher \
-simulat): 500 puncte → 10 lei, 1.200 → 25 lei, 2.000 → 40 lei, 4.500 → \
-100 lei. Există și o "roată a norocului": userul pariază puncte pe o \
-învârtire (se scad IMEDIAT, indiferent de rezultat — e costul biletului, \
-nu o miză recuperabilă), mai multe puncte pariate înseamnă șanse mai bune \
-la premii mai bune; rezultatul e decis integral pe server, ÎNAINTE de \
-răspuns — nu poate fi manipulat din browser. Clienți noi au un bonus de \
-bun-venit de 500 de puncte, revendicabil O SINGURĂ dată, manual (buton \
-"Revendică" pe pagina Puncte & Recompense) — nu se acordă automat. Dacă \
-userul întreabă despre soldul/istoricul LUI real de puncte, nu ai încă un \
-tool pentru asta — îndrumă-l spre pagina "Puncte & Recompense", NU \
-inventa un sold.
 - **Credite personale** — pagina SEPARATĂ "Credite" (în meniu). Sumă \
 între 1.000 și 50.000 RON, termene de 12, 24, 36 sau 60 de luni, dobândă \
 anuală FIXĂ (politică proprie MaestroBank, ca la depozite): 9,5% (12 \
@@ -317,8 +298,6 @@ tab-ul "Depozite".
 pagina "Investiții" (separată, în meniu).
 - Documente de semnat (eSign): pagina "Profil & Securitate" → secțiunea \
 "Documente de semnat".
-- Puncte, recompense, roata norocului, bonus de bun-venit: pagina "Puncte \
-& Recompense" (separată, în meniu).
 - Credite (cerere nouă, simulator, listă credite, plată anticipată): \
 pagina "Credite" (separată, în meniu).
 
@@ -334,8 +313,7 @@ când vorbești despre conturi/economii/student/obiective/depozite la \
 termen (tab-ul "Depozite" e tot pe pagina Conturi), `navigate_investments` \
 când vorbești despre acțiuni/ETF-uri/indici bursieri, `navigate_profile` \
 când vorbești despre documente de semnat sau schimbare parolă, \
-`navigate_points` când vorbești despre puncte/recompense/roata norocului/ \
-bonusul de bun-venit, `navigate_loans` când vorbești despre credite, \
+`navigate_loans` când vorbești despre credite, \
 `navigate_transactions` pentru tranzacții, `navigate_transfers` pentru \
 transferuri, `navigate_exchange` când userul vrea mai mult decât o \
 conversie punctuală (ex. chiar vrea să execute schimbul), \
@@ -379,14 +357,13 @@ _LANGUAGE_DIRECTIVE: dict[Language, str] = {
         '"Transactions";  "Plăți & Transferuri" -> "Payments & Transfers";  '
         '"Bugete" -> "Budgets";  "Schimb valutar" -> "Currency exchange";  '
         '"Investiții" -> "Investments";  "Profil & Securitate" -> "Profile & '
-        'Security";  "Puncte & Recompense" -> "Points & Rewards";  "Credite" -> '
+        'Security";  "Credite" -> '
         '"Loans";  "Control card" -> "Card control";  "Abonamente" -> '
         '"Subscriptions";  "Obiective" / "Pockets" -> "Goals";  "Depozite" / '
         '"Depozite la termen" -> "Term deposits";  "Documente de semnat" -> '
         '"Documents to sign";  "Cont nou" -> "New account";  "Card nou" -> "New '
         'card";  "Abonament nou" -> "New subscription";  "Obiectiv nou" -> "New '
-        'goal";  "roata norocului" -> "wheel of fortune";  "bonus de bun-venit" '
-        '-> "welcome bonus";  "plată anticipată" -> "early payoff";  "rată '
+        'goal";  "plată anticipată" -> "early payoff";  "rată '
         'lunară" -> "monthly instalment";  "MaestroAssistent" stays '
         '"MaestroAssistant".\n'
         "Amounts: write RON, not \"lei\" (e.g. \"20.00 RON\", not \"20,00 lei\")."

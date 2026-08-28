@@ -66,7 +66,6 @@ async def test_classify_intent_fast_path_routes_budget_questions(message: str, m
         "De ce mi-a fost reținut transferul de ieri?",
         "Vreau să deschid un cont de economii",
         "Cât mai am de plătit la creditul meu?",
-        "Ce puncte am acumulat luna asta?",
         "Am un document de semnat?",
         "Bună ziua",
     ],
