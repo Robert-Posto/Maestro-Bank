@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../core/api-config';
 import { AccountView, TransactionView } from './banking.service';
+import { LoanApplicationDetails, LoanStatus, LoanTermMonths } from './loans.service';
 
 /**
  * Tot ce ține de /api/transactions/staff — accesibil DOAR unui JWT cu
@@ -81,6 +82,38 @@ export interface StaffCustomerSearchResult {
   first_name: string;
   last_name: string;
   email: string;
+}
+
+export interface LoanApplicantContactView {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string | null;
+}
+
+export interface EligibilitySnapshotView {
+  average_monthly_income_minor: number;
+  max_affordable_installment_minor: number;
+  existing_installments_minor: number;
+  recommended: boolean;
+  reason: string | null;
+}
+
+export interface LoanApplicationStaffView {
+  id: string;
+  user_id: string;
+  applicant: LoanApplicantContactView | null;
+  principal_minor: number;
+  term_months: LoanTermMonths;
+  rate_percent_annual: number;
+  monthly_installment_minor: number;
+  applied_at: string;
+  status: LoanStatus;
+  application: LoanApplicationDetails;
+  eligibility: EligibilitySnapshotView;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 }
 
 export interface StaffDocumentView {
@@ -186,5 +219,22 @@ export class StaffService {
 
   cancelDocument(documentId: string): Observable<void> {
     return this.http.delete<void>(`${API_BASE_URL}/support/staff/documents/${documentId}`);
+  }
+
+  /** Cereri de credit în așteptare — vezi features/staff-loan-applications.
+   * Aprobarea acordă banii REAL (credit pe contul curent al clientului);
+   * respingerea nu mută niciun ban — vezi loans-service/app/service.py. */
+  listLoanApplications(): Observable<LoanApplicationStaffView[]> {
+    return this.http.get<LoanApplicationStaffView[]>(`${API_BASE_URL}/loans/staff/applications`);
+  }
+
+  approveLoanApplication(applicationId: string): Observable<LoanApplicationStaffView> {
+    return this.http.post<LoanApplicationStaffView>(`${API_BASE_URL}/loans/staff/applications/${applicationId}/approve`, {});
+  }
+
+  rejectLoanApplication(applicationId: string, reason: string): Observable<LoanApplicationStaffView> {
+    return this.http.post<LoanApplicationStaffView>(`${API_BASE_URL}/loans/staff/applications/${applicationId}/reject`, {
+      reason,
+    });
   }
 }

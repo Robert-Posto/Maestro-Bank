@@ -316,6 +316,9 @@ services:
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8000
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8000
       - SUPPORT_SERVICE_URL=http://support-service:8000
+      # Datele de contact ale aplicantului, pentru ecranul de personal
+      # (vezi routers/staff.py) — la fel ca transactions-service::holds.py.
+      - AUTH_SERVICE_URL=http://auth-service:8000
     volumes:
       - ./backend/services/loans-service/app:/app/app
       - ./backend/services/loans-service/tests:/app/tests
@@ -330,6 +333,8 @@ services:
       accounts-service:
         condition: service_healthy
       transactions-service:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     networks:
       - maestrobank-network

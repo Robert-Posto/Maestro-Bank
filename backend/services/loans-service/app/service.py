@@ -21,7 +21,14 @@ from app.config import settings
 from app.database import get_database
 from app.eligibility import EligibilityResult, evaluate_eligibility, render_rejection_reason
 from app.i18n import translate
-from app.models import LoanApplyRequest, LoanOut, LoanPaymentOut
+from app.models import (
+    EligibilitySnapshotOut,
+    LoanApplicantContact,
+    LoanApplicationStaffOut,
+    LoanApplyRequest,
+    LoanOut,
+    LoanPaymentOut,
+)
 from app.rates import MAX_LOAN_MINOR, MIN_LOAN_MINOR, compute_monthly_installment_minor, get_rate
 
 logger = logging.getLogger("loans-service")
@@ -115,11 +122,48 @@ def _to_loan_out(doc: dict) -> LoanOut:
         rate_percent_annual=doc["rate_percent_annual"],
         monthly_installment_minor=doc["monthly_installment_minor"],
         payments_made=doc["payments_made"],
-        opened_at=doc["opened_at"],
+        applied_at=doc["applied_at"],
+        opened_at=doc.get("opened_at"),
         next_payment_due_at=doc.get("next_payment_due_at"),
         status=doc["status"],
         paid_off_at=doc.get("paid_off_at"),
+        rejection_reason=doc.get("rejection_reason"),
+        application=doc["application"],
     )
+
+
+def _to_staff_out(doc: dict, applicant: LoanApplicantContact | None) -> LoanApplicationStaffOut:
+    return LoanApplicationStaffOut(
+        id=str(doc["_id"]),
+        user_id=doc["user_id"],
+        applicant=applicant,
+        principal_minor=doc["principal_minor"],
+        term_months=doc["term_months"],
+        rate_percent_annual=doc["rate_percent_annual"],
+        monthly_installment_minor=doc["monthly_installment_minor"],
+        applied_at=doc["applied_at"],
+        status=doc["status"],
+        application=doc["application"],
+        eligibility=EligibilitySnapshotOut(**doc["eligibility_snapshot"]),
+        rejection_reason=doc.get("rejection_reason"),
+        reviewed_by=doc.get("reviewed_by"),
+        reviewed_at=doc.get("reviewed_at"),
+    )
+
+
+async def _fetch_user_contact(user_id: str) -> LoanApplicantContact | None:
+    """Best-effort — identic ca tipar cu transactions-service/app/holds.py
+    ::_fetch_user_contact. Un ecran de personal fără numele clientului tot
+    e util (id-ul rămâne vizibil), deci nu blocăm lista dacă auth-service
+    e temporar indisponibil."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.get(f"{settings.auth_service_url}/internal/users/{user_id}/contact")
+        except httpx.RequestError:
+            return None
+    if response.status_code != 200:
+        return None
+    return LoanApplicantContact(**response.json())
 
 
 def _to_payment_out(doc: dict) -> LoanPaymentOut:
@@ -141,7 +185,15 @@ async def _sum_active_installments(user_id: str) -> int:
     return sum(doc["monthly_installment_minor"] for doc in docs)
 
 
-async def apply_for_loan(user_id: str, payload: LoanApplyRequest) -> LoanOut:
+async def submit_loan_application(user_id: str, payload: LoanApplyRequest) -> LoanOut:
+    """Depune o cerere de credit — NU mai acordă bani pe loc (spre
+    deosebire de vechiul apply_for_loan). Verificarea de eligibilitate încă
+    rulează AICI, o singură dată, pe date reale — dar rezultatul devine o
+    RECOMANDARE atașată cererii (`eligibility_snapshot`), afișată
+    personalului la revizuire, nu o respingere automată. Decizia finală
+    aparține STRICT personalului (vezi approve_application/reject_application
+    mai jos) — exact fluxul unei bănci reale, unde un scor automat
+    informează un ofițer de credit, nu decide singur."""
     if payload.amount_minor < MIN_LOAN_MINOR or payload.amount_minor > MAX_LOAN_MINOR:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -154,14 +206,18 @@ async def apply_for_loan(user_id: str, payload: LoanApplyRequest) -> LoanOut:
     existing_installments_minor = await _sum_active_installments(user_id)
     eligibility: EligibilityResult = await evaluate_eligibility(user_id, existing_installments_minor)
     total_installments_minor = monthly_installment_minor + existing_installments_minor
-    if total_installments_minor > eligibility.max_affordable_installment_minor:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=render_rejection_reason(eligibility, monthly_installment_minor),
-        )
+    recommended = total_installments_minor <= eligibility.max_affordable_installment_minor
+    eligibility_snapshot = {
+        "average_monthly_income_minor": eligibility.average_monthly_income_minor,
+        "max_affordable_installment_minor": eligibility.max_affordable_installment_minor,
+        "existing_installments_minor": eligibility.existing_installments_minor,
+        "recommended": recommended,
+        "reason": None if recommended else render_rejection_reason(eligibility, monthly_installment_minor),
+    }
 
+    # Verificăm contul curent acum (există?), dar NU-l credităm încă — abia
+    # la approve_application, când personalul chiar aprobă cererea.
     account = await _get_current_account(user_id)
-    await _credit_account(account["id"], payload.amount_minor)
 
     now = datetime.now(timezone.utc)
     doc = {
@@ -174,37 +230,130 @@ async def apply_for_loan(user_id: str, payload: LoanApplyRequest) -> LoanOut:
         "monthly_installment_minor": monthly_installment_minor,
         "payments_made": 0,
         "missed_payments_count": 0,
-        "opened_at": now,
-        "next_payment_due_at": now + timedelta(days=_INSTALLMENT_INTERVAL_DAYS),
-        "status": "active",
+        "applied_at": now,
+        "opened_at": None,
+        "next_payment_due_at": None,
+        "status": "pending_review",
         "paid_off_at": None,
+        "rejection_reason": None,
+        "application": payload.application.model_dump(),
+        "eligibility_snapshot": eligibility_snapshot,
+        "reviewed_by": None,
+        "reviewed_at": None,
     }
     result = await get_database().loans.insert_one(doc)
     doc["_id"] = result.inserted_id
     logger.info(
-        "loans-service: credit aprobat (id=%s, user_id=%s, suma=%s, termen=%s luni, rata=%s)",
+        "loans-service: cerere depusă (id=%s, user_id=%s, suma=%s, termen=%s luni, recomandare=%s)",
         result.inserted_id,
         user_id,
         payload.amount_minor,
         payload.term_months,
-        monthly_installment_minor,
-    )
-    await _notify_user(
-        user_id,
-        "loan_approved",
-        "loanApproved",
-        {
-            "amount_minor": payload.amount_minor,
-            "instalment_minor": monthly_installment_minor,
-            "months": payload.term_months,
-        },
-        reference_id=str(result.inserted_id),
+        recommended,
     )
     return _to_loan_out(doc)
 
 
+async def _get_pending_application_by_id(application_id: str) -> dict:
+    try:
+        oid = ObjectId(application_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("loanNotFound")) from exc
+    doc = await get_database().loans.find_one({"_id": oid})
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("loanNotFound"))
+    if doc["status"] != "pending_review":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("applicationNoLongerPending"))
+    return doc
+
+
+async def list_pending_applications() -> list[LoanApplicationStaffOut]:
+    """Pentru personal — vezi routers/staff.py. Cererile în așteptare,
+    cele mai vechi primele (FIFO, ca la o coadă de evaluare reală)."""
+    db = get_database()
+    docs = await db.loans.find({"status": "pending_review"}).sort("applied_at", 1).to_list(length=200)
+    results = []
+    for doc in docs:
+        applicant = await _fetch_user_contact(doc["user_id"])
+        results.append(_to_staff_out(doc, applicant))
+    return results
+
+
+async def approve_application(application_id: str, staff_user_id: str) -> LoanApplicationStaffOut:
+    """Aprobă o cerere — ABIA acum se acordă banii (credit real pe contul
+    curent), exact ca la vechiul apply_for_loan, dar declanșat de personal,
+    nu automat la depunere."""
+    doc = await _get_pending_application_by_id(application_id)
+    await _credit_account(doc["account_id"], doc["principal_minor"])
+
+    now = datetime.now(timezone.utc)
+    update = {
+        "status": "active",
+        "opened_at": now,
+        "next_payment_due_at": now + timedelta(days=_INSTALLMENT_INTERVAL_DAYS),
+        "reviewed_by": staff_user_id,
+        "reviewed_at": now,
+    }
+    await get_database().loans.update_one({"_id": doc["_id"]}, {"$set": update})
+    doc.update(update)
+    logger.info(
+        "loans-service: cerere aprobată (id=%s, user_id=%s, staff=%s, suma=%s)",
+        application_id,
+        doc["user_id"],
+        staff_user_id,
+        doc["principal_minor"],
+    )
+    await _notify_user(
+        doc["user_id"],
+        "loan_approved",
+        "loanApproved",
+        {
+            "amount_minor": doc["principal_minor"],
+            "instalment_minor": doc["monthly_installment_minor"],
+            "months": doc["term_months"],
+        },
+        reference_id=str(doc["_id"]),
+    )
+    applicant = await _fetch_user_contact(doc["user_id"])
+    return _to_staff_out(doc, applicant)
+
+
+async def reject_application(application_id: str, staff_user_id: str, reason: str) -> LoanApplicationStaffOut:
+    """Respinge o cerere — NICIUN ban nu s-a mișcat vreodată (banii se
+    acordă STRICT la aprobare), deci nu există nimic de anulat/rollback."""
+    doc = await _get_pending_application_by_id(application_id)
+
+    now = datetime.now(timezone.utc)
+    update = {
+        "status": "rejected",
+        "rejection_reason": reason,
+        "reviewed_by": staff_user_id,
+        "reviewed_at": now,
+    }
+    await get_database().loans.update_one({"_id": doc["_id"]}, {"$set": update})
+    doc.update(update)
+    logger.info(
+        "loans-service: cerere respinsă (id=%s, user_id=%s, staff=%s)",
+        application_id,
+        doc["user_id"],
+        staff_user_id,
+    )
+    await _notify_user(
+        doc["user_id"],
+        "loan_rejected",
+        "loanRejected",
+        {"reason": reason},
+        reference_id=str(doc["_id"]),
+    )
+    applicant = await _fetch_user_contact(doc["user_id"])
+    return _to_staff_out(doc, applicant)
+
+
 async def list_my_loans(user_id: str) -> list[LoanOut]:
-    cursor = get_database().loans.find({"user_id": user_id}).sort("opened_at", -1)
+    # sortăm după applied_at, NU opened_at — o cerere "pending_review"/
+    # "rejected" n-are opened_at (setat DOAR la aprobare, vezi
+    # approve_application), dar are mereu applied_at.
+    cursor = get_database().loans.find({"user_id": user_id}).sort("applied_at", -1)
     docs = await cursor.to_list(length=200)
     return [_to_loan_out(doc) for doc in docs]
 

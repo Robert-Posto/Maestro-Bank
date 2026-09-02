@@ -40,4 +40,5 @@ export const NAV_I18N: Record<string, TranslationEntry> = {
   'admin.nav.holds': { ro: 'Rețineri', en: 'Holds' },
   'admin.nav.blocklist': { ro: 'Blocklist', en: 'Blocklist' },
   'admin.nav.documents': { ro: 'Documente', en: 'Documents' },
+  'admin.nav.loanApplications': { ro: 'Cereri credit', en: 'Loan applications' },
 };

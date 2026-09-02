@@ -17,8 +17,8 @@ export const LOANS_I18N: Record<string, TranslationEntry> = {
     en: 'Swipe left and right through the cards — from amount to automatic instalment.',
   },
   'loans.deckNote': {
-    ro: 'Aprobăm un credit doar dacă rata lui (împreună cu cele active deja) nu depășește 40% din venitul tău mediu lunar — o politică simplă, ca să nu te împrumuți peste ce-ți poți permite.',
-    en: "We approve a loan only if its instalment (together with any active ones) stays under 40% of your average monthly income — a simple policy so you don't borrow beyond what you can afford.",
+    ro: 'Recomandăm aprobarea doar dacă rata (împreună cu cele active deja) nu depășește 40% din venitul tău mediu lunar — un ofițer de credit vede acest semnal și decide.',
+    en: 'We recommend approval only if the instalment (together with any active ones) stays under 40% of your average monthly income — a loan officer sees this signal and decides.',
   },
   'loans.simulateCta': { ro: 'Simulează rata ta →', en: 'Simulate your instalment →' },
 
@@ -50,14 +50,67 @@ export const LOANS_I18N: Record<string, TranslationEntry> = {
   'loans.paymentHistory': { ro: 'Istoric plăți', en: 'Payment history' },
   'loans.earlyPayoff': { ro: 'Plată anticipată', en: 'Early payoff' },
 
-  'loans.confirmApplyTitle': { ro: 'Confirmă cererea de credit', en: 'Confirm your loan application' },
+  'loans.confirmApplyTitle': { ro: 'Cerere de credit', en: 'Loan application' },
   'loans.termWithRate': { ro: '{months} luni ({rate}%/an)', en: '{months} months ({rate}%/year)' },
   'loans.estimatedMonthlyInstalment': { ro: 'Rată lunară estimată', en: 'Estimated monthly instalment' },
   'loans.applyConfirmHint': {
-    ro: 'Verificăm eligibilitatea reală acum — dacă rata depășește ce-ți poți permite, cererea e respinsă, cu motivul exact.',
-    en: "We check your real eligibility now — if the instalment exceeds what you can afford, the application is rejected, with the exact reason.",
+    ro: 'Ca la o cerere reală de credit, avem nevoie de câteva răspunsuri — cererea ta merge apoi la un ofițer de credit, care decide după ce analizează venitul tău real.',
+    en: 'Like a real loan application, we need a few answers — your application then goes to a loan officer, who decides after reviewing your real income.',
   },
+
+  'loans.field.sectionTitle': { ro: 'Câteva întrebări despre situația ta', en: 'A few questions about your situation' },
+  'loans.field.purpose': { ro: 'Scopul creditului', en: 'Purpose of the loan' },
+  'loans.field.employmentStatus': { ro: 'Statutul profesional', en: 'Employment status' },
+  'loans.field.employmentTenure': { ro: 'Vechime la locul actual', en: 'Tenure in your current role' },
+  'loans.field.incomeSource': { ro: 'Sursa venitului', en: 'Source of income' },
+  'loans.field.incomeSourcePlaceholder': { ro: 'Ex. Angajator SRL, sau descrie venitul', en: 'E.g. your employer, or describe your income' },
+  'loans.field.declaredIncome': { ro: 'Venit lunar net declarat (RON)', en: 'Declared net monthly income (RON)' },
+  'loans.field.dependentsCount': { ro: 'Persoane în întreținere', en: 'Dependents' },
+  'loans.field.hasOtherDebts': { ro: 'Ai alte credite/rate în derulare?', en: 'Do you have other loans/instalments running?' },
+  'loans.field.otherDebtsAmount': { ro: 'Rata lunară totală la celelalte credite (RON)', en: 'Total monthly instalment on other loans (RON)' },
+  'loans.field.consent': {
+    ro: 'Sunt de acord ca MaestroBank să îmi verifice istoricul de tranzacții pentru evaluarea acestei cereri.',
+    en: 'I agree that MaestroBank may review my transaction history to evaluate this application.',
+  },
+
+  'loans.purpose.personal_needs': { ro: 'Nevoi personale', en: 'Personal needs' },
+  'loans.purpose.home_renovation': { ro: 'Renovarea locuinței', en: 'Home renovation' },
+  'loans.purpose.purchase_goods': { ro: 'Achiziție bunuri', en: 'Purchasing goods' },
+  'loans.purpose.debt_refinancing': { ro: 'Refinanțare datorii', en: 'Debt refinancing' },
+  'loans.purpose.education': { ro: 'Educație', en: 'Education' },
+  'loans.purpose.medical': { ro: 'Cheltuieli medicale', en: 'Medical expenses' },
+  'loans.purpose.vacation': { ro: 'Vacanță', en: 'Vacation' },
+  'loans.purpose.other': { ro: 'Altul', en: 'Other' },
+
+  'loans.employmentStatus.employed_permanent': { ro: 'Angajat, contract nedeterminat', en: 'Employed, permanent contract' },
+  'loans.employmentStatus.employed_fixed_term': { ro: 'Angajat, contract determinat', en: 'Employed, fixed-term contract' },
+  'loans.employmentStatus.self_employed': { ro: 'Liber profesionist / PFA', en: 'Self-employed' },
+  'loans.employmentStatus.retired': { ro: 'Pensionar', en: 'Retired' },
+  'loans.employmentStatus.student': { ro: 'Student', en: 'Student' },
+  'loans.employmentStatus.unemployed': { ro: 'Fără loc de muncă', en: 'Unemployed' },
+
+  'loans.employmentTenure.under_6_months': { ro: 'Sub 6 luni', en: 'Under 6 months' },
+  'loans.employmentTenure.6_to_12_months': { ro: '6-12 luni', en: '6-12 months' },
+  'loans.employmentTenure.1_to_3_years': { ro: '1-3 ani', en: '1-3 years' },
+  'loans.employmentTenure.3_to_5_years': { ro: '3-5 ani', en: '3-5 years' },
+  'loans.employmentTenure.over_5_years': { ro: 'Peste 5 ani', en: 'Over 5 years' },
+
   'loans.submitApplication': { ro: 'Trimite cererea', en: 'Submit application' },
+  'loans.applicationSubmittedToast': {
+    ro: 'Cererea a fost trimisă — un ofițer de credit o analizează, te anunțăm cu decizia.',
+    en: "Application submitted — a loan officer is reviewing it, we'll notify you with the decision.",
+  },
+  'loans.applySubmitError': { ro: 'Trimiterea cererii a eșuat.', en: 'Submitting the application failed.' },
+
+  'loans.status.pending_review': { ro: 'În analiză', en: 'Under review' },
+  'loans.status.active': { ro: 'Activ', en: 'Active' },
+  'loans.status.rejected': { ro: 'Respinsă', en: 'Rejected' },
+  'loans.status.paid_off': { ro: 'Achitat', en: 'Paid off' },
+  'loans.pendingReviewNote': {
+    ro: 'Cererea ta e în analiza unui ofițer de credit. Te anunțăm imediat ce e o decizie.',
+    en: "Your application is with a loan officer for review. We'll let you know as soon as there's a decision.",
+  },
+  'loans.rejectionReasonLabel': { ro: 'Motiv:', en: 'Reason:' },
 
   'loans.payoffTextBefore': { ro: 'Achiți acum', en: 'You now pay off' },
   'loans.payoffTextAfter': {
@@ -77,11 +130,6 @@ export const LOANS_I18N: Record<string, TranslationEntry> = {
   'loans.tablePrincipal': { ro: 'Principal', en: 'Principal' },
   'loans.tableRemaining': { ro: 'Rest', en: 'Remaining' },
 
-  'loans.approvedToast': {
-    ro: 'Creditul a fost aprobat — suma e deja în contul tău curent.',
-    en: 'The loan was approved — the amount is already in your current account.',
-  },
-  'loans.applyRejected': { ro: 'Cererea de credit a fost respinsă.', en: 'The loan application was rejected.' },
   'loans.payoffDoneToast': { ro: 'Credit achitat anticipat.', en: 'Loan paid off early.' },
   'loans.payoffFailed': { ro: 'Plata anticipată a eșuat.', en: 'The early payoff failed.' },
 
@@ -104,20 +152,20 @@ export const LOANS_I18N: Record<string, TranslationEntry> = {
     ro: 'Ne uităm la istoricul tău de tranzacții din ultimele 3 luni, nu la ce declari.',
     en: 'We look at your transaction history from the last 3 months, not at what you declare.',
   },
-  'loans.howItWorks.step3Title': { ro: 'Banii intră imediat în cont', en: 'The money arrives in your account right away' },
+  'loans.howItWorks.step3Title': { ro: 'Un ofițer de credit analizează cererea', en: 'A loan officer reviews the application' },
   'loans.howItWorks.step3Text': {
-    ro: 'Fără așteptare, fără aprobare manuală — dacă eligibilitatea e îndeplinită.',
-    en: 'No waiting, no manual approval — as long as you meet the eligibility check.',
+    ro: 'Cu venitul tău real și chestionarul completat sub ochi, decide — banii intră în cont doar la aprobare.',
+    en: 'With your real income and completed questionnaire in front of them, they decide — the money lands in your account only on approval.',
   },
   'loans.howItWorks.step4Title': { ro: 'Rata se plătește singură', en: 'The instalment pays itself' },
   'loans.howItWorks.step4Text': {
     ro: 'Automat, lunar, din contul curent — sau achiți oricând tot restul, fără cost suplimentar.',
     en: 'Automatically, monthly, from your current account — or pay off the rest anytime, at no extra cost.',
   },
-  'loans.howItWorks.benefitInstantTitle': { ro: 'Aprobare pe loc', en: 'Instant approval' },
+  'loans.howItWorks.benefitInstantTitle': { ro: 'Decizie informată', en: 'Informed decision' },
   'loans.howItWorks.benefitInstantText': {
-    ro: 'Verificăm venitul tău real, din istoric — nu aștepți zile pentru un răspuns.',
-    en: "We check your real income from your history — you don't wait days for an answer.",
+    ro: 'Ofițerul de credit vede venitul tău real, din istoric — nu doar ce declari.',
+    en: "The loan officer sees your real income from your history — not just what you declare.",
   },
   'loans.howItWorks.benefitNoHiddenTitle': { ro: 'Fără costuri ascunse', en: 'No hidden costs' },
   'loans.howItWorks.benefitNoHiddenText': {

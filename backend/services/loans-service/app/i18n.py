@@ -48,6 +48,7 @@ T: dict[str, dict[Language, str]] = {
         "en": "Missing Authorization header: Bearer <token>.",
     },
     "tokenMissingSubject": {"ro": "Token invalid: lipsește subiectul.", "en": "Invalid token: missing subject."},
+    "staffOnly": {"ro": "Acces permis doar personalului.", "en": "Staff access only."},
     # --- cross-service calls ----------------------------------------------
     "accountsServiceUnavailable": {"ro": "accounts-service indisponibil.", "en": "accounts-service is unavailable."},
     "accountsServiceQueryError": {
@@ -72,6 +73,10 @@ T: dict[str, dict[Language, str]] = {
     },
     "loanNotFound": {"ro": "Credit inexistent.", "en": "This loan does not exist."},
     "loanNoLongerActive": {"ro": "Creditul nu mai este activ.", "en": "The loan is no longer active."},
+    "applicationNoLongerPending": {
+        "ro": "Cererea a fost deja procesată — nu mai e în așteptare.",
+        "en": "This application has already been processed — it's no longer pending.",
+    },
     "insufficientBalanceForPayoff": {
         "ro": "Sold insuficient pentru plata anticipată.",
         "en": "Insufficient balance for the early payoff.",

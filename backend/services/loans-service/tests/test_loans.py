@@ -1,6 +1,11 @@
 """Teste de integrare pentru loans-service — apelurile către accounts-service
 și eligibility sunt MOCK-uite, la fel ca la deposits-service/investments-service.
 
+Fluxul e acum în DOUĂ etape (nu mai există aprobare automată instant):
+submit_loan_application (client) creează o cerere "pending_review", FĂRĂ
+să mute bani — approve_application/reject_application (personal) decid,
+iar banii se mută STRICT la aprobare. Vezi app/service.py.
+
 Rulare (cu stack-ul pornit prin `docker compose up`, bază de TEST separată):
 
     docker compose exec loans-service pip install pytest==8.3.3 pytest-asyncio==0.24.0 httpx==0.27.2 -q
@@ -16,10 +21,29 @@ from httpx import ASGITransport, AsyncClient
 from app.database import get_database
 from app.eligibility import EligibilityResult
 from app.main import app
-from app.models import LoanApplyRequest
+from app.models import LoanApplicantContact, LoanApplicationDetails, LoanApplyRequest
 
 USER_ID = str(ObjectId())
+STAFF_USER_ID = str(ObjectId())
 CURRENT_ACCOUNT_ID = str(ObjectId())
+
+
+def _valid_application(**overrides) -> LoanApplicationDetails:
+    """Chestionar COMPLET, valid — folosit ca bază de fiecare test care
+    depune o cerere; `overrides` schimbă doar câmpurile relevante testului."""
+    defaults = dict(
+        purpose="personal_needs",
+        employment_status="employed_permanent",
+        income_source="MaestroBank Demo SRL",
+        employment_tenure="1_to_3_years",
+        declared_monthly_income_minor=800_000,
+        has_other_debts=False,
+        other_debts_monthly_minor=None,
+        dependents_count=0,
+        consent_credit_check=True,
+    )
+    defaults.update(overrides)
+    return LoanApplicationDetails(**defaults)
 
 
 @pytest.fixture(autouse=True)
@@ -86,6 +110,17 @@ def mock_notify(monkeypatch):
     return calls
 
 
+@pytest.fixture(autouse=True)
+def mock_contact(monkeypatch):
+    """Best-effort — vezi app/service.py::_fetch_user_contact. Mock-uit
+    peste tot (autouse), ca niciun test să nu depindă de auth-service REAL."""
+
+    async def fake_contact(user_id: str) -> LoanApplicantContact | None:
+        return LoanApplicantContact(first_name="Test", last_name="Applicant", email="test@maestrobank.local")
+
+    monkeypatch.setattr("app.service._fetch_user_contact", fake_contact)
+
+
 def _mock_eligible(monkeypatch, max_affordable_installment_minor: int = 10_000_000):
     async def fake_evaluate(user_id: str, existing_installments_minor: int) -> EligibilityResult:
         return EligibilityResult(
@@ -104,44 +139,55 @@ async def client():
         yield ac
 
 
-# --- Cerere de credit ---------------------------------------------------------
+# --- Depunere cerere — NU mai mută bani, doar creează "pending_review" --------------
 
 
-async def test_apply_for_loan_approves_and_credits_when_eligible(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan
+async def test_submit_application_creates_pending_review_without_moving_money(monkeypatch, mock_accounts, mock_notify):
+    from app.service import submit_loan_application
 
     _mock_eligible(monkeypatch)
-    loan = await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
 
-    assert loan.status == "active"
-    assert loan.principal_minor == 1_000_000
-    assert loan.outstanding_principal_minor == 1_000_000
-    assert loan.payments_made == 0
-    assert loan.monthly_installment_minor > 0
-    assert mock_accounts["credits"] == [1_000_000]
-    assert any(call["kind"] == "loan_approved" for call in mock_notify)
+    assert application.status == "pending_review"
+    assert application.principal_minor == 1_000_000
+    assert application.outstanding_principal_minor == 1_000_000
+    assert application.opened_at is None
+    assert application.next_payment_due_at is None
+    assert application.applied_at is not None
+    # NICIUN ban mutat la depunere — abia la aprobare (vezi testul de mai jos).
+    assert mock_accounts["credits"] == []
+    assert mock_notify == []
 
 
-async def test_apply_for_loan_rejects_amount_below_minimum(mock_accounts, mock_notify):
-    from app.service import apply_for_loan
+async def test_submit_application_rejects_amount_below_minimum(mock_accounts, mock_notify):
+    from app.service import submit_loan_application
 
     with pytest.raises(Exception) as exc_info:
-        await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000, term_months=12))
+        await submit_loan_application(
+            USER_ID, LoanApplyRequest(amount_minor=1_000, term_months=12, application=_valid_application())
+        )
     assert exc_info.value.status_code == 400
 
 
-async def test_apply_for_loan_rejects_when_installment_exceeds_income(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan
+async def test_submit_application_still_pending_when_installment_exceeds_income(monkeypatch, mock_accounts, mock_notify):
+    """Diferența cheie față de vechiul flux: rata prea mare NU mai respinge
+    automat (nu mai aruncă 422) — cererea tot ajunge "pending_review", doar
+    cu `eligibility.recommended=False`, ca personalul să decidă."""
+    from app.service import submit_loan_application
 
     _mock_eligible(monkeypatch, max_affordable_installment_minor=0)
-    with pytest.raises(Exception) as exc_info:
-        await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
-    assert exc_info.value.status_code == 422
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+
+    assert application.status == "pending_review"
     assert mock_accounts["credits"] == []  # nu s-a mutat niciun ban
 
 
-async def test_apply_for_loan_counts_existing_active_loans_toward_eligibility(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan
+async def test_submit_application_counts_existing_active_loans_toward_eligibility(monkeypatch, mock_accounts, mock_notify):
+    from app.service import submit_loan_application
 
     captured: dict = {}
 
@@ -166,6 +212,7 @@ async def test_apply_for_loan_counts_existing_active_loans_toward_eligibility(mo
             "monthly_installment_minor": 43_800,
             "payments_made": 2,
             "missed_payments_count": 0,
+            "applied_at": datetime.now(timezone.utc),
             "opened_at": datetime.now(timezone.utc),
             "next_payment_due_at": datetime.now(timezone.utc) + timedelta(days=10),
             "status": "active",
@@ -173,21 +220,102 @@ async def test_apply_for_loan_counts_existing_active_loans_toward_eligibility(mo
         }
     )
 
-    await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
     assert captured["existing"] == 43_800
+
+
+# --- Revizuire de personal (approve/reject) ----------------------------------------
+
+
+async def test_approve_application_credits_account_and_activates_loan(monkeypatch, mock_accounts, mock_notify):
+    from app.service import approve_application, submit_loan_application
+
+    _mock_eligible(monkeypatch)
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    assert mock_accounts["credits"] == []  # confirmăm din nou — nimic încă
+
+    approved = await approve_application(application.id, STAFF_USER_ID)
+
+    assert approved.status == "active"
+    assert mock_accounts["credits"] == [1_000_000]
+    assert any(call["kind"] == "loan_approved" for call in mock_notify)
+
+    doc = await get_database().loans.find_one({"_id": ObjectId(application.id)})
+    assert doc["opened_at"] is not None
+    assert doc["next_payment_due_at"] is not None
+    assert doc["reviewed_by"] == STAFF_USER_ID
+
+
+async def test_reject_application_moves_no_money_and_records_reason(monkeypatch, mock_accounts, mock_notify):
+    from app.service import reject_application, submit_loan_application
+
+    _mock_eligible(monkeypatch)
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+
+    rejected = await reject_application(application.id, STAFF_USER_ID, "Venit insuficient documentat.")
+
+    assert rejected.status == "rejected"
+    assert rejected.rejection_reason == "Venit insuficient documentat."
+    assert mock_accounts["credits"] == []
+    assert mock_accounts["debits"] == []
+    assert any(call["kind"] == "loan_rejected" for call in mock_notify)
+
+
+async def test_approve_application_rejects_already_decided_application(monkeypatch, mock_accounts, mock_notify):
+    from app.service import approve_application, reject_application, submit_loan_application
+
+    _mock_eligible(monkeypatch)
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    await reject_application(application.id, STAFF_USER_ID, "Motiv oarecare.")
+
+    with pytest.raises(Exception) as exc_info:
+        await approve_application(application.id, STAFF_USER_ID)
+    assert exc_info.value.status_code == 409
+
+
+async def test_list_pending_applications_returns_only_pending(monkeypatch, mock_accounts, mock_notify):
+    from app.service import approve_application, list_pending_applications, submit_loan_application
+
+    _mock_eligible(monkeypatch)
+    pending = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    decided = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=500_000, term_months=24, application=_valid_application())
+    )
+    await approve_application(decided.id, STAFF_USER_ID)
+
+    applications = await list_pending_applications()
+
+    ids = [a.id for a in applications]
+    assert pending.id in ids
+    assert decided.id not in ids
+    assert applications[0].applicant is not None
+    assert applications[0].applicant.first_name == "Test"
 
 
 # --- Plată anticipată -----------------------------------------------------------
 
 
 async def test_payoff_loan_debits_outstanding_and_closes(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan, payoff_loan
+    from app.service import approve_application, payoff_loan, submit_loan_application
 
     _mock_eligible(monkeypatch)
-    loan = await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    await approve_application(application.id, STAFF_USER_ID)
     debits_before = list(mock_accounts["debits"])
 
-    result = await payoff_loan(loan.id, USER_ID)
+    result = await payoff_loan(application.id, USER_ID)
 
     assert result.status == "paid_off"
     assert result.outstanding_principal_minor == 0
@@ -195,15 +323,33 @@ async def test_payoff_loan_debits_outstanding_and_closes(monkeypatch, mock_accou
     assert any(call["kind"] == "loan_paid_off" for call in mock_notify)
 
 
-async def test_payoff_loan_rejects_insufficient_funds(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan, payoff_loan
+async def test_payoff_loan_rejects_pending_application(monkeypatch, mock_accounts, mock_notify):
+    """O cerere încă "pending_review" nu poate fi plătită anticipat — nu
+    există încă niciun principal acordat."""
+    from app.service import payoff_loan, submit_loan_application
 
     _mock_eligible(monkeypatch)
-    loan = await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        await payoff_loan(application.id, USER_ID)
+    assert exc_info.value.status_code == 409
+
+
+async def test_payoff_loan_rejects_insufficient_funds(monkeypatch, mock_accounts, mock_notify):
+    from app.service import approve_application, payoff_loan, submit_loan_application
+
+    _mock_eligible(monkeypatch)
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    await approve_application(application.id, STAFF_USER_ID)
     mock_accounts["balance_minor"] = 0  # fondurile "dispar" înainte de plata anticipată
 
     with pytest.raises(Exception) as exc_info:
-        await payoff_loan(loan.id, USER_ID)
+        await payoff_loan(application.id, USER_ID)
     assert exc_info.value.status_code == 409
 
 
@@ -215,14 +361,17 @@ async def test_payoff_loan_rejects_unknown_loan(mock_accounts, mock_notify):
     assert exc_info.value.status_code == 404
 
 
-# --- Rate automate (scheduler) ---------------------------------------------------
+# --- Rate automate (scheduler) — direct pe un credit ACTIV, inserat deja -----------
 
 
 async def test_process_due_payments_pays_installment_and_advances_schedule(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan, process_due_payments
+    from app.service import approve_application, process_due_payments, submit_loan_application
 
     _mock_eligible(monkeypatch)
-    loan = await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    loan = await approve_application(application.id, STAFF_USER_ID)
     await get_database().loans.update_one(
         {"_id": ObjectId(loan.id)}, {"$set": {"next_payment_due_at": datetime.now(timezone.utc) - timedelta(days=1)}}
     )
@@ -257,6 +406,7 @@ async def test_process_due_payments_closes_loan_on_final_installment(monkeypatch
             "monthly_installment_minor": 87_600,
             "payments_made": 11,  # a 12-a rată = ultima
             "missed_payments_count": 0,
+            "applied_at": datetime.now(timezone.utc) - timedelta(days=330),
             "opened_at": datetime.now(timezone.utc) - timedelta(days=330),
             "next_payment_due_at": datetime.now(timezone.utc) - timedelta(days=1),
             "status": "active",
@@ -275,10 +425,13 @@ async def test_process_due_payments_closes_loan_on_final_installment(monkeypatch
 
 
 async def test_process_due_payments_retries_after_insufficient_funds(monkeypatch, mock_accounts, mock_notify):
-    from app.service import apply_for_loan, process_due_payments
+    from app.service import approve_application, process_due_payments, submit_loan_application
 
     _mock_eligible(monkeypatch)
-    loan = await apply_for_loan(USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12))
+    application = await submit_loan_application(
+        USER_ID, LoanApplyRequest(amount_minor=1_000_000, term_months=12, application=_valid_application())
+    )
+    loan = await approve_application(application.id, STAFF_USER_ID)
     await get_database().loans.update_one(
         {"_id": ObjectId(loan.id)}, {"$set": {"next_payment_due_at": datetime.now(timezone.utc) - timedelta(days=1)}}
     )
@@ -301,4 +454,9 @@ async def test_process_due_payments_retries_after_insufficient_funds(monkeypatch
 
 async def test_apply_endpoint_requires_auth(client: AsyncClient):
     response = await client.post("/loans/apply", json={"amount_minor": 100_000, "term_months": 12})
+    assert response.status_code == 401
+
+
+async def test_staff_applications_endpoint_requires_staff_role(client: AsyncClient):
+    response = await client.get("/loans/staff/applications")
     assert response.status_code == 401

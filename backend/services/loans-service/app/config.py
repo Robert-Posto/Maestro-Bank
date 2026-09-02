@@ -26,8 +26,13 @@ class Settings:
     # tipar: pull, nu push).
     transactions_service_url: str = os.getenv("TRANSACTIONS_SERVICE_URL", "http://transactions-service:8000")
 
-    # Notificare la aprobare/plată/plată ratată/închidere credit.
+    # Notificare la aprobare/respingere/plată/plată ratată/închidere credit.
     support_service_url: str = os.getenv("SUPPORT_SERVICE_URL", "http://support-service:8000")
+
+    # Adresă INTERNĂ Docker — datele de contact ale aplicantului, pentru
+    # ecranul de personal (vezi app/routers/staff.py) — identic ca tipar cu
+    # transactions-service/app/holds.py::_fetch_user_contact.
+    auth_service_url: str = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
 
     # Cât de des verificăm dacă există rate scadente — vezi
     # app/scheduler.py::payment_due_loop. 60s e suficient de responsiv pt

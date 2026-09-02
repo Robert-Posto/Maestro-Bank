@@ -13,6 +13,8 @@ export const COMMON_I18N: Record<string, TranslationEntry> = {
   'common.next': { ro: 'Continuă', en: 'Next' },
   'common.retry': { ro: 'Reîncearcă', en: 'Retry' },
   'common.refresh': { ro: 'Reîmprospătează', en: 'Refresh' },
+  'common.yes': { ro: 'Da', en: 'Yes' },
+  'common.no': { ro: 'Nu', en: 'No' },
   'common.loading': { ro: 'Se încarcă...', en: 'Loading...' },
   'common.search': { ro: 'Caută', en: 'Search' },
   'common.viewAll': { ro: 'Vezi toate', en: 'View all' },

@@ -1,0 +1,229 @@
+.applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-3);
+}
+
+.application-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mb-space-4);
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-md);
+  padding: var(--mb-space-4) var(--mb-space-5);
+  box-shadow: var(--mb-shadow-xs);
+  flex-wrap: wrap;
+}
+
+.application-card__main {
+  /* Grid cu coloane fixe — ca la staff-holds, aliniere stabilă indiferent
+     de lungimea numelui/scopului pe fiecare rând. */
+  display: grid;
+  grid-template-columns: 190px minmax(200px, 1.3fr) 190px 130px;
+  align-items: center;
+  gap: var(--mb-space-6);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.application-card__applicant {
+  display: flex;
+  align-items: center;
+  gap: var(--mb-space-3);
+  min-width: 0;
+}
+
+.application-card__applicant > div {
+  min-width: 0;
+}
+
+.application-card__name {
+  font-weight: var(--mb-font-weight-medium);
+  color: var(--mb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.application-card__email {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.application-card__loan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.application-card__amount {
+  font-weight: var(--mb-font-weight-semibold);
+  font-size: var(--mb-font-size-md);
+  color: var(--mb-text-primary);
+}
+
+.application-card__meta {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.application-card__purpose {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.application-card__eligibility {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  min-width: 0;
+}
+
+.application-card__income {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.application-card__date {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.application-card__actions {
+  display: flex;
+  gap: var(--mb-space-2);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1100px) {
+  .application-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .application-card__main {
+    grid-template-columns: 1fr 1fr;
+    row-gap: var(--mb-space-4);
+  }
+  .application-card__actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .application-card__main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Modal de detalii (chestionar + eligibilitate) ---------------------------- */
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-5);
+}
+
+.details__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-2);
+  padding-bottom: var(--mb-space-4);
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.details__section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.details__section-title {
+  font-size: var(--mb-font-size-xs);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: var(--mb-space-1);
+}
+
+.details__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mb-space-3);
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.details__note {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+  background: var(--mb-surface-muted);
+  border-radius: var(--mb-radius-sm);
+  padding: var(--mb-space-2) var(--mb-space-3);
+}
+
+.details__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mb-space-2);
+}
+
+/* --- Formular modal (respinge cererea, cu motiv) ------------------------------- */
+
+.reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.reject-form__hint {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+}
+
+.reject-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.reject-form__field textarea {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  padding: 0.65rem var(--mb-space-3);
+  border-radius: 10px;
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+  resize: vertical;
+}
+
+.reject-form__field textarea:focus {
+  border-color: var(--mb-blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.reject-form__error {
+  margin: 0;
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-negative);
+}
+
+.reject-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mb-space-2);
+}

@@ -70,7 +70,7 @@
         <strong>{{ calculatorTotalInterestMinor() | money: 'RON' }}</strong>
       </div>
     </div>
-    <app-action-button [fullWidth]="true" (pressed)="openApplyConfirm()">{{ 'loans.applyForThisLoan' | translate }}</app-action-button>
+    <app-action-button [fullWidth]="true" (pressed)="openApplyForm()">{{ 'loans.applyForThisLoan' | translate }}</app-action-button>
     <p class="calculator-result__disclaimer">{{ 'loans.estimateDisclaimer' | translate }}</p>
   </div>
 </section>
@@ -90,25 +90,35 @@
               <p class="loan-card__amount">{{ loan.principal_minor | money: 'RON' }}</p>
               <p class="loan-card__meta">{{ loan.term_months }} {{ 'loans.monthsShort' | translate }} · {{ loan.rate_percent_annual }}%{{ 'loans.perYearSuffix' | translate }}</p>
             </div>
-            <app-status-badge [status]="loan.status" />
+            <app-status-badge [status]="loan.status" [labelOverride]="loanStatusLabel(loan.status)" />
           </div>
 
-          <div class="loan-card__bar">
-            <div class="loan-card__bar-fill" [style.width.%]="loanProgressPercent(loan)"></div>
-          </div>
-          <p class="loan-card__progress-label">
-            {{ ('loans.paymentsProgress' | translate).replace('{made}', loan.payments_made + '').replace('{total}', loan.term_months + '') }}
-          </p>
+          @if (loan.status === 'pending_review') {
+            <p class="loan-card__note">{{ 'loans.pendingReviewNote' | translate }}</p>
+          } @else if (loan.status === 'rejected') {
+            <p class="loan-card__note loan-card__note--rejected">
+              <strong>{{ 'loans.rejectionReasonLabel' | translate }}</strong> {{ loan.rejection_reason }}
+            </p>
+          } @else {
+            <div class="loan-card__bar">
+              <div class="loan-card__bar-fill" [style.width.%]="loanProgressPercent(loan)"></div>
+            </div>
+            <p class="loan-card__progress-label">
+              {{ ('loans.paymentsProgress' | translate).replace('{made}', loan.payments_made + '').replace('{total}', loan.term_months + '') }}
+            </p>
+          }
 
           <div class="loan-card__stats">
             <div>
               <span class="loan-card__stat-label">{{ 'loans.monthlyInstalment' | translate }}</span>
               <strong>{{ loan.monthly_installment_minor | money: 'RON' }}</strong>
             </div>
-            <div>
-              <span class="loan-card__stat-label">{{ 'loans.outstanding' | translate }}</span>
-              <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong>
-            </div>
+            @if (loan.status === 'active' || loan.status === 'paid_off') {
+              <div>
+                <span class="loan-card__stat-label">{{ 'loans.outstanding' | translate }}</span>
+                <strong>{{ loan.outstanding_principal_minor | money: 'RON' }}</strong>
+              </div>
+            }
             @if (loan.status === 'active' && daysUntilDue(loan) !== null) {
               <div>
                 <span class="loan-card__stat-label">{{ 'loans.nextInstalment' | translate }}</span>
@@ -117,35 +127,125 @@
             }
           </div>
 
-          <div class="loan-card__actions">
-            <app-action-button variant="ghost" (pressed)="openPayments(loan)">{{ 'loans.paymentHistory' | translate }}</app-action-button>
-            @if (loan.status === 'active') {
-              <app-action-button variant="secondary" (pressed)="requestPayoff(loan)">{{ 'loans.earlyPayoff' | translate }}</app-action-button>
-            }
-          </div>
+          @if (loan.status === 'active' || loan.status === 'paid_off') {
+            <div class="loan-card__actions">
+              <app-action-button variant="ghost" (pressed)="openPayments(loan)">{{ 'loans.paymentHistory' | translate }}</app-action-button>
+              @if (loan.status === 'active') {
+                <app-action-button variant="secondary" (pressed)="requestPayoff(loan)">{{ 'loans.earlyPayoff' | translate }}</app-action-button>
+              }
+            </div>
+          }
         </div>
       }
     </div>
   }
 </section>
 
-@if (applyConfirmOpen()) {
-  <app-modal [title]="'loans.confirmApplyTitle' | translate" (closed)="closeApplyConfirm()">
-    <div class="apply-confirm">
-      <div class="apply-confirm__row">
-        <span>{{ 'loans.amount' | translate }}</span>
-        <strong>{{ calculatorAmountRon() | number }} {{ 'common.lei' | translate }}</strong>
+@if (applyModalOpen()) {
+  <app-modal [title]="'loans.confirmApplyTitle' | translate" [maxWidth]="620" (closed)="closeApplyForm()">
+    <div class="apply-form">
+      <div class="apply-confirm">
+        <div class="apply-confirm__row">
+          <span>{{ 'loans.amount' | translate }}</span>
+          <strong>{{ calculatorAmountRon() | number }} {{ 'common.lei' | translate }}</strong>
+        </div>
+        <div class="apply-confirm__row">
+          <span>{{ 'loans.term' | translate }}</span>
+          <strong>{{ ('loans.termWithRate' | translate).replace('{months}', calculatorTerm() + '').replace('{rate}', calculatorRate() + '') }}</strong>
+        </div>
+        <div class="apply-confirm__row apply-confirm__row--highlight">
+          <span>{{ 'loans.estimatedMonthlyInstalment' | translate }}</span>
+          <strong>{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+        </div>
       </div>
-      <div class="apply-confirm__row">
-        <span>{{ 'loans.term' | translate }}</span>
-        <strong>{{ ('loans.termWithRate' | translate).replace('{months}', calculatorTerm() + '').replace('{rate}', calculatorRate() + '') }}</strong>
+
+      <p class="apply-form__hint">{{ 'loans.applyConfirmHint' | translate }}</p>
+
+      <div class="apply-form__section-title">{{ 'loans.field.sectionTitle' | translate }}</div>
+
+      <div class="apply-field">
+        <span>{{ 'loans.field.purpose' | translate }}</span>
+        <app-select [options]="purposeOptions()" [value]="applyPurpose()" (changed)="applyPurpose.set($any($event))" />
       </div>
-      <div class="apply-confirm__row apply-confirm__row--highlight">
-        <span>{{ 'loans.estimatedMonthlyInstalment' | translate }}</span>
-        <strong>{{ displayedInstallmentMinor() | money: 'RON' }}</strong>
+
+      <div class="apply-form__row">
+        <div class="apply-field">
+          <span>{{ 'loans.field.employmentStatus' | translate }}</span>
+          <app-select [options]="employmentStatusOptions()" [value]="applyEmploymentStatus()" (changed)="applyEmploymentStatus.set($any($event))" />
+        </div>
+        <div class="apply-field">
+          <span>{{ 'loans.field.employmentTenure' | translate }}</span>
+          <app-select [options]="employmentTenureOptions()" [value]="applyEmploymentTenure()" (changed)="applyEmploymentTenure.set($any($event))" />
+        </div>
       </div>
-      <p class="apply-confirm__hint">{{ 'loans.applyConfirmHint' | translate }}</p>
-      <app-action-button [fullWidth]="true" [loading]="applying()" (pressed)="submitApply()">{{ 'loans.submitApplication' | translate }}</app-action-button>
+
+      <div class="apply-field">
+        <span>{{ 'loans.field.incomeSource' | translate }}</span>
+        <input
+          type="text"
+          maxlength="140"
+          [placeholder]="'loans.field.incomeSourcePlaceholder' | translate"
+          [ngModel]="applyIncomeSource()"
+          (ngModelChange)="applyIncomeSource.set($event)"
+        />
+      </div>
+
+      <div class="apply-form__row">
+        <div class="apply-field">
+          <span>{{ 'loans.field.declaredIncome' | translate }}</span>
+          <input
+            type="number"
+            min="0"
+            step="50"
+            placeholder="0"
+            [ngModel]="applyDeclaredIncomeRon()"
+            (ngModelChange)="applyDeclaredIncomeRon.set($event)"
+          />
+        </div>
+        <div class="apply-field">
+          <span>{{ 'loans.field.dependentsCount' | translate }}</span>
+          <input
+            type="number"
+            min="0"
+            max="15"
+            [ngModel]="applyDependentsCount()"
+            (ngModelChange)="applyDependentsCount.set($event)"
+          />
+        </div>
+      </div>
+
+      <div class="apply-field apply-field--toggle">
+        <span>{{ 'loans.field.hasOtherDebts' | translate }}</span>
+        <app-toggle-control [checked]="applyHasOtherDebts()" (toggled)="setApplyHasOtherDebts($event)" />
+      </div>
+
+      @if (applyHasOtherDebts()) {
+        <div class="apply-field">
+          <span>{{ 'loans.field.otherDebtsAmount' | translate }}</span>
+          <input
+            type="number"
+            min="0"
+            step="50"
+            placeholder="0"
+            [ngModel]="applyOtherDebtsRon()"
+            (ngModelChange)="applyOtherDebtsRon.set($event)"
+          />
+        </div>
+      }
+
+      <label class="apply-checkbox">
+        <input type="checkbox" [ngModel]="applyConsent()" (ngModelChange)="applyConsent.set($event)" name="consentCreditCheck" />
+        <span>{{ 'loans.field.consent' | translate }}</span>
+      </label>
+
+      <app-action-button
+        [fullWidth]="true"
+        [loading]="applying()"
+        [disabled]="!applyFormValid()"
+        (pressed)="submitApply()"
+      >
+        {{ 'loans.submitApplication' | translate }}
+      </app-action-button>
     </div>
   </app-modal>
 }

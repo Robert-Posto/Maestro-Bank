@@ -34,3 +34,27 @@ async def get_current_user_id(authorization: str | None = Header(default=None)) 
 
 
 CurrentUserId = Depends(get_current_user_id)
+
+
+async def require_staff(authorization: str | None = Header(default=None)) -> str:
+    """Ca get_current_user_id, dar cere ȘI claim-ul "role"="staff" din JWT —
+    identic ca tipar cu transactions-service/app/security.py::require_staff.
+    Apărare suplimentară (defense in depth) — Gateway-ul oricum forwardează
+    orice JWT valid către /api/loans/*, verificarea de rol e făcută AICI,
+    de acest serviciu, nu doar la nivel de proxy."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=translate("missingAuthorizationHeader"),
+        )
+    token = authorization.split(" ", 1)[1]
+    payload = _decode(token)
+    if payload.get("role") != "staff":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("staffOnly"))
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("tokenMissingSubject"))
+    return user_id
+
+
+RequireStaff = Depends(require_staff)

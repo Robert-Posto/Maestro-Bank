@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from app.database import close_database_connection, ping_database
 from app.i18n import LanguageMiddleware
 from app.routers.loans import router as loans_router
+from app.routers.staff import router as staff_router
 from app.scheduler import payment_due_loop
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [loans-service] %(levelname)s %(message)s")
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MaestroBank Loans Service", lifespan=lifespan)
 app.add_middleware(LanguageMiddleware)
+app.include_router(staff_router)
 app.include_router(loans_router)
 
 

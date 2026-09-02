@@ -28,7 +28,7 @@ async def get_rates(user_id: str = CurrentUserId):
 
 @router.post("/apply", response_model=LoanOut, status_code=201)
 async def apply_for_loan_route(payload: LoanApplyRequest, user_id: str = CurrentUserId):
-    return await service.apply_for_loan(user_id, payload)
+    return await service.submit_loan_application(user_id, payload)
 
 
 @router.get("", response_model=list[LoanOut])

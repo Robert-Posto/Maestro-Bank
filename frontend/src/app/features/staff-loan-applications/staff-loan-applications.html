@@ -1,0 +1,189 @@
+<app-page-header [title]="'staffLoanApplications.title' | translate" [subtitle]="'staffLoanApplications.subtitle' | translate">
+  <app-action-button variant="secondary" (pressed)="load()">
+    <app-icon name="reload" [size]="16" /> {{ 'common.refresh' | translate }}
+  </app-action-button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-skeleton [rows]="4" [height]="96" [gap]="14" />
+} @else if (error()) {
+  <app-empty-state icon="info" [title]="'staffLoanApplications.loadErrorTitle' | translate" [description]="error()!" />
+} @else if (applications().length === 0) {
+  <app-empty-state
+    icon="banknote"
+    [title]="'staffLoanApplications.emptyTitle' | translate"
+    [description]="'staffLoanApplications.emptyDescription' | translate"
+  />
+} @else {
+  <div class="applications-list">
+    @for (app of applications(); track app.id) {
+      <div class="application-card">
+        <div class="application-card__main">
+          <div class="application-card__applicant">
+            <app-icon name="profile" [size]="18" />
+            <div>
+              <p class="application-card__name">{{ applicantName(app) }}</p>
+              @if (app.applicant?.email) {
+                <span class="application-card__email">{{ app.applicant!.email }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="application-card__loan">
+            <span class="application-card__amount">{{ app.principal_minor | money: 'RON' }}</span>
+            <span class="application-card__meta">
+              {{ app.term_months }} {{ 'loans.monthsShort' | translate }} · {{ app.rate_percent_annual }}%{{ 'loans.perYearSuffix' | translate }} ·
+              {{ app.monthly_installment_minor | money: 'RON' }}/{{ 'loans.monthsShort' | translate }}
+            </span>
+            <span class="application-card__purpose">{{ purposeLabel(app) }}</span>
+          </div>
+
+          <div class="application-card__eligibility">
+            <app-status-badge status="eligibility" [toneOverride]="eligibilityTone(app)" [labelOverride]="eligibilityLabel(app)" />
+            <span class="application-card__income">
+              {{ 'staffLoanApplications.realIncome' | translate }} {{ app.eligibility.average_monthly_income_minor | money: 'RON' }}
+            </span>
+          </div>
+
+          <div class="application-card__date">
+            <span>{{ app.applied_at | date: 'dd MMM yyyy, HH:mm' }}</span>
+          </div>
+        </div>
+
+        <div class="application-card__actions">
+          <app-action-button variant="ghost" (pressed)="openDetails(app)">
+            <app-icon name="info" [size]="15" /> {{ 'staffLoanApplications.viewDetails' | translate }}
+          </app-action-button>
+          <app-action-button variant="danger" (pressed)="askReject(app)">
+            <app-icon name="close" [size]="15" /> {{ 'staffLoanApplications.reject' | translate }}
+          </app-action-button>
+          <app-action-button variant="primary" [loading]="approvingId() === app.id" (pressed)="approve(app)">
+            <app-icon name="check" [size]="15" /> {{ 'staffLoanApplications.approve' | translate }}
+          </app-action-button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (detailsTarget(); as app) {
+  <app-modal [title]="'staffLoanApplications.detailsTitle' | translate" [maxWidth]="560" (closed)="closeDetails()">
+    <div class="details">
+      <div class="details__section">
+        <div class="details__row">
+          <span>{{ 'loans.amount' | translate }}</span>
+          <strong>{{ app.principal_minor | money: 'RON' }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.term' | translate }}</span>
+          <strong>{{ app.term_months }} {{ 'loans.monthsShort' | translate }} ({{ app.rate_percent_annual }}%{{ 'loans.perYearSuffix' | translate }})</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.monthlyInstalment' | translate }}</span>
+          <strong>{{ app.monthly_installment_minor | money: 'RON' }}</strong>
+        </div>
+      </div>
+
+      <div class="details__section">
+        <p class="details__section-title">{{ 'staffLoanApplications.eligibilityTitle' | translate }}</p>
+        <div class="details__row">
+          <span>{{ 'staffLoanApplications.realIncome' | translate }}</span>
+          <strong>{{ app.eligibility.average_monthly_income_minor | money: 'RON' }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'staffLoanApplications.maxAffordable' | translate }}</span>
+          <strong>{{ app.eligibility.max_affordable_installment_minor | money: 'RON' }}</strong>
+        </div>
+        @if (app.eligibility.existing_installments_minor > 0) {
+          <div class="details__row">
+            <span>{{ 'staffLoanApplications.existingInstalments' | translate }}</span>
+            <strong>{{ app.eligibility.existing_installments_minor | money: 'RON' }}</strong>
+          </div>
+        }
+        <div class="details__row">
+          <app-status-badge status="eligibility" [toneOverride]="eligibilityTone(app)" [labelOverride]="eligibilityLabel(app)" />
+        </div>
+        @if (app.eligibility.reason) {
+          <p class="details__note">{{ app.eligibility.reason }}</p>
+        }
+      </div>
+
+      <div class="details__section">
+        <p class="details__section-title">{{ 'staffLoanApplications.questionnaireTitle' | translate }}</p>
+        <div class="details__row">
+          <span>{{ 'loans.field.purpose' | translate }}</span>
+          <strong>{{ purposeLabel(app) }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.field.employmentStatus' | translate }}</span>
+          <strong>{{ employmentStatusLabel(app) }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.field.employmentTenure' | translate }}</span>
+          <strong>{{ employmentTenureLabel(app) }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.field.incomeSource' | translate }}</span>
+          <strong>{{ app.application.income_source }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'staffLoanApplications.declaredIncome' | translate }}</span>
+          <strong>{{ app.application.declared_monthly_income_minor | money: 'RON' }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.field.dependentsCount' | translate }}</span>
+          <strong>{{ app.application.dependents_count }}</strong>
+        </div>
+        <div class="details__row">
+          <span>{{ 'loans.field.hasOtherDebts' | translate }}</span>
+          <strong>
+            {{ app.application.has_other_debts ? ('common.yes' | translate) : ('common.no' | translate) }}
+            @if (app.application.has_other_debts && app.application.other_debts_monthly_minor !== null) {
+              — {{ app.application.other_debts_monthly_minor | money: 'RON' }}
+            }
+          </strong>
+        </div>
+      </div>
+
+      <div class="details__actions">
+        <app-action-button variant="danger" (pressed)="askReject(app)">
+          <app-icon name="close" [size]="15" /> {{ 'staffLoanApplications.reject' | translate }}
+        </app-action-button>
+        <app-action-button variant="primary" [loading]="approvingId() === app.id" (pressed)="approve(app)">
+          <app-icon name="check" [size]="15" /> {{ 'staffLoanApplications.approve' | translate }}
+        </app-action-button>
+      </div>
+    </div>
+  </app-modal>
+}
+
+@if (rejectTarget(); as app) {
+  <app-modal [title]="'staffLoanApplications.rejectModalTitle' | translate" [maxWidth]="440" (closed)="cancelReject()">
+    <form class="reject-form" (ngSubmit)="confirmReject()">
+      <p class="reject-form__hint">
+        {{ ('staffLoanApplications.rejectHint' | translate).replace('{name}', applicantName(app)) }}
+      </p>
+      <label class="reject-form__field">
+        <span>{{ 'staffLoanApplications.reasonLabel' | translate }}</span>
+        <textarea
+          name="reason"
+          rows="3"
+          [ngModel]="rejectReason()"
+          (ngModelChange)="rejectReason.set($event)"
+          [placeholder]="'staffLoanApplications.reasonPlaceholder' | translate"
+        ></textarea>
+      </label>
+      @if (rejectError()) {
+        <p class="reject-form__error">{{ rejectError() }}</p>
+      }
+      <div class="reject-form__actions">
+        <app-action-button type="button" variant="ghost" [disabled]="rejecting()" (pressed)="cancelReject()">
+          {{ 'common.cancel' | translate }}
+        </app-action-button>
+        <app-action-button type="submit" variant="danger" [loading]="rejecting()">
+          {{ 'staffLoanApplications.reject' | translate }}
+        </app-action-button>
+      </div>
+    </form>
+  </app-modal>
+}

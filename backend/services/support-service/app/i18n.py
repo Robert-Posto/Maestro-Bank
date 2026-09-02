@@ -129,6 +129,10 @@ NOTIFICATION_MESSAGES: dict[str, dict[Language, str]] = {
         "ro": "Creditul tău de {amount} a fost aprobat — rata lunară e {instalment}, pe {months} luni.",
         "en": "Your loan of {amount} was approved — the monthly instalment is {instalment}, over {months} months.",
     },
+    "loanRejected": {
+        "ro": "Cererea ta de credit a fost respinsă. Motiv: {reason}",
+        "en": "Your loan application was rejected. Reason: {reason}",
+    },
     "loanPaidOffEarly": {
         "ro": "Ai plătit anticipat restul de {amount} — creditul e închis.",
         "en": "You paid off the remaining {amount} early — the loan is closed.",

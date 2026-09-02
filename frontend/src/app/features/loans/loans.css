@@ -365,6 +365,106 @@
   margin-bottom: var(--mb-space-5);
 }
 
+/* --- Chestionarul cererii de credit ------------------------------------------------ */
+
+.apply-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mb-space-4);
+}
+
+.apply-form__hint {
+  font-size: var(--mb-font-size-xs);
+  color: var(--mb-text-tertiary);
+}
+
+.apply-form__section-title {
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-semibold);
+  color: var(--mb-text-primary);
+  padding-top: var(--mb-space-2);
+  border-top: 1px solid var(--mb-border);
+}
+
+.apply-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mb-space-4);
+}
+
+.apply-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  font-weight: var(--mb-font-weight-medium);
+}
+
+.apply-field input {
+  font-family: inherit;
+  font-size: var(--mb-font-size-base);
+  padding: 0.65rem var(--mb-space-4);
+  border-radius: var(--mb-radius-sm);
+  border: 1px solid var(--mb-border-strong);
+  outline: none;
+  color: var(--mb-text-primary);
+  background: var(--mb-surface);
+}
+
+.apply-field input:focus {
+  border-color: var(--mb-blue-500);
+}
+
+.apply-field app-select {
+  display: block;
+}
+
+.apply-field--toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.apply-checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: var(--mb-space-2) !important;
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  cursor: pointer;
+}
+
+.apply-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--mb-blue-500);
+}
+
+@media (max-width: 560px) {
+  .apply-form__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Note pe cardul de credit (în analiză / respins) -------------------------------- */
+
+.loan-card__note {
+  font-size: var(--mb-font-size-sm);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface-muted);
+  border-radius: var(--mb-radius-sm);
+  padding: var(--mb-space-3);
+  margin-bottom: var(--mb-space-4);
+}
+
+.loan-card__note--rejected {
+  background: var(--mb-negative-bg);
+  color: var(--mb-negative);
+}
+
 /* --- Istoric plăți --------------------------------------------------------------- */
 
 .payments-table-wrap {

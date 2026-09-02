@@ -128,6 +128,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/staff-documents/staff-documents').then((m) => m.StaffDocuments),
       },
       {
+        path: 'loan-applications',
+        loadComponent: () =>
+          import('./features/staff-loan-applications/staff-loan-applications').then((m) => m.StaffLoanApplications),
+      },
+      {
         path: 'customers/:userId',
         loadComponent: () => import('./features/staff-customer/staff-customer').then((m) => m.StaffCustomer),
       },

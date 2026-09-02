@@ -2,14 +2,27 @@ import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { LoanPaymentView, LoanRateView, LoanTermMonths, LoanView, LoansService } from '../../services/loans.service';
+import {
+  EmploymentStatus,
+  EmploymentTenure,
+  LoanApplicationDetails,
+  LoanPaymentView,
+  LoanPurpose,
+  LoanRateView,
+  LoanStatus,
+  LoanTermMonths,
+  LoanView,
+  LoansService,
+} from '../../services/loans.service';
 import { LanguageService } from '../../services/language.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { LoadingSkeleton } from '../../shared/components/loading-skeleton/loading-skeleton';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { Modal } from '../../shared/components/modal/modal';
+import { Select, SelectOption } from '../../shared/components/select/select';
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
+import { ToggleControl } from '../../shared/components/toggle-control/toggle-control';
 import { SwipeCardDeck, SwipeDeckCard } from '../../shared/components/swipe-card-deck/swipe-card-deck';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -59,7 +72,9 @@ const HOW_IT_WORKS_CARD_KEYS: DeckCardKeys[] = [
     LoadingSkeleton,
     EmptyState,
     Modal,
+    Select,
     StatusBadge,
+    ToggleControl,
     SwipeCardDeck,
     MoneyPipe,
     TranslatePipe,
@@ -112,8 +127,49 @@ export class Loans implements OnInit, OnDestroy {
   private readonly prefersReducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  protected readonly applyConfirmOpen = signal(false);
+  // --- Cerere de credit — chestionar, ca la o bancă reală ------------------------
+  protected readonly applyModalOpen = signal(false);
   protected readonly applying = signal(false);
+
+  protected readonly applyPurpose = signal<LoanPurpose>('personal_needs');
+  protected readonly applyEmploymentStatus = signal<EmploymentStatus>('employed_permanent');
+  protected readonly applyIncomeSource = signal('');
+  protected readonly applyEmploymentTenure = signal<EmploymentTenure>('1_to_3_years');
+  protected readonly applyDeclaredIncomeRon = signal<number | null>(null);
+  protected readonly applyHasOtherDebts = signal(false);
+  protected readonly applyOtherDebtsRon = signal<number | null>(null);
+  protected readonly applyDependentsCount = signal(0);
+  protected readonly applyConsent = signal(false);
+
+  protected readonly purposeOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return (
+      ['personal_needs', 'home_renovation', 'purchase_goods', 'debt_refinancing', 'education', 'medical', 'vacation', 'other'] as LoanPurpose[]
+    ).map((value) => ({ value, label: this.language.t(`loans.purpose.${value}`) }));
+  });
+
+  protected readonly employmentStatusOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return (
+      ['employed_permanent', 'employed_fixed_term', 'self_employed', 'retired', 'student', 'unemployed'] as EmploymentStatus[]
+    ).map((value) => ({ value, label: this.language.t(`loans.employmentStatus.${value}`) }));
+  });
+
+  protected readonly employmentTenureOptions = computed<SelectOption[]>(() => {
+    this.language.language();
+    return (['under_6_months', '6_to_12_months', '1_to_3_years', '3_to_5_years', 'over_5_years'] as EmploymentTenure[]).map(
+      (value) => ({ value, label: this.language.t(`loans.employmentTenure.${value}`) }),
+    );
+  });
+
+  /** Formularul e valid DOAR când toate câmpurile obligatorii sunt completate
+   * — verificat înainte de trimitere, ca butonul să reflecte clar de ce nu
+   * poate fi apăsat încă (dezactivat, nu doar o eroare după click). */
+  protected readonly applyFormValid = computed(() => {
+    const incomeValid = (this.applyDeclaredIncomeRon() ?? 0) > 0;
+    const otherDebtsValid = !this.applyHasOtherDebts() || (this.applyOtherDebtsRon() ?? -1) >= 0;
+    return this.applyIncomeSource().trim().length >= 2 && incomeValid && otherDebtsValid && this.applyConsent();
+  });
 
   protected readonly payoffTarget = signal<LoanView | null>(null);
   protected readonly payingOff = signal(false);
@@ -211,32 +267,70 @@ export class Loans implements OnInit, OnDestroy {
     return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
   }
 
-  // --- Cerere de credit (din simulator) -------------------------------------------
-
-  protected openApplyConfirm(): void {
-    this.applyConfirmOpen.set(true);
+  /** Textul badge-ului de status e specific creditelor (nu cel generic din
+   * app-status-badge, gândit pentru rețineri de tranzacții) — vezi
+   * [labelOverride] pe app-status-badge din loans.html. Tonurile implicite
+   * (warning/success/error/neutral) rămân corecte, deci nu e nevoie de
+   * toneOverride aici. */
+  protected loanStatusLabel(status: LoanStatus): string {
+    return this.language.t(`loans.status.${status}`);
   }
 
-  protected closeApplyConfirm(): void {
+  // --- Cerere de credit (din simulator) -------------------------------------------
+
+  /** Deschide chestionarul — pornește mereu de la câmpuri goale, ca o
+   * cerere anterioară (trimisă sau abandonată) să nu rămână "lipită" pe
+   * ecran la o cerere nouă. */
+  protected openApplyForm(): void {
+    this.applyPurpose.set('personal_needs');
+    this.applyEmploymentStatus.set('employed_permanent');
+    this.applyIncomeSource.set('');
+    this.applyEmploymentTenure.set('1_to_3_years');
+    this.applyDeclaredIncomeRon.set(null);
+    this.applyHasOtherDebts.set(false);
+    this.applyOtherDebtsRon.set(null);
+    this.applyDependentsCount.set(0);
+    this.applyConsent.set(false);
+    this.applyModalOpen.set(true);
+  }
+
+  protected closeApplyForm(): void {
     if (this.applying()) return;
-    this.applyConfirmOpen.set(false);
+    this.applyModalOpen.set(false);
+  }
+
+  protected setApplyHasOtherDebts(value: boolean): void {
+    this.applyHasOtherDebts.set(value);
+    if (!value) this.applyOtherDebtsRon.set(null);
   }
 
   protected submitApply(): void {
     const amountMinor = Math.round(this.calculatorAmountRon() * 100);
-    if (amountMinor <= 0) return;
+    if (amountMinor <= 0 || !this.applyFormValid()) return;
+
+    const application: LoanApplicationDetails = {
+      purpose: this.applyPurpose(),
+      employment_status: this.applyEmploymentStatus(),
+      income_source: this.applyIncomeSource().trim(),
+      employment_tenure: this.applyEmploymentTenure(),
+      declared_monthly_income_minor: Math.round((this.applyDeclaredIncomeRon() ?? 0) * 100),
+      has_other_debts: this.applyHasOtherDebts(),
+      other_debts_monthly_minor: this.applyHasOtherDebts() ? Math.round((this.applyOtherDebtsRon() ?? 0) * 100) : null,
+      dependents_count: this.applyDependentsCount(),
+      consent_credit_check: this.applyConsent(),
+    };
 
     this.applying.set(true);
-    this.loansApi.apply(amountMinor, this.calculatorTerm()).subscribe({
+    this.loansApi.apply(amountMinor, this.calculatorTerm(), application).subscribe({
       next: () => {
         this.applying.set(false);
-        this.applyConfirmOpen.set(false);
-        this.toast.success(this.language.t('loans.approvedToast'));
+        this.applyModalOpen.set(false);
+        this.toast.success(this.language.t('loans.applicationSubmittedToast'));
         this.loadLoans();
       },
       error: (err) => {
         this.applying.set(false);
-        this.toast.error(extractErrorMessage(err, this.language.t('loans.applyRejected')));
+        this.toast.error(extractErrorMessage(err, this.language.t('loans.applySubmitError')));
       },
     });
   }
