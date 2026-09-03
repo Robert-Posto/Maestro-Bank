@@ -173,7 +173,7 @@ def build_snapshot(
 
     analysis = {
         "current_balance_minor": account["balance_minor"],
-        "recommended_buffer_minor": recommended_buffer_minor(spending_summary),
+        "recommended_buffer_minor": recommended_buffer_minor(forecast["baseline_daily_rate_minor"]),
     }
 
     return {

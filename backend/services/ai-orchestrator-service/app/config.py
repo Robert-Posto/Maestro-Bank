@@ -60,5 +60,25 @@ class Settings:
     def azure_embeddings_configured(self) -> bool:
         return bool(self.azure_openai_embedding_endpoint and self.azure_openai_embedding_api_key)
 
+    # --- Duffel (self-service, test mode) — preț REAL de zbor pentru
+    # "estimate_trip_cost" (vezi app/duffel_client.py și app/tools/registry.py).
+    # Opțional, la fel ca Azure OpenAI: neconfigurat = tool-ul întoarce
+    # "indisponibil", agentul nu inventează un preț. Un token de TEST
+    # (`duffel_test_...`) întoarce date reale de zbor (tarife/companii reale),
+    # dar nu poate crea nicio comandă/plată reală — vezi
+    # https://duffel.com/docs/api/overview/test-mode/duffel-airways.
+    # NOTĂ: am încercat inițial Amadeus for Developers, dar programul lor
+    # self-service a fost închis complet (iulie 2026) — Duffel e alegerea
+    # curentă tocmai fiindcă ține propria acreditare IATA, deci nu cere
+    # aprobare/acreditare separată din partea noastră.
+    duffel_access_token: str = os.getenv("DUFFEL_ACCESS_TOKEN", "")
+    duffel_base_url: str = os.getenv("DUFFEL_BASE_URL", "https://api.duffel.com")
+    duffel_api_version: str = os.getenv("DUFFEL_API_VERSION", "v2")
+    duffel_request_timeout_seconds: float = float(os.getenv("DUFFEL_REQUEST_TIMEOUT_SECONDS", "20.0"))
+
+    @property
+    def duffel_configured(self) -> bool:
+        return bool(self.duffel_access_token)
+
 
 settings = Settings()

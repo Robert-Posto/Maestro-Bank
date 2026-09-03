@@ -74,6 +74,7 @@ FORECAST = {
     "upcoming_obligations": [{"name": "Netflix", "amount_minor": 4999, "billing_day": 25}],
     "estimated_end_of_month_balance_minor": 458861,
     "days_remaining_in_month": 15,
+    "baseline_daily_rate_minor": 8800,
 }
 SUBSCRIPTIONS = [
     {

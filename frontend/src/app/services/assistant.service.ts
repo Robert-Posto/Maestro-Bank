@@ -24,19 +24,19 @@ export interface ClassifyResultView {
 export class AssistantService {
   constructor(private readonly http: HttpClient) {}
 
-  /** `allowLlmFallback` — implicit true (prima întrebare a unei conversații
-   * noi, fără niciun context anterior de unde să greșească fallback-ul
-   * LLM). Pasează `false` pentru un mesaj care CONTINUĂ o conversație deja
-   * angajată cu un agent — vezi support.ts::askAgent: un fallback LLM
-   * STATELESS (fără istoricul conversației) ar clasifica greșit un
-   * follow-up ambiguu ("Ce buffer?", fără niciun cuvânt-cheie de buget) ca
-   * fiind Support, deși ține clar de continuarea discuției cu MaestroAgent
-   * — bug real, raportat de user. Cu `false`, doar cuvintele-cheie clare
-   * mai pot declanșa o schimbare de agent. */
-  classify(message: string, allowLlmFallback = true): Observable<ClassifyResultView> {
+  /** `currentAgent` — `undefined` pentru prima întrebare a unei conversații
+   * NOI (clasificare hibridă completă, fără context de unde să greșească).
+   * Setat pentru un mesaj care CONTINUĂ o conversație deja angajată — vezi
+   * support.ts::askAgent: backend-ul (intent_router.py) NU mai oprește
+   * complet LLM-ul în cazul ăsta (asta bloca reclasificarea reală fără
+   * cuvânt-cheie — bug raportat), ci îl consultă din nou, dar CU context
+   * (`currentAgent` + `recentHistory`), ca să distingă o continuare
+   * firească de o schimbare reală de subiect. */
+  classify(message: string, currentAgent?: 'spending_forecast' | 'support', recentHistory: string[] = []): Observable<ClassifyResultView> {
     return this.http.post<ClassifyResultView>(`${API_BASE_URL}/ai/assistant/classify`, {
       message,
-      allow_llm_fallback: allowLlmFallback,
+      current_agent: currentAgent ?? null,
+      recent_history: recentHistory,
     });
   }
 }

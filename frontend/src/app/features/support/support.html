@@ -57,15 +57,16 @@
                     <button
                       type="button"
                       class="support-conversations__item"
-                      [class.support-conversations__item--active]="conversation.id === activeConversationId()"
-                      (click)="openConversation(conversation.id)"
+                      [class.support-conversations__item--active]="conversation.id === activeConversationId() || conversation.id === maestroConversationId()"
+                      (click)="openConversation(conversation.id, conversation.agent)"
                     >
+                      <app-icon [name]="conversation.agent === 'maestro' ? 'sparkles' : 'support'" [size]="13" />
                       <span class="support-conversations__item-title">{{ conversation.title }}</span>
                       <span class="support-conversations__item-date">{{ conversation.updated_at | date: 'dd MMM, HH:mm' }}</span>
                       <span
                         class="support-conversations__item-delete"
                         [attr.aria-label]="'support.deleteConversation' | translate"
-                        (click)="deleteConversation($event, conversation.id)"
+                        (click)="deleteConversation($event, conversation.id, conversation.agent)"
                       >
                         <app-icon name="trash" [size]="13" />
                       </span>
@@ -96,7 +97,7 @@
         </div>
       }
 
-      @for (chatMessage of chatMessages(); track chatMessage.id) {
+      @for (chatMessage of chatMessages(); track chatMessage.id; let isLast = $last) {
         <div class="support-chat__message-row" [class.support-chat__message-row--user]="chatMessage.role === 'user'">
           @if (chatMessage.role === 'support') {
             <span class="support-chat__message-avatar"><app-icon name="support" [size]="16" /></span>
@@ -283,6 +284,32 @@
                   }
                 </div>
               }
+              @if (chatMessage.context?.exchange; as exchange) {
+                <div class="support-chat__context-account support-chat__context-account--row">
+                  <div>
+                    <span class="support-chat__context-account-type">{{ exchange.from_currency }} → {{ exchange.to_currency }}</span>
+                    <span class="support-chat__context-account-iban">{{ 'support.exchangeRateLabel' | translate }} {{ exchange.applied_rate }}</span>
+                  </div>
+                  <span class="support-chat__context-account-balance">
+                    -{{ exchange.amount_minor | money: exchange.from_currency }} / +{{ exchange.received_minor | money: exchange.to_currency }}
+                  </span>
+                </div>
+              }
+              @if (chatMessage.context?.statement; as statement) {
+                <div class="support-chat__context-account support-chat__context-account--row">
+                  <div>
+                    <span class="support-chat__context-account-type">{{ 'support.statementLabel' | translate }}</span>
+                    <span class="support-chat__context-account-iban">{{ statement.date_from | date: 'dd.MM.yyyy' }} — {{ statement.date_to | date: 'dd.MM.yyyy' }}</span>
+                  </div>
+                  <app-action-button
+                    variant="secondary"
+                    [loading]="downloadingStatementId() === chatMessage.id"
+                    (pressed)="downloadStatementFromChat(chatMessage)"
+                  >
+                    {{ 'support.downloadStatement' | translate }}
+                  </app-action-button>
+                </div>
+              }
               @if (chatMessage.context?.card; as card) {
                 <div class="support-chat__context-card-status">
                   <div class="support-chat__context-card-status-header">
@@ -299,6 +326,26 @@
                   </div>
                 </div>
               }
+              @if (chatMessage.context?.cards; as cardsList) {
+                <div class="support-chat__context-card">
+                  @for (card of cardsList; track card.last_four) {
+                    <div class="support-chat__context-card-status">
+                      <div class="support-chat__context-card-status-header">
+                        <span>{{ 'support.cardLabel' | translate }} •••• {{ card.last_four }}</span>
+                        <app-status-badge [status]="card.is_frozen ? 'frozen' : card.status" />
+                      </div>
+                      <div class="support-chat__context-card-features">
+                        @for (f of cardFeatures(card); track f.label) {
+                          <span class="support-chat__context-feature" [class.support-chat__context-feature--off]="!f.enabled">
+                            <app-icon [name]="f.enabled ? 'check' : 'close'" [size]="13" />
+                            {{ f.label }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
               @if (chatMessage.context?.tickets; as ticketsList) {
                 <div class="support-chat__context-card">
                   @for (t of ticketsList; track t.id) {
@@ -307,6 +354,13 @@
                       <app-status-badge [status]="t.status" />
                     </div>
                   }
+                </div>
+              }
+
+              @if (isLast && pendingAction() && PENDING_ACTION_TOOLS_WITH_BUTTONS.has(pendingAction()!.tool)) {
+                <div class="support-chat__pending-action">
+                  <button type="button" class="support-chat__pending-action-confirm" [disabled]="supportTyping()" (click)="confirmSupportPendingAction()">{{ 'common.confirm' | translate }}</button>
+                  <button type="button" class="support-chat__pending-action-cancel" [disabled]="supportTyping()" (click)="cancelSupportPendingAction()">{{ 'common.cancel' | translate }}</button>
                 </div>
               }
 
@@ -343,14 +397,6 @@
         </div>
       }
     </div>
-
-    @if (chatMessages().length > 0) {
-      <div class="support-chat__quick-replies" role="group" [attr.aria-label]="'support.quickRepliesAriaLabel' | translate">
-        @for (item of faqItems(); track item.q) {
-          <button type="button" class="support-chat__quick-reply" [disabled]="supportTyping()" (click)="askSuggested(item)">{{ item.q }}</button>
-        }
-      </div>
-    }
 
     <form class="support-chat__composer" (ngSubmit)="sendChatMessage()">
       @if (speech.sttSupported) {

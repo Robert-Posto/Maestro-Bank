@@ -93,7 +93,7 @@ class PendingAction(BaseModel):
     POST /spending-forecast/actions/confirm cu ACEST `type` + `payload`.
     """
 
-    type: Literal["create_budget", "update_budget", "delete_budget"]
+    type: Literal["create_budget", "update_budget", "delete_budget", "create_pocket"]
     summary: str
     payload: dict[str, Any]
 
@@ -132,7 +132,7 @@ class SpendingForecastResponse(BaseModel):
 
 
 class ConfirmActionRequest(BaseModel):
-    type: Literal["create_budget", "update_budget", "delete_budget"]
+    type: Literal["create_budget", "update_budget", "delete_budget", "create_pocket"]
     payload: dict[str, Any]
 
 
@@ -140,3 +140,4 @@ class ConfirmActionResponse(BaseModel):
     success: bool
     message: str
     budget: dict[str, Any] | None = None
+    pocket: dict[str, Any] | None = None

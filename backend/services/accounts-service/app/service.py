@@ -242,6 +242,64 @@ async def get_fraud_holding_account_id() -> str:
     return str(account["_id"])
 
 
+# --- Reîncărcare telefon (diaspora) — conturi-pseudo operator -------------
+#
+# Exact același rol ca _FRAUD_HOLDING_ACCOUNT_USER_ID de mai sus și ca
+# conturile-pseudo de comerciant din scripts/seed_demo_data.py (unele
+# operatori — Orange, Vodafone, Digi — există deja acolo, ca merchant-uri
+# pentru istoricul FALS de tranzacții; aici garantăm că exact ACELEAȘI
+# nume există și ca ținte REALE, chiar dacă seed-ul demo nu a rulat).
+# Reîncărcarea propriu-zisă (integrarea cu un operator real) e simulată —
+# banii chiar ies din contul userului, printr-un transfer normal către
+# acest cont-pseudo (vezi transactions-service::create_topup), la fel ca
+# orice alt transfer, cu tot ce implică asta (motor de fraudă inclus).
+_TOPUP_OPERATOR_NAMES: dict[str, str] = {
+    "orange": "Orange",
+    "vodafone": "Vodafone",
+    "digi": "Digi",
+    "telekom": "Telekom",
+}
+
+
+async def ensure_topup_merchant_accounts() -> None:
+    """Idempotent, rulat la fiecare pornire (vezi main.py::lifespan) — un
+    cont-pseudo per operator, creat DOAR dacă nu există deja unul cu
+    același `merchant_name` (evită duplicarea celor deja create de
+    scripts/seed_demo_data.py, dacă a rulat)."""
+    db = get_database()
+    for operator_key, display_name in _TOPUP_OPERATOR_NAMES.items():
+        existing = await db.accounts.find_one({"is_demo_merchant": True, "merchant_name": display_name})
+        if existing is not None:
+            continue
+        iban = await generate_unique_demo_iban(db.accounts)
+        await db.accounts.insert_one(
+            {
+                "user_id": f"merchant:topup-{operator_key}",
+                "iban": iban,
+                "currency": "RON",
+                "balance_minor": 0,
+                "status": "active",
+                "created_at": datetime.now(timezone.utc),
+                "is_demo_merchant": True,
+                "merchant_name": display_name,
+            }
+        )
+        logger.info("accounts-service: cont-pseudo operator reîncărcare creat (operator=%s)", display_name)
+
+
+async def get_topup_merchant_iban(operator: str) -> str | None:
+    """IBAN-ul contului-pseudo al operatorului, căutat STRICT după
+    `merchant_name` (stabil), niciodată după `_id`/IBAN (care se pot
+    regenera dacă seed-ul demo rulează din nou) — vezi
+    ensure_topup_merchant_accounts."""
+    display_name = _TOPUP_OPERATOR_NAMES.get(operator.strip().lower())
+    if display_name is None:
+        return None
+    db = get_database()
+    account = await db.accounts.find_one({"is_demo_merchant": True, "merchant_name": display_name})
+    return account["iban"] if account else None
+
+
 async def list_accounts_for_user(user_id: str) -> list[dict]:
     """Toate conturile userului (curent + economii/depozit/student), cel mai vechi primul."""
     db = get_database()

@@ -51,6 +51,38 @@ class TransferRequest(BaseModel):
         return normalized if normalized in TRANSACTION_CATEGORIES else "other"
 
 
+# Reîncărcare telefon (diaspora) — vezi service.py::create_topup. NU e un
+# tip nou de tranzacție: devine un TransferRequest normal, către contul-
+# pseudo al operatorului (accounts-service), cu tot ce implică asta (motor
+# de fraudă, content screening) — vezi service.py pentru raționament.
+TOPUP_OPERATORS: list[str] = ["orange", "vodafone", "digi", "telekom"]
+
+
+class TopupRequest(BaseModel):
+    """Input primit de la Angular pentru POST /transactions/topups."""
+
+    operator: Literal["orange", "vodafone", "digi", "telekom"]
+    # Format RO simplu — 07xxxxxxxx (10 cifre) — suficient pentru un demo,
+    # NU o validare completă de numerotare telefonică reală.
+    phone_number: str = Field(min_length=10, max_length=10)
+    amount_minor: int = Field(gt=0, le=100_000)  # cap 1.000,00 RON/reîncărcare — o reîncărcare, nu un transfer mare
+    # Prima încercare (din frontend) NU o are — dacă Twilio Lookup detectează
+    # că numărul aparține altui operator decât cel selectat, backend-ul
+    # respinge cu 428 ÎNAINTE de a mișca banii (vezi service.py::
+    # create_topup), frontend-ul arată un dialog de confirmare și
+    # RETRIMITE exact același request, cu acest câmp pe True — mirror exact
+    # pe `card_pin`/428 de la TransferRequest, mai sus.
+    confirm_mismatch: bool = Field(default=False)
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped.isdigit() or not stripped.startswith("07"):
+            raise ValueError("Numărul de telefon trebuie să fie în format 07xxxxxxxx (10 cifre).")
+        return stripped
+
+
 class DescriptionCheckRequest(BaseModel):
     """POST /transactions/transfers/screen-description — verificare LIVE,
     în timp ce userul scrie în câmpul de descriere (înainte de a trimite
@@ -86,6 +118,25 @@ class RiskOut(BaseModel):
     status: Literal["pending", "ready", "template_fallback"]
 
 
+class PhoneVerificationOut(BaseModel):
+    """Rezultatul verificării REALE (Twilio Lookup) a numărului de telefon la
+    o reîncărcare — vezi service.py::_verify_topup_phone /
+    app/twilio_client.py. Prezent DOAR pe tranzacții create prin
+    create_topup; None pentru orice altă tranzacție (transfer normal etc.).
+
+    `checked=False` distinge explicit DE CE n-a fost verificat
+    (`unavailable_reason`) — userul trebuie să vadă mereu dacă verificarea
+    chiar a avut loc, nu doar o tăcere identică unui succes."""
+
+    checked: bool
+    carrier_name: str | None = None
+    line_type: str | None = None
+    # None = neconcludent (Twilio n-a întors un nume de operator recunoscut),
+    # NU o nepotrivire — vezi service.py::_carrier_matches_operator.
+    operator_match: bool | None = None
+    unavailable_reason: Literal["not_configured", "request_failed"] | None = None
+
+
 class TransactionOut(BaseModel):
     """DTO orientat pe VIEWER — `direction`/`counterparty_iban` sunt
     calculate relativ la contul userului care face requestul, nu sunt un
@@ -115,6 +166,9 @@ class TransactionOut(BaseModel):
     # (app/fraud/) — un semnal complet separat. Informativ, NU blochează
     # transferul (vezi service.py::create_transfer).
     content_warning: str | None = None
+    # Prezent DOAR pe reîncărcări de telefon (vezi PhoneVerificationOut) —
+    # None pentru orice altă tranzacție.
+    phone_verification: PhoneVerificationOut | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 

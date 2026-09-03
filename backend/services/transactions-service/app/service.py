@@ -23,7 +23,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import BackgroundTasks, HTTPException, status
 
-from app import blocklist, content_screening, holds
+from app import blocklist, content_screening, holds, twilio_client
 from app import content_screening, holds
 from app import statement as statement_module
 from app.config import settings
@@ -37,6 +37,7 @@ from app.models import (
     PaymentRequestCreate,
     ReportTransactionRequest,
     ScheduledTransferCreate,
+    TopupRequest,
     TransactionFilters,
     TransferRequest,
 )
@@ -213,6 +214,9 @@ def to_transaction_view(doc: dict, viewer_account_id: str) -> dict:
         # câmpul "description" de mai sus) — deci vizibilă ambelor părți,
         # nu doar expeditorului.
         "content_warning": doc.get("content_warning"),
+        # Prezent DOAR pe reîncărcări de telefon — vezi create_topup /
+        # PhoneVerificationOut. None pentru orice altă tranzacție.
+        "phone_verification": doc.get("phone_verification"),
     }
 
 
@@ -483,6 +487,132 @@ async def create_transfer(
         # rulăm noi explicit, DUPĂ ce documentul final e deja citit.
         await background_tasks()
 
+    return view
+
+
+async def _get_topup_merchant_iban(operator: str) -> str:
+    """IBAN-ul contului-pseudo al operatorului (accounts-service) — vezi
+    accounts-service/app/service.py::ensure_topup_merchant_accounts. 404 de
+    la accounts-service (operator neconfigurat, n-ar trebui să se
+    întâmple — enum-ul de mai sus e fix) devine 502 aici, NU o presupunere
+    silențioasă a unui IBAN."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.get(f"{settings.accounts_service_url}/internal/accounts/topup-merchant/{operator}")
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceUnavailable")) from exc
+    if response.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=translate("accountsServiceQueryError"))
+    return response.json()["iban"]
+
+
+# Numele de carrier întors de Twilio Lookup e adesea entitatea LEGALĂ, nu
+# brandul (ex. Digi apare frecvent ca „RCS & RDS" în bazele de date de
+# carrier, Telekom Romania a fost „Cosmote" înainte de rebranding) — de-aia
+# potrivirea de mai jos e pe alias-uri, nu pe numele exact al operatorului.
+_OPERATOR_CARRIER_ALIASES: dict[str, list[str]] = {
+    "orange": ["orange"],
+    "vodafone": ["vodafone"],
+    "digi": ["digi", "rcs", "rds"],
+    "telekom": ["telekom", "cosmote"],
+}
+
+
+def _carrier_matches_operator(carrier_name: str | None, operator: str) -> bool | None:
+    """None = neconcludent (Twilio n-a întors un nume recunoscut) — NU o
+    tratăm ca nepotrivire, doar ca "nu putem confirma"."""
+    if not carrier_name:
+        return None
+    normalized = carrier_name.strip().lower()
+    aliases = _OPERATOR_CARRIER_ALIASES.get(operator, [operator])
+    return any(alias in normalized for alias in aliases)
+
+
+async def _verify_topup_phone(operator: str, phone_number: str) -> tuple[dict, str | None]:
+    """Verificare REALĂ (Twilio Lookup) a numărului, ÎNAINTE de orice mișcare
+    de bani — vezi app/twilio_client.py. Întoarce (phone_verification de
+    salvat pe tranzacție, motiv de blocare sau None).
+
+    Blocăm DOAR pe ceva cert — numărul nu e deloc mobil (nu poate primi
+    credit). O nepotrivire de OPERATOR e doar avertisment (vezi
+    create_topup, câmpul content_warning), fiindcă potrivirea pe nume de
+    carrier e prin natura ei nesigură (vezi _OPERATOR_CARRIER_ALIASES) —
+    nu blocăm o reîncărcare legitimă doar fiindcă baza de date a Twilio
+    folosește numele legal, nu brandul."""
+    if not settings.twilio_configured:
+        return {"checked": False, "unavailable_reason": "not_configured"}, None
+
+    phone_e164 = f"+40{phone_number[1:]}"  # 07xxxxxxxx -> +407xxxxxxxx
+    result = await twilio_client.lookup_carrier(phone_e164)
+    if result is None:
+        return {"checked": False, "unavailable_reason": "request_failed"}, None
+
+    if result.line_type and result.line_type != "mobile":
+        verification = {
+            "checked": True,
+            "carrier_name": result.carrier_name,
+            "line_type": result.line_type,
+            "unavailable_reason": None,
+        }
+        return verification, translate("topupNotMobileNumber")
+
+    verification = {
+        "checked": True,
+        "carrier_name": result.carrier_name,
+        "line_type": result.line_type,
+        "operator_match": _carrier_matches_operator(result.carrier_name, operator),
+        "unavailable_reason": None,
+    }
+    return verification, None
+
+
+async def create_topup(payload: TopupRequest, user_id: str, background_tasks: BackgroundTasks | None = None) -> dict:
+    """Reîncărcare telefon (diaspora) — NU e un flux nou de bani: devine un
+    transfer NORMAL către contul-pseudo al operatorului, cu tot ce implică
+    un transfer real (motor de fraudă, content screening, apare în
+    istoricul de tranzacții) — vezi create_transfer mai sus, pe care îl
+    reutilizează direct, fără nicio logică de bani duplicată aici.
+
+    Singurul adaos: o verificare REALĂ a numărului (Twilio Lookup) înainte
+    de a mișca banii — vezi _verify_topup_phone. Rezultatul (inclusiv DE CE
+    n-a fost verificat, dacă e cazul) se salvează pe tranzacție, ca userul
+    să vadă mereu dacă verificarea chiar a avut loc.
+
+    O nepotrivire de operator NU mai trece automat cu doar un avertisment —
+    cere confirmare explicită (428, mirror pe `card_pin`/"Payment
+    confirmation" de la create_transfer) ÎNAINTE de a atinge banii. Dacă
+    userul confirmă totuși (`confirm_mismatch=True`), reîncărcarea trece,
+    dar avertismentul rămâne pe tranzacție ca istoric — userul a ales
+    explicit să continue, nu înseamnă că nepotrivirea a dispărut."""
+    verification, block_reason = await _verify_topup_phone(payload.operator, payload.phone_number)
+    if block_reason:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=block_reason)
+
+    mismatch_detected = bool(verification.get("checked")) and verification.get("operator_match") is False
+    mismatch_message = (
+        translate("topupOperatorMismatchWarning", detected=verification.get("carrier_name") or "?")
+        if mismatch_detected
+        else None
+    )
+    if mismatch_detected and not payload.confirm_mismatch:
+        raise HTTPException(status_code=status.HTTP_428_PRECONDITION_REQUIRED, detail=mismatch_message)
+
+    to_iban = await _get_topup_merchant_iban(payload.operator)
+    transfer_payload = TransferRequest(
+        to_iban=to_iban,
+        amount_minor=payload.amount_minor,
+        description=f"Reîncărcare {payload.operator.capitalize()} — {payload.phone_number}",
+        category="bills",
+    )
+    view = await create_transfer(transfer_payload, user_id, background_tasks)
+
+    update_fields: dict = {"phone_verification": verification}
+    if mismatch_detected:
+        update_fields["content_warning"] = mismatch_message
+
+    db = get_database()
+    await db.transactions.update_one({"_id": view["_id"]}, {"$set": update_fields})
+    view.update(update_fields)
     return view
 
 
@@ -1277,15 +1407,81 @@ async def get_cash_flow_analytics(user_id: str, days: int = 30) -> dict:
     return {"period_days": days, "points": points}
 
 
+# Categorii lump-sum, NU un cost care se repetă zi de zi — excluse din rata
+# folosită ca să PROIECTEZE cheltuiala rămasă (vezi get_forecast_analytics).
+# "bills" e adesea o plată unică/rară (chirie, o factură mare); a o
+# extrapola liniar ("media zilnică × zile rămase") ar presupune că userul
+# plătește din nou aceeași factură în fiecare zi rămasă din lună — absurd,
+# mai ales devreme în lună, când puține zile scurse fac media extrem de
+# sensibilă la o singură tranzacție mare. "subscriptions" e deja numărată
+# separat, în `upcoming_obligations` (billing_day cunoscut) — a o include
+# și aici ar dubla-o. NU afectează `average_daily_spending_minor` (stat
+# general "cât cheltui pe zi", afișat userului), doar formula de forecast.
+_NON_PROJECTABLE_CATEGORIES = {"bills", "subscriptions"}
+
+# Fereastră ROLANTĂ (nu luna calendaristică curentă) pentru rata zilnică
+# "tipică" folosită la buffer/proiecție — vezi get_baseline_daily_rate_minor.
+# Aceeași durată ca la alte calibrări similare din proiect (vezi
+# scripts/seed_fraud_scenarios.py::BASELINE_HISTORY_DAYS).
+_BASELINE_RATE_WINDOW_DAYS = 60
+
+
+async def get_baseline_daily_rate_minor(user_id: str) -> int:
+    """Rată zilnică STABILĂ de cheltuire, dintr-o fereastră ROLANTĂ de
+    ultimele 60 de zile — INDEPENDENTĂ de granița lunii calendaristice
+    (spre deosebire de `average_daily_spending_minor` din
+    get_spending_analytics, care se resetează pe 1 ale lunii).
+
+    Motiv (raportat de user): o lună excepțională (ex. o vacanță cu
+    cheltuieli mari) NU mai trebuie să domine singură bufferul/proiecția
+    doar pentru că e "luna curentă" — cu o fereastră rolantă, acea lună se
+    diluează automat în restul perioadei de 60 de zile, în loc să
+    determine 100% calculul cât timp mai e calendaristic "luna asta".
+    Devreme în luna calendaristică, unde `average_daily_spending_minor` ar
+    avea un numitor de doar 1-3 zile (extrem de instabil), fereastra asta
+    are mereu (aproape) 60 de zile la numitor.
+
+    Aceleași excluderi ca la proiecția anterioară — o factură sau o
+    achiziție unică mare (≥ pragul de "transfer mare" al băncii) tot nu e
+    un cost zilnic repetabil, indiferent de fereastra de timp folosită.
+
+    Simplificare documentată: pentru un cont mai nou de 60 de zile,
+    fereastra tot împarte la 60 (nu la vârsta reală a contului) —
+    subestimează ușor rata pentru conturi foarte noi. Acceptabil pentru un
+    demo; accounts-service nu expune `created_at` prin view-ul intern
+    folosit aici (InternalAccountView), altfel am clampa fereastra la el.
+    """
+    db = get_database()
+    source = await _get_account_by_user(user_id)
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(days=_BASELINE_RATE_WINDOW_DAYS)
+
+    docs = await db.transactions.find(
+        {
+            "from_account_id": source["id"],
+            "status": "completed",
+            "created_at": {"$gte": window_start, "$lte": now},
+        }
+    ).to_list(length=10_000)
+
+    qualifying_spent_minor = sum(
+        doc["amount_minor"]
+        for doc in docs
+        if doc.get("category", "other") not in _NON_PROJECTABLE_CATEGORIES
+        and doc["amount_minor"] < _PAYMENT_CONFIRMATION_THRESHOLD_MINOR
+    )
+    return round(qualifying_spent_minor / _BASELINE_RATE_WINDOW_DAYS)
+
+
 async def get_forecast_analytics(user_id: str) -> dict:
     now = datetime.now(timezone.utc)
     account = await _get_account_by_user(user_id)
-    spending = await get_spending_analytics(user_id)
     subscriptions = await _get_subscriptions_for_user(user_id)
+    baseline_daily_rate_minor = await get_baseline_daily_rate_minor(user_id)
 
     days_total = _days_in_month(now)
     days_remaining = max(days_total - now.day, 0)
-    projected_variable_spending_minor = spending["average_daily_spending_minor"] * days_remaining
+    projected_variable_spending_minor = baseline_daily_rate_minor * days_remaining
 
     upcoming_obligations = [
         {
@@ -1307,4 +1503,5 @@ async def get_forecast_analytics(user_id: str) -> dict:
         "upcoming_obligations": upcoming_obligations,
         "estimated_end_of_month_balance_minor": estimated_end_of_month_balance_minor,
         "days_remaining_in_month": days_remaining,
+        "baseline_daily_rate_minor": baseline_daily_rate_minor,
     }

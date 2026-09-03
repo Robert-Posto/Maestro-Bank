@@ -59,6 +59,18 @@ T: dict[str, dict[Language, str]] = {
         "ro": "Eroare la interogarea accounts-service.",
         "en": "Error querying accounts-service.",
     },
+    # --- Reîncărcare telefon — verificare Twilio Lookup (service.py::
+    # _verify_topup_phone). Blocăm DOAR pe „nu e mobil" (cert); o
+    # nepotrivire de operator e doar avertisment (content_warning), vezi
+    # comentariul din service.py despre nume legale vs. branduri.
+    "topupNotMobileNumber": {
+        "ro": "Acest număr nu pare a fi de telefon mobil — nu poate primi reîncărcare de credit.",
+        "en": "This number does not appear to be a mobile number — it cannot receive a top-up.",
+    },
+    "topupOperatorMismatchWarning": {
+        "ro": "Numărul pare să aparțină de {detected}, nu operatorul selectat — verifică înainte de a continua.",
+        "en": "The number appears to belong to {detected}, not the selected operator — please double-check.",
+    },
     "noAccountForUser": {
         "ro": "Nu există un cont pentru utilizatorul curent.",
         "en": "There is no account for the current user.",

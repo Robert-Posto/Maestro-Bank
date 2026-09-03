@@ -128,6 +128,21 @@ async def get_transactions_by_date_range(authorization: str, date_from: str, dat
         return {"error": exc.detail, "status_code": exc.status_code}
 
 
+async def get_account_statement(authorization: str, date_from: str, date_to: str) -> dict[str, Any]:
+    """Validează perioada cerută pentru extrasul de cont (PDF) — reutilizează
+    `_explicit_range_bounds` doar pentru validare (format + ordine), NU
+    generează efectiv PDF-ul aici: ar însemna să trimitem bytes binari
+    către GPT, inutil și costisitor. Frontend-ul declanșează REAL
+    descărcarea din `context.statement` (vezi TransactionsService::downloadStatement),
+    exact PDF-ul deja existent, generat de transactions-service (app/statement.py) —
+    același buton pe care userul l-ar apăsa manual din pagina Conturi."""
+    try:
+        _explicit_range_bounds(date_from, date_to)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return {"date_from": date_from, "date_to": date_to}
+
+
 async def get_transfer_status(authorization: str, transaction_id: str) -> dict[str, Any]:
     """Statusul unui transfer — identic cu get_transaction_details, pentru
     că un transfer ESTE o tranzacție (nu există o entitate "transfer"

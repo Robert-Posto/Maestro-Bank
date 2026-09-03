@@ -5,6 +5,7 @@ app/service.py — logica de business trăiește acolo.
 
 Extern (prin Gateway) acestea devin:
   POST  /api/transactions/transfers
+  POST  /api/transactions/topups
   GET   /api/transactions
   GET   /api/transactions/export
   GET   /api/transactions/statement
@@ -33,6 +34,7 @@ from app.models import (
     DescriptionCheckRequest,
     DescriptionCheckResponse,
     ReportTransactionRequest,
+    TopupRequest,
     TransactionFilters,
     TransactionOut,
     TransferRequest,
@@ -71,6 +73,14 @@ def get_transaction_filters(
 @router.post("/transfers", response_model=TransactionOut, response_model_by_alias=False, status_code=201)
 async def create_transfer(payload: TransferRequest, background_tasks: BackgroundTasks, user_id: str = CurrentUserId):
     return await service.create_transfer(payload, user_id, background_tasks)
+
+
+@router.post("/topups", response_model=TransactionOut, response_model_by_alias=False, status_code=201)
+async def create_topup(payload: TopupRequest, background_tasks: BackgroundTasks, user_id: str = CurrentUserId):
+    """Reîncărcare telefon (diaspora) — vezi service.py::create_topup: e un
+    transfer normal către contul-pseudo al operatorului, nu un flux de bani
+    separat."""
+    return await service.create_topup(payload, user_id, background_tasks)
 
 
 @router.post("/transfers/screen-description", response_model=DescriptionCheckResponse)

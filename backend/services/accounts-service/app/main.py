@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     await service.backfill_missing_account_types()
     await service.backfill_missing_card_pins()
     await service.ensure_fraud_holding_account()
+    await service.ensure_topup_merchant_accounts()
     yield
     await close_database_connection()
 

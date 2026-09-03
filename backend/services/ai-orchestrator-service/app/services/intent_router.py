@@ -25,6 +25,19 @@ calea rapidă absentă, fie prin decizia LLM-ului, fie ca fallback dacă
 apelul LLM eșuează), exact cum Support e deja domeniul "tot restul" (conturi,
 carduri, tranzacții, transferuri, schimb valutar, depozite, investiții,
 credite, documente, tichete).
+
+Reclasificare pe parcursul unei conversații deja angajate (`current_agent`
+setat): fallback-ul LLM STATELESS original (doar mesajul curent, fără
+context) avea o limitare reală, raportată de user — cu contextul absent,
+orice follow-up ambiguu fără cuvânt-cheie ("Ce buffer?") risca să fie
+clasificat greșit ca schimbare de agent. O primă reparație (vezi git log)
+a rezolvat asta oprind complet LLM-ul după primul mesaj — dar simetric,
+asta bloca și schimbările REALE de subiect fără cuvânt-cheie exact (ex.
+"cât mai am pana la salariu?" în mijlocul unei conversații de Support).
+Soluția corectă: LLM-ul rămâne activ pe tot parcursul conversației, dar
+primește explicit agentul curent + un istoric scurt, ca să poată judeca
+"asta continuă discuția curentă, sau chiar schimbă domeniul?" — vezi
+`_classify_by_llm_with_context`.
 """
 
 from __future__ import annotations
@@ -103,6 +116,27 @@ _SYSTEM_PROMPT = (
     "prognoză financiară. La orice dubiu, alege 'support'."
 )
 
+# Folosit DOAR când conversația e deja angajată cu un agent (current_agent
+# setat) — spre deosebire de _SYSTEM_PROMPT (prima întrebare, fără context),
+# aici LLM-ul primește explicit agentul curent + un istoric scurt, ca să
+# poată distinge o continuare firească (rămâi) de o schimbare reală de
+# subiect (comută) — vezi docstring-ul modulului.
+_CONTEXT_SYSTEM_PROMPT_TEMPLATE = (
+    "Ești un router determinist pentru MaestroBank (bancă demo). Clientul are "
+    "deja o conversație în curs cu agentul '{current_agent}'. Vezi mai jos "
+    "istoricul recent al conversației, urmat de mesajul nou al clientului. "
+    "Apelează OBLIGATORIU tool-ul select_agent — niciodată text liber. Alege "
+    "'spending_forecast' STRICT dacă mesajul nou introduce clar un subiect "
+    "de buget, cheltuieli, economii, ce își permite clientul, sau prognoză "
+    "financiară — DIFERIT de ce se discută deja. Alege 'support' STRICT dacă "
+    "mesajul nou introduce clar un subiect de cont, card, tranzacții, "
+    "transferuri, schimb valutar, depozite, investiții, credite, documente "
+    "sau tichete — DIFERIT de ce se discută deja. Dacă mesajul doar "
+    "continuă, clarifică sau răspunde la discuția curentă — chiar și fără "
+    "niciun cuvânt-cheie explicit — alege '{current_agent}'. NU schimba "
+    "agentul fără un semnal clar de subiect nou."
+)
+
 
 def _classify_by_keywords(message: str) -> AgentName | None:
     """Calea rapidă, fără LLM. Întoarce None dacă nu e clar — caz în care
@@ -143,22 +177,68 @@ async def _classify_by_llm(message: str) -> AgentName:
     return "support"
 
 
-async def classify_intent(message: str, *, allow_llm_fallback: bool = True) -> AgentName:
+async def _classify_by_llm_with_context(
+    message: str, current_agent: AgentName, recent_history: list[str]
+) -> AgentName:
+    """Reclasificare pe parcursul unei conversații deja angajate — spre
+    deosebire de `_classify_by_llm` (stateless, doar pentru prima
+    întrebare), aici LLM-ul vede și agentul curent, și un istoric scurt, ca
+    să poată distinge o continuare firească de o schimbare reală de
+    subiect. Orice eșec (Azure neconfigurat, timeout) cade sigur pe
+    `current_agent` — RĂMÂNEM pe agentul deja angajat, nu pe "support" —
+    o eroare de rețea nu trebuie să arate ca o decizie de rutare."""
+    history_text = "\n".join(recent_history) if recent_history else "(fără istoric)"
+    user_content = f"Istoric recent:\n{history_text}\n\nMesaj nou al clientului: {message}"
+    try:
+        response_message = await chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": _CONTEXT_SYSTEM_PROMPT_TEMPLATE.format(current_agent=current_agent),
+                },
+                {"role": "user", "content": user_content},
+            ],
+            tools=[_CLASSIFY_TOOL],
+            tool_choice={"type": "function", "function": {"name": "select_agent"}},
+        )
+        tool_calls = getattr(response_message, "tool_calls", None)
+        if tool_calls:
+            args = json.loads(tool_calls[0].function.arguments)
+            agent = args.get("agent")
+            if agent in ("spending_forecast", "support"):
+                return agent
+    except AzureOpenAINotConfigured:
+        logger.info("Azure OpenAI neconfigurat — rămânem pe agentul curent (%s).", current_agent)
+    except Exception:
+        # NU logăm mesajul userului (poate conține date financiare) — doar
+        # faptul că apelul a eșuat.
+        logger.warning("Reclasificare cu context eșuată — rămânem pe agentul curent.", exc_info=True)
+
+    return current_agent
+
+
+async def classify_intent(
+    message: str,
+    *,
+    current_agent: AgentName | None = None,
+    recent_history: list[str] | None = None,
+) -> AgentName:
     """"spending_forecast" dacă mesajul ține clar de buget/cheltuieli/
     economii/prognoză, altfel "support" (domeniul implicit, catch-all).
     Vezi docstring-ul modulului pentru calea rapidă vs. LLM.
 
-    `allow_llm_fallback=False` — pentru un mesaj care CONTINUĂ o
-    conversație deja angajată cu un agent (vezi app/models/assistant.py::
-    ClassifyRequest.allow_llm_fallback pentru raționamentul complet): fără
-    o potrivire clară de cuvinte-cheie, întoarce direct "support" (fără
-    apel LLM), NU o presupunere despre domeniu — apelantul (frontend-ul)
-    tratează acest "support" ca "fără semnal clar de schimbare", nu ca o
-    decizie fermă, și rămâne pe agentul deja angajat dacă rezultatul nu
-    e "spending_forecast"."""
+    `current_agent=None` — prima întrebare a unei conversații NOI, fără
+    niciun context anterior: clasificare hibridă completă (cuvinte-cheie,
+    apoi LLM stateless dacă e nevoie).
+
+    `current_agent` setat — un mesaj care CONTINUĂ o conversație deja
+    angajată cu agentul respectiv: fără o potrivire clară de cuvinte-cheie,
+    LLM-ul e consultat DIN NOU, dar de data asta cu context (agentul curent
+    + `recent_history`), ca să poată distinge o continuare firească de o
+    schimbare reală de subiect — vezi `_classify_by_llm_with_context`."""
     fast = _classify_by_keywords(message)
     if fast is not None:
         return fast
-    if not allow_llm_fallback:
-        return "support"
-    return await _classify_by_llm(message)
+    if current_agent is None:
+        return await _classify_by_llm(message)
+    return await _classify_by_llm_with_context(message, current_agent, recent_history or [])

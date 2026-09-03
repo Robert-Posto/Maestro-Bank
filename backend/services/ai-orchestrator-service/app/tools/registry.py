@@ -26,8 +26,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 
-from app.services import affordability_service, budget_actions_service, budget_service
-from app.tools import accounts_tools, budgets_tools, transactions_tools
+from app import duffel_client
+from app.config import settings
+from app.services import affordability_service, budget_actions_service, budget_service, pocket_actions_service, trip_estimate_service
+from app.tools import accounts_tools, budgets_tools, exchange_tools, transactions_tools
 from app.tools.errors import ToolError
 
 TOOL_SCHEMAS: list[dict] = [
@@ -180,6 +182,73 @@ TOOL_SCHEMAS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "estimate_trip_cost",
+            "description": (
+                "Estimează costul REAL (preț live de zbor, convertit în RON) al unei vacanțe "
+                "către o destinație, pentru date specifice — folosește ACEST tool ORICE dată "
+                "userul menționează o vacanță/călătorie cu o destinație și o perioadă "
+                "aproximativă, ÎNAINTE de evaluate_affordability (folosește totalul estimat "
+                "aici ca requested_amount_ron acolo). Zborul pleacă din București (OTP) — "
+                "presupunere fixă a acestei bănci, NU întreba userul de unde pleacă. NU include "
+                "încă și cazarea — spune userului că estimarea e doar pentru zbor, dacă întreabă."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination_city": {
+                        "type": "string",
+                        "description": "Numele orașului destinație, pentru afișare — ex. 'Barcelona'.",
+                    },
+                    "destination_iata": {
+                        "type": "string",
+                        "description": "Codul IATA (3 litere) al orașului/aeroportului destinație — ex. 'BCN' pentru Barcelona.",
+                    },
+                    "departure_date": {
+                        "type": "string",
+                        "description": "Data plecării, format YYYY-MM-DD. Dedu-o din data curentă + perioada menționată de user (ex. 'peste 5 luni').",
+                    },
+                    "return_date": {
+                        "type": "string",
+                        "description": "Data întoarcerii, format YYYY-MM-DD — dedusă dintr-o durată de sejur rezonabilă dacă userul n-a specificat una (ex. 5-7 nopți).",
+                    },
+                    "travelers": {
+                        "type": "integer",
+                        "description": "Numărul de călători — implicit 1 dacă userul nu specifică.",
+                    },
+                },
+                "required": ["destination_city", "destination_iata", "departure_date", "return_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_create_savings_pocket",
+            "description": (
+                "PROPUNE crearea unui obiectiv de economisire (Pocket) — NU îl creează efectiv, "
+                "userul trebuie să confirme explicit din interfață. Folosește asta după "
+                "estimate_trip_cost, când userul vrea să înceapă să economisească pentru acea "
+                "vacanță, sau pentru orice alt obiectiv de economisire cerut explicit."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Numele obiectivului — ex. 'Vacanță Barcelona'.",
+                    },
+                    "target_ron": {
+                        "type": "number",
+                        "description": "Ținta de economisire, în LEI (RON) — ex. 3500 pentru '3500 lei'. NU converti tu în bani.",
+                    },
+                },
+                "required": ["name", "target_ron"],
+            },
+        },
+    },
 ]
 
 
@@ -284,6 +353,7 @@ async def execute_tool(name: str, arguments: dict, auth_header: str, cache: Tool
                 requested_amount_minor=requested_amount_minor,
                 estimated_end_of_month_balance_minor=forecast["estimated_end_of_month_balance_minor"],
                 spending_summary=spending,
+                baseline_daily_rate_minor=forecast["baseline_daily_rate_minor"],
             )
             cache.affordability = result
             return result
@@ -316,6 +386,50 @@ async def execute_tool(name: str, arguments: dict, auth_header: str, cache: Tool
                 raise ToolError("Lipsește bugetul țintă.")
             existing = await _cached_budgets(cache, auth_header)
             action = budget_actions_service.propose_delete(arguments["target"], existing)
+            cache.pending_action = action
+            return {"proposal": action["summary"], "requires_confirmation": True}
+        if name == "estimate_trip_cost":
+            required = ("destination_city", "destination_iata", "departure_date", "return_date")
+            if any(field_name not in arguments for field_name in required):
+                raise ToolError("Lipsesc destinația sau datele de plecare/întoarcere.")
+            if not settings.duffel_configured:
+                return {"available": False, "reason": "not_configured"}
+            travelers = int(arguments.get("travelers") or 1)
+            flight = await duffel_client.search_cheapest_flight(
+                origin_iata="OTP",
+                destination_iata=arguments["destination_iata"],
+                departure_date=arguments["departure_date"],
+                return_date=arguments["return_date"],
+                adults=travelers,
+            )
+            flight_total_ron_minor = None
+            applied_rate = None
+            if flight is not None:
+                if flight.currency == "RON":
+                    flight_total_ron_minor = flight.price_minor
+                else:
+                    try:
+                        quote = await exchange_tools.get_quote(flight.currency, "RON", flight.price_minor, auth_header)
+                        flight_total_ron_minor = quote["received_minor"]
+                        applied_rate = quote["applied_rate"]
+                    except ToolError:
+                        # Zborul e real, dar nu putem converti acum — mai bine
+                        # "indisponibil" decât un total în valuta greșită.
+                        flight_total_ron_minor = None
+            return trip_estimate_service.build_trip_estimate(
+                destination_city=arguments["destination_city"],
+                departure_date=arguments["departure_date"],
+                return_date=arguments["return_date"],
+                applied_rate=applied_rate,
+                travelers=travelers,
+                flight=flight,
+                flight_total_ron_minor=flight_total_ron_minor,
+            )
+        if name == "propose_create_savings_pocket":
+            if "name" not in arguments or "target_ron" not in arguments:
+                raise ToolError("Lipsește numele sau ținta obiectivului de economisire.")
+            target_minor = _to_minor(arguments["target_ron"], "target_ron")
+            action = pocket_actions_service.propose_create_pocket(arguments["name"], target_minor)
             cache.pending_action = action
             return {"proposal": action["summary"], "requires_confirmation": True}
         raise ToolError(f"Tool necunoscut: {name}")
