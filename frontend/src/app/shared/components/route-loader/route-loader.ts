@@ -1,7 +1,8 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { NavigationCancel, NavigationEnd, NavigationError, NavigationStart, Router } from '@angular/router';
 
 import { LanguageService } from '../../../services/language.service';
+import { ThemeService } from '../../../services/theme.service';
 
 /**
  * Cât durează o navigare înainte s-o considerăm „lentă" și să merite un
@@ -31,7 +32,7 @@ const FADE_OUT_MS = 240;
  * la rădăcină (vezi app.ts), deci vede toate navigările aplicației.
  *
  * NU apare la orice schimbare de pagină — ar obosi la o aplicație în care
- * te muți des între ecrane. Apare doar în trei situații:
+ * te muți des între ecrane. Apare doar în patru situații:
  *
  *   1. La reîncărcarea paginii (F5) sau la prima deschidere — cât timp
  *      Angular pornește și rezolvă ruta inițială.
@@ -41,6 +42,13 @@ const FADE_OUT_MS = 240;
  *   3. La o navigare obișnuită care depășește SLOW_NAVIGATION_THRESHOLD_MS
  *      — adică exact atunci când userul chiar ar începe să se întrebe dacă
  *      s-a blocat ceva. Navigările rapide nu arată nimic.
+ *   4. La schimbarea de temă (dark/light) sau de limbă (RO/EN) — ambele
+ *      schimbă instant un atribut pe <html>, ceea ce re-randează dintr-o
+ *      dată toată aplicația (fiecare culoare/text), fără nicio tranziție
+ *      proprie — arăta ca un flash brut. Pulsăm cu exact aceeași durată ca
+ *      la reîncărcare (MIN_VISIBLE_BRANDED_MS), ca timpul să fie predictibil
+ *      — nu o durată separată, mai scurtă, care s-ar putea suprapune ciudat
+ *      peste un pulse deja pornit din alt motiv.
  */
 @Component({
   selector: 'app-route-loader',
@@ -153,6 +161,7 @@ export class RouteLoader {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly language = inject(LanguageService);
+  private readonly theme = inject(ThemeService);
 
   /** Prezent în DOM — rămâne `true` și pe durata fade-out-ului. */
   protected readonly rendered = signal(false);
@@ -163,8 +172,15 @@ export class RouteLoader {
   private slowTimer?: ReturnType<typeof setTimeout>;
   private hideTimer?: ReturnType<typeof setTimeout>;
   private removeTimer?: ReturnType<typeof setTimeout>;
-  private shownAt = 0;
-  private minVisibleMs = MIN_VISIBLE_BRANDED_MS;
+  /** Timestamp absolut — nu se ascunde mai devreme de atât. Fiecare apel al
+   * lui show() îl duce la max(valoarea curentă, acum + durata cerută), NU
+   * îl suprascrie — altfel un declanșator (ex. toggle temă) care apare cât
+   * timp overlay-ul e deja afișat din alt motiv (ex. reload) ar moșteni
+   * timing-ul aceluia: fie dispare aproape instant (dacă acela era pe
+   * terminate), fie se întinde nejustificat de mult (dacă acela abia
+   * pornise) — exact bug-ul raportat ("fie durează prea mult, fie nu se
+   * încarcă deloc"). */
+  private hideNotBeforeAt = 0;
 
   constructor() {
     const subscription = this.router.events.subscribe((event) => {
@@ -192,12 +208,56 @@ export class RouteLoader {
       this.hideAfterMinimum();
     }
 
+    // Schimbare de temă/limbă — spre deosebire de navigare, n-are un
+    // eveniment de "s-a terminat" separat, deci pulsăm noi înșine (show +
+    // hideAfterMinimum imediat), nu doar la NavigationEnd. Skip la PRIMA
+    // rulare a fiecărui efect (valoarea inițială, citită la construcție —
+    // nu e o schimbare reală, userul nu a apăsat nimic încă).
+    //
+    // pulseToggle() e învelit în untracked(): show()/hideAfterMinimum()
+    // citesc `rendered` intern, iar dacă acea citire s-ar întâmpla direct
+    // în corpul efectului, Angular ar considera `rendered` o dependență A
+    // EFECTULUI — iar când mai târziu overlay-ul își setează singur
+    // rendered=false (la finalul pulsației, din removeTimer), acea scriere
+    // ar re-declanșa efectul, care ar arăta overlay-ul din nou, care l-ar
+    // ascunde din nou... buclă infinită (exact bug-ul „pulsează, dispare,
+    // apare, pulsează iar, la nesfârșit"). untracked() spune explicit lui
+    // Angular să nu urmărească citirile din interiorul lui pulseToggle() —
+    // efectul rămâne legat STRICT de theme()/language().
+    let isFirstThemeRead = true;
+    effect(() => {
+      this.theme.theme();
+      if (isFirstThemeRead) {
+        isFirstThemeRead = false;
+        return;
+      }
+      untracked(() => this.pulseToggle());
+    });
+
+    let isFirstLanguageRead = true;
+    effect(() => {
+      this.language.language();
+      if (isFirstLanguageRead) {
+        isFirstLanguageRead = false;
+        return;
+      }
+      untracked(() => this.pulseToggle());
+    });
+
     this.destroyRef.onDestroy(() => {
       subscription.unsubscribe();
       clearTimeout(this.slowTimer);
       clearTimeout(this.hideTimer);
       clearTimeout(this.removeTimer);
     });
+  }
+
+  /** Arată logo-ul pulsând, apoi îl ascunde singur după minimul garantat —
+   * spre deosebire de navigare, o schimbare de temă/limbă n-are un
+   * eveniment extern de "s-a terminat" care să declanșeze ascunderea. */
+  private pulseToggle(): void {
+    this.show(MIN_VISIBLE_BRANDED_MS);
+    this.hideAfterMinimum();
   }
 
   private onNavigationStart(targetUrl: string): void {
@@ -221,29 +281,38 @@ export class RouteLoader {
   }
 
   private show(minVisibleMs: number): void {
-    clearTimeout(this.hideTimer);
     clearTimeout(this.removeTimer);
 
-    // Deja complet afișat (ex. un guard redirecționează imediat spre altă
-    // rută) — îl lăsăm cum e, fără să repornim cronometrul minim; altfel
-    // un lanț de redirect-uri ar ține loader-ul pe ecran la nesfârșit.
-    if (this.visible()) return;
+    // Niciodată o suprascriere — un declanșator NOU (ex. toggle temă) cât
+    // timp overlay-ul e deja afișat din alt motiv (ex. reload) trebuie să-și
+    // impună propriul minim, nu să moștenească tăcut timing-ul celuilalt
+    // apel (vezi comentariul de la hideNotBeforeAt).
+    this.hideNotBeforeAt = Math.max(this.hideNotBeforeAt, Date.now() + minVisibleMs);
 
-    this.minVisibleMs = minVisibleMs;
-    this.rendered.set(true);
-    this.shownAt = Date.now();
-    // Un frame în care elementul există cu opacity: 0, ca tranziția să
-    // aibă de unde porni (altfel apare brusc, fără fade).
-    requestAnimationFrame(() => this.visible.set(true));
+    if (!this.rendered()) {
+      this.rendered.set(true);
+      // Un frame în care elementul există cu opacity: 0, ca tranziția să
+      // aibă de unde porni (altfel apare brusc, fără fade).
+      requestAnimationFrame(() => this.visible.set(true));
+    }
+
+    // NU programăm ascunderea aici pentru orice apel — o navigare (intrare
+    // în cont / navigare lentă) trebuie să aștepte evenimentul REAL de
+    // NavigationEnd/Cancel/Error (mai jos), altfel o pagină care chiar
+    // durează mai mult decât minVisibleMs ar ajunge să se ascundă înainte
+    // să se termine navigarea. Apelanții care n-au un asemenea eveniment
+    // extern (constructorul, pentru navigarea inițială deja rezolvată, și
+    // pulseToggle) își programează explicit ascunderea, imediat după show().
   }
 
   private hideAfterMinimum(): void {
     if (!this.rendered()) return;
 
-    const remaining = Math.max(0, this.minVisibleMs - (Date.now() - this.shownAt));
+    const remaining = Math.max(0, this.hideNotBeforeAt - Date.now());
     clearTimeout(this.hideTimer);
     this.hideTimer = setTimeout(() => {
       this.visible.set(false);
+      this.hideNotBeforeAt = 0;
       this.removeTimer = setTimeout(() => this.rendered.set(false), FADE_OUT_MS);
     }, remaining);
   }

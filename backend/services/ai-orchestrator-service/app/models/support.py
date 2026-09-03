@@ -39,7 +39,13 @@ class PendingAction(BaseModel):
     retrimite neschimbată, ca `pending_action`, în request-ul următor, în
     care userul confirmă explicit — vezi app/services/support_service.py."""
 
-    tool: Literal["create_support_ticket"]
+    tool: Literal[
+        "create_support_ticket",
+        "propose_internal_transfer",
+        "propose_update_card_settings",
+        "propose_open_account",
+        "propose_execute_exchange",
+    ]
     arguments: dict[str, Any]
 
 

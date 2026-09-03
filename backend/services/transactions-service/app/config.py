@@ -72,5 +72,19 @@ class Settings:
     def azure_openai_configured(self) -> bool:
         return bool(self.azure_openai_endpoint and self.azure_openai_api_key)
 
+    # Twilio Lookup (line_type_intelligence) — verificare REALĂ a numărului
+    # la o reîncărcare de telefon (vezi app/twilio_client.py și
+    # service.py::_verify_topup_phone). Opțional, la fel ca Azure OpenAI:
+    # neconfigurat = reîncărcarea continuă fără verificare (vezi
+    # phone_verification.unavailable_reason="not_configured" pe tranzacție,
+    # ca userul să vadă mereu DE CE n-a fost verificat, nu doar tăcere).
+    twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    twilio_lookup_timeout_seconds: float = float(os.getenv("TWILIO_LOOKUP_TIMEOUT_SECONDS", "5.0"))
+
+    @property
+    def twilio_configured(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token)
+
 
 settings = Settings()

@@ -24,19 +24,30 @@ from __future__ import annotations
 from app.i18n import current_language, pick
 
 # Buffer-ul recomandat = o regulă simplă, documentată (task-ul, secțiunea
-# 10: "NU inventa un algoritm financiar sofisticat") — jumătate dintr-o
-# lună de cheltuieli, la ritmul mediu zilnic curent al userului.
-BUFFER_SAFETY_FRACTION = 0.5
+# 10: "NU inventa un algoritm financiar sofisticat") — o LUNĂ întreagă de
+# cheltuieli, la rata zilnică STABILĂ a userului (vezi
+# baseline_daily_rate_minor). Era jumătate de lună (0.5) — dublat la
+# cererea userului: o jumătate de lună ca "rezervă de siguranță" simțea
+# prea puțin în termeni absoluți, chiar și după ce am reparat volatilitatea
+# ratei de bază.
+BUFFER_SAFETY_FRACTION = 1.0
 DAYS_PER_MONTH_FOR_BUFFER = 30
 
 
-def recommended_buffer_minor(spending_summary: dict) -> int:
-    """Buffer de siguranță recomandat, derivat din ritmul mediu de
-    cheltuire al userului (average_daily_spending_minor, din
-    GET /transactions/analytics/spending) — nu un număr fix hardcodat.
+def recommended_buffer_minor(baseline_daily_rate_minor: int) -> int:
+    """Buffer de siguranță recomandat, derivat dintr-o rată zilnică
+    STABILĂ (fereastră rolantă de 60 de zile, calculată determinist de
+    transactions-service — vezi app/service.py::get_baseline_daily_rate_minor,
+    întoarsă ca `baseline_daily_rate_minor` în GET /transactions/analytics/forecast).
+
+    Bug real reparat (raportat de user): formula folosea înainte
+    `average_daily_spending_minor` din GET /transactions/analytics/spending
+    — media zilnică DIN LUNA CALENDARISTICĂ CURENTĂ. O lună cu cheltuieli
+    neobișnuit de mari (ex. o vacanță) sau pur și simplu puține zile trecute
+    din lună dădeau un buffer absurd de mare. Fereastra rolantă de 60 de
+    zile diluează automat o lună excepțională în restul perioadei.
     """
-    average_daily_minor = spending_summary.get("average_daily_spending_minor", 0)
-    return round(average_daily_minor * DAYS_PER_MONTH_FOR_BUFFER * BUFFER_SAFETY_FRACTION)
+    return round(baseline_daily_rate_minor * DAYS_PER_MONTH_FOR_BUFFER * BUFFER_SAFETY_FRACTION)
 
 
 def evaluate_affordability(
@@ -44,10 +55,16 @@ def evaluate_affordability(
     requested_amount_minor: int,
     estimated_end_of_month_balance_minor: int,
     spending_summary: dict,
+    baseline_daily_rate_minor: int,
 ) -> dict:
     """Verdictul determinist pentru "îmi permit X?". Aruncă ValueError
     pentru sume invalide (<=0) — tratat de tool-ul care apelează asta
     (vezi app/tools/registry.py), NU lăsat să iasă ca 500 brut.
+
+    `spending_summary` rămâne necesar DOAR pentru `top_discretionary_category`
+    (sfatul de economisire — "unde poți tăia" e legitim să reflecte
+    cheltuiala DIN LUNA CURENTĂ, spre deosebire de buffer, care are nevoie
+    de o bază stabilă — vezi recommended_buffer_minor).
     """
     if requested_amount_minor <= 0:
         raise ValueError("Suma cerută trebuie să fie un număr pozitiv.")
@@ -56,7 +73,7 @@ def evaluate_affordability(
     # forecast_service.
     from app.services.forecast_service import top_discretionary_category
 
-    buffer_minor = recommended_buffer_minor(spending_summary)
+    buffer_minor = recommended_buffer_minor(baseline_daily_rate_minor)
     estimated_balance_without_purchase_minor = estimated_end_of_month_balance_minor
     estimated_balance_after_purchase_minor = estimated_balance_without_purchase_minor - requested_amount_minor
     affordable = estimated_balance_after_purchase_minor >= buffer_minor

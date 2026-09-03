@@ -160,6 +160,7 @@ def test_build_snapshot_end_to_end():
         "upcoming_obligations": [{"name": "Netflix", "amount_minor": 4999, "billing_day": 25}],
         "estimated_end_of_month_balance_minor": 420000,
         "days_remaining_in_month": 10,
+        "baseline_daily_rate_minor": 5000,
     }
     subscriptions = [_subscription("Netflix", 4999, billing_day=25), _subscription("Spotify", 2999, billing_day=3)]
 
@@ -172,6 +173,7 @@ def test_build_snapshot_end_to_end():
     )
 
     assert snapshot["analysis"]["current_balance_minor"] == 500000
+    assert snapshot["analysis"]["recommended_buffer_minor"] == round(5000 * 30 * 0.5)
     assert snapshot["financial_summary"]["estimated_end_balance_minor"] == 420000
     assert snapshot["financial_summary"]["remaining_income_minor"] is None  # fără cash_flow
     assert snapshot["recurring_payments"]["total_remaining_minor"] == 4999 + 2999

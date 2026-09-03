@@ -20,6 +20,9 @@
   <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'request'" (click)="sendMode.set('request')">
     <app-icon name="send" [size]="14" /> {{ 'transfers.modeRequest' | translate }}
   </button>
+  <button type="button" role="tab" [class.transfer-mode-toggle__btn--active]="sendMode() === 'topup'" (click)="sendMode.set('topup')">
+    <app-icon name="phone" [size]="14" /> {{ 'transfers.modeTopup' | translate }}
+  </button>
 </div>
 
 @if (sendMode() === 'send') {
@@ -225,7 +228,7 @@
     </div>
   </div>
 }
-} @else {
+} @else if (sendMode() === 'request') {
   <div class="transfer-wrap">
     <form class="transfer-card" (ngSubmit)="createPaymentRequest()">
       <h2 class="requests-form__title">{{ 'transfers.requestTitle' | translate }}</h2>
@@ -326,6 +329,89 @@
       </div>
     }
   </div>
+} @else {
+  <div class="transfer-wrap">
+    @if (topupCompletedTransaction(); as tx) {
+      <div class="transfer-card transfer-success">
+        <div class="transfer-success__icon">
+          <app-icon name="check" [size]="28" />
+        </div>
+        <h2>{{ 'transfers.topupSuccessTitle' | translate }}</h2>
+        <p class="transfer-success__amount">{{ tx.amount_minor | money: tx.currency }}</p>
+        <p class="transfer-success__meta">
+          {{ 'transfers.topupSuccessMeta' | translate }} {{ topupPhoneNumber() }}
+        </p>
+        @if (tx.content_warning) {
+          <p class="transfer-content-warning"><app-icon name="info" [size]="15" /> {{ tx.content_warning }}</p>
+        } @else if (tx.phone_verification?.checked && tx.phone_verification?.operator_match) {
+          <p class="transfer-topup-verified">
+            <app-icon name="check" [size]="14" /> {{ 'transfers.topupOperatorConfirmed' | translate }} ({{ tx.phone_verification?.carrier_name }})
+          </p>
+        } @else if (tx.phone_verification?.unavailable_reason === 'request_failed') {
+          <p class="transfer-content-warning">
+            <app-icon name="info" [size]="15" /> {{ 'transfers.topupVerificationFailed' | translate }}
+          </p>
+        }
+        <div class="transfer-success__actions">
+          <app-action-button [fullWidth]="true" (pressed)="startNewTopup()">{{ 'transfers.newTopup' | translate }}</app-action-button>
+          <a routerLink="/app/transactions" class="transfer-success__link">{{ 'transfers.viewInTransactions' | translate }} ›</a>
+        </div>
+      </div>
+    } @else {
+      <form class="transfer-card" (ngSubmit)="submitTopup()">
+        <h2 class="requests-form__title">{{ 'transfers.topupTitle' | translate }}</h2>
+        <p class="requests-form__subtitle">{{ 'transfers.topupSubtitle' | translate }}</p>
+
+        <label class="transfer-field">
+          <span>{{ 'transfers.topupOperator' | translate }}</span>
+          <app-select [options]="topupOperatorOptions" [value]="topupOperator()" (changed)="setTopupOperator($event)" />
+        </label>
+
+        <label class="transfer-field">
+          <span>{{ 'transfers.topupPhoneNumber' | translate }}</span>
+          <div class="transfer-input-line">
+            <app-icon name="phone" [size]="16" />
+            <input
+              type="tel"
+              class="transfer-input-line__iban"
+              [placeholder]="'transfers.topupPhonePlaceholder' | translate"
+              [ngModel]="topupPhoneNumber()"
+              (ngModelChange)="topupPhoneNumber.set($event)"
+              name="topupPhoneNumber"
+            />
+          </div>
+        </label>
+
+        <label class="transfer-field transfer-field--amount">
+          <span>{{ 'common.amount' | translate }}</span>
+          <div class="transfer-input-line transfer-input-line--amount">
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              [ngModel]="topupAmount()"
+              (ngModelChange)="topupAmount.set($event)"
+              name="topupAmount"
+            />
+            <span class="transfer-input-line__currency">{{ account()?.currency ?? 'RON' }}</span>
+          </div>
+        </label>
+
+        @if (topupError()) {
+          <p class="transfer-error"><app-icon name="info" [size]="14" /> {{ topupError() }}</p>
+        }
+
+        <p class="transfer-safety-note">
+          <app-icon name="shield" [size]="14" /> {{ 'transfers.topupSafetyNote' | translate }}
+        </p>
+
+        <app-action-button type="submit" [fullWidth]="true" [loading]="topupSubmitting()">
+          <app-icon name="phone" [size]="16" /> {{ 'transfers.topupSubmit' | translate }}
+        </app-action-button>
+      </form>
+    }
+  </div>
 }
 }
 
@@ -369,6 +455,18 @@
     </div>
   }
 </section>
+}
+
+@if (topupMismatchMessage(); as mismatchMessage) {
+  <app-confirm-dialog
+    [title]="'transfers.topupMismatchTitle' | translate"
+    [message]="mismatchMessage"
+    [confirmLabel]="'transfers.topupMismatchConfirm' | translate"
+    [danger]="true"
+    [loading]="topupSubmitting()"
+    (confirmed)="confirmTopupMismatch()"
+    (cancelled)="cancelTopupMismatch()"
+  />
 }
 
 @if (shareRequest(); as shared) {

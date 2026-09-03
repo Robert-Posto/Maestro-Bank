@@ -13,7 +13,7 @@ from app.agents.support import PendingConfirmationRequired, SupportLLMClient, _d
 from app.i18n import translate
 from app.models.support import ChatRequest, ChatResponse, PendingAction, RecommendedAction
 from app.services import moderation_service
-from app.tools import support_ticket_tools
+from app.tools import support_account_actions_tools, support_ticket_tools
 
 logger = logging.getLogger("ai-orchestrator-service")
 
@@ -63,6 +63,23 @@ def _build_confirmation_question(tool: str, arguments: dict) -> str:
         subject = arguments.get("subject", "")
         category = arguments.get("category", "other")
         return translate("confirmCreateTicket", subject=subject, category=category)
+    if tool == "propose_internal_transfer":
+        return translate(
+            "confirmInternalTransfer",
+            amount=arguments.get("amount", 0),
+            account_type=arguments.get("to_account_type", ""),
+        )
+    if tool == "propose_update_card_settings":
+        return translate("confirmUpdateCardSettings")
+    if tool == "propose_open_account":
+        return translate("confirmOpenAccount", account_type=arguments.get("account_type", ""))
+    if tool == "propose_execute_exchange":
+        return translate(
+            "confirmExecuteExchange",
+            amount=arguments.get("amount", 0),
+            from_currency=arguments.get("from_currency", ""),
+            to_currency=arguments.get("to_currency", ""),
+        )
     return translate("confirmGenericAction")
 
 
@@ -83,6 +100,71 @@ async def _execute_confirmed_action(pending: PendingAction, authorization: str) 
             recommended_actions=[_build_recommended_action("view_tickets", translate("viewMyTickets"))],
             requires_confirmation=False,
         )
+
+    if pending.tool == "propose_internal_transfer":
+        result = await support_account_actions_tools.execute_internal_transfer(authorization, **pending.arguments)
+        if isinstance(result, dict) and "error" in result:
+            return ChatResponse(
+                answer=translate("internalTransferFailed", error=result["error"]),
+                intent="account_help",
+                context=result,
+                requires_confirmation=False,
+            )
+        return ChatResponse(
+            answer=translate("internalTransferDone", account_type=result.get("to_account_type", "")),
+            intent="account_help",
+            context={"transaction": result.get("transfer")},
+            requires_confirmation=False,
+        )
+
+    if pending.tool == "propose_update_card_settings":
+        result = await support_account_actions_tools.execute_update_card_settings(authorization, **pending.arguments)
+        if isinstance(result, dict) and "error" in result:
+            return ChatResponse(
+                answer=translate("cardSettingsUpdateFailed", error=result["error"]),
+                intent="card_help",
+                context=result,
+                requires_confirmation=False,
+            )
+        return ChatResponse(
+            answer=translate("cardSettingsUpdateDone"),
+            intent="card_help",
+            context={"card": result.get("card")},
+            requires_confirmation=False,
+        )
+
+    if pending.tool == "propose_open_account":
+        result = await support_account_actions_tools.execute_open_account(authorization, **pending.arguments)
+        if isinstance(result, dict) and "error" in result:
+            return ChatResponse(
+                answer=translate("openAccountFailed", error=result["error"]),
+                intent="account_help",
+                context=result,
+                requires_confirmation=False,
+            )
+        return ChatResponse(
+            answer=translate("openAccountDone", account_type=pending.arguments.get("account_type", "")),
+            intent="account_help",
+            context={"account": result.get("account")},
+            requires_confirmation=False,
+        )
+
+    if pending.tool == "propose_execute_exchange":
+        result = await support_account_actions_tools.execute_currency_exchange(authorization, **pending.arguments)
+        if isinstance(result, dict) and "error" in result:
+            return ChatResponse(
+                answer=translate("executeExchangeFailed", error=result["error"]),
+                intent="account_help",
+                context=result,
+                requires_confirmation=False,
+            )
+        return ChatResponse(
+            answer=translate("executeExchangeDone"),
+            intent="account_help",
+            context={"exchange": result.get("exchange")},
+            requires_confirmation=False,
+        )
+
     return ChatResponse(answer=translate("unknownAction"), intent="unknown")  # neatins în V1
 
 

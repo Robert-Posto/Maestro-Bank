@@ -13,12 +13,14 @@ import {
   PaymentRequestView,
   ScheduleFrequency,
   ScheduledTransferView,
+  TopupOperator,
   TransactionView,
 } from '../../services/banking.service';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 import { ActionButton } from '../../shared/components/action-button/action-button';
 import { Icon } from '../../shared/components/icon/icon';
 import { Modal } from '../../shared/components/modal/modal';
+import { ConfirmDialog } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { DatePipe } from '@angular/common';
@@ -31,7 +33,7 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 type TransferStep = 'form' | 'review' | 'success';
 type MainTab = 'new' | 'scheduled';
-type SendMode = 'send' | 'request';
+type SendMode = 'send' | 'request' | 'topup';
 
 /**
  * Plăți & Transferuri — vezi task-ul MaestroBank, secțiunea 13.
@@ -43,7 +45,20 @@ type SendMode = 'send' | 'request';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeader, ActionButton, Icon, Modal, EmptyState, MoneyPipe, DatePipe, Select, TranslatePipe],
+  imports: [
+    FormsModule,
+    RouterLink,
+    PageHeader,
+    ActionButton,
+    Icon,
+    Modal,
+    ConfirmDialog,
+    EmptyState,
+    MoneyPipe,
+    DatePipe,
+    Select,
+    TranslatePipe,
+  ],
   templateUrl: './transfers.html',
   styleUrl: './transfers.css',
 })
@@ -121,6 +136,26 @@ export class Transfers implements OnInit {
   protected readonly shareRequest = signal<PaymentRequestView | null>(null);
   protected readonly shareQrDataUrl = signal<string | null>(null);
   protected readonly shareQrLoading = signal(false);
+
+  // --- Reîncărcare telefon (diaspora) — al treilea mod, alături de
+  // Trimit/Solicit. Debit REAL din cont (vezi banking.service.ts
+  // ::createTopup) — doar reîncărcarea efectivă la operator e simulată. ---
+  protected readonly topupOperator = signal<TopupOperator>('orange');
+  protected readonly topupOperatorOptions: SelectOption[] = [
+    { value: 'orange', label: 'Orange' },
+    { value: 'vodafone', label: 'Vodafone' },
+    { value: 'digi', label: 'Digi' },
+    { value: 'telekom', label: 'Telekom' },
+  ];
+  protected readonly topupPhoneNumber = signal('');
+  protected readonly topupAmount = signal<number | null>(null);
+  protected readonly topupSubmitting = signal(false);
+  protected readonly topupError = signal<string | null>(null);
+  protected readonly topupCompletedTransaction = signal<TransactionView | null>(null);
+  /** Non-null DOAR când backend-ul a respins cu 428 (nepotrivire de
+   * operator detectată de Twilio Lookup) — mesajul vine direct din
+   * răspuns, ca userul să vadă exact ce operator real a fost detectat. */
+  protected readonly topupMismatchMessage = signal<string | null>(null);
 
   constructor() {
     // Verificare LIVE a descrierii, direct din câmpul de formular — nu
@@ -488,6 +523,95 @@ export class Transfers implements OnInit {
       }
     }
     return this.language.t('transfers.transferFailedGeneric');
+  }
+
+  protected setTopupOperator(value: string): void {
+    this.topupOperator.set(value as TopupOperator);
+  }
+
+  protected submitTopup(): void {
+    this.topupError.set(null);
+
+    const phoneNumber = this.topupPhoneNumber().trim();
+    if (!/^07\d{8}$/.test(phoneNumber)) {
+      this.topupError.set(this.language.t('transfers.topupInvalidPhone'));
+      return;
+    }
+    const amountMinor = Math.round((this.topupAmount() ?? 0) * 100);
+    if (amountMinor <= 0) {
+      this.topupError.set(this.language.t('transfers.invalidAmount'));
+      return;
+    }
+    if (this.account() && amountMinor > this.account()!.balance_minor) {
+      this.topupError.set(this.language.t('transfers.insufficientBalanceAmount'));
+      return;
+    }
+
+    this.sendTopup(phoneNumber, amountMinor, /* confirmMismatch */ false);
+  }
+
+  /** Userul a confirmat în dialogul de nepotrivire (vezi topupMismatchMessage)
+   * — retrimitem EXACT același request, cu confirm_mismatch=true, mirror pe
+   * fluxul de confirmare cu PIN de card de la transferuri normale. */
+  protected confirmTopupMismatch(): void {
+    const phoneNumber = this.topupPhoneNumber().trim();
+    const amountMinor = Math.round((this.topupAmount() ?? 0) * 100);
+    this.sendTopup(phoneNumber, amountMinor, /* confirmMismatch */ true);
+  }
+
+  protected cancelTopupMismatch(): void {
+    this.topupMismatchMessage.set(null);
+  }
+
+  private sendTopup(phoneNumber: string, amountMinor: number, confirmMismatch: boolean): void {
+    this.topupSubmitting.set(true);
+    this.banking
+      .createTopup({
+        operator: this.topupOperator(),
+        phone_number: phoneNumber,
+        amount_minor: amountMinor,
+        confirm_mismatch: confirmMismatch,
+      })
+      .subscribe({
+        next: (transaction) => {
+          this.topupSubmitting.set(false);
+          this.topupMismatchMessage.set(null);
+          this.topupCompletedTransaction.set(transaction);
+          this.toast.success(this.language.t('transfers.topupSuccess'));
+          this.refreshAccount();
+        },
+        error: (err) => {
+          this.topupSubmitting.set(false);
+          if (err instanceof HttpErrorResponse && err.status === 428) {
+            const detail = err.error?.detail;
+            this.topupMismatchMessage.set(typeof detail === 'string' ? detail : this.language.t('transfers.topupMismatchFallback'));
+            return;
+          }
+          this.topupMismatchMessage.set(null);
+          this.topupError.set(this.mapTopupError(err));
+        },
+      });
+  }
+
+  private mapTopupError(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      if (err.status === 0) return this.language.t('transfers.serviceUnavailable');
+      if (err.status === 409) return this.language.t('transfers.insufficientBalance409');
+      if (err.status === 502) return this.language.t('transfers.topupOperatorUnavailable');
+      if (err.status === 400 || err.status === 422) {
+        const detail = err.error?.detail;
+        if (typeof detail === 'string') return detail;
+      }
+    }
+    return this.language.t('transfers.topupFailedGeneric');
+  }
+
+  protected startNewTopup(): void {
+    this.topupPhoneNumber.set('');
+    this.topupAmount.set(null);
+    this.topupError.set(null);
+    this.topupMismatchMessage.set(null);
+    this.topupCompletedTransaction.set(null);
   }
 
   protected startNewTransfer(): void {

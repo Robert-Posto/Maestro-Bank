@@ -465,6 +465,27 @@
   margin-top: 1px;
 }
 
+/* Confirmare REALĂ de operator (Twilio Lookup) la reîncărcarea de telefon —
+ * vezi transfers.ts, TopupPayload. Mirror pe .transfer-content-warning, dar
+ * cu tonul pozitiv (--mb-positive), nu de avertisment. */
+.transfer-topup-verified {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mb-space-2);
+  margin-top: var(--mb-space-3);
+  padding: var(--mb-space-3);
+  border-radius: var(--mb-radius-sm);
+  background: var(--mb-positive-bg);
+  color: var(--mb-positive);
+  font-size: var(--mb-font-size-xs);
+  line-height: 1.5;
+}
+
+.transfer-topup-verified app-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .transfer-safety-note app-icon {
   flex-shrink: 0;
   color: var(--mb-blue-600);

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from app.i18n import pick
 from app.services.affordability_service import format_ron
-from app.tools import budgets_tools
+from app.tools import budgets_tools, pockets_tools
 from app.tools.errors import ToolError
 
 # Categoriile valide pentru un buget — identice cu TRANSACTION_CATEGORIES
@@ -167,5 +167,25 @@ async def execute_confirmed_action(action_type: str, payload: dict, authorizatio
             raise ToolError(pick("Lipsește identificatorul bugetului de șters.", "Missing the budget ID to delete."))
         await budgets_tools.delete_budget(budget_id, authorization_header)
         return {"success": True, "message": pick("Bugetul a fost șters.", "The budget was deleted."), "budget": None}
+
+    if action_type == "create_pocket":
+        name = payload.get("name")
+        target_minor = payload.get("target_minor")
+        if not name or not target_minor:
+            raise ToolError(
+                pick(
+                    "Datele acțiunii sunt incomplete (lipsește numele sau ținta).",
+                    "The action data is incomplete (missing name or target).",
+                )
+            )
+        pocket = await pockets_tools.create_pocket(name, target_minor, authorization_header)
+        return {
+            "success": True,
+            "message": pick(
+                f"Obiectivul de economisire „{pocket['name']}” a fost creat.",
+                f'The "{pocket["name"]}" savings goal was created.',
+            ),
+            "pocket": pocket,
+        }
 
     raise ToolError(pick(f"Tip de acțiune necunoscut: {action_type}", f"Unknown action type: {action_type}"))

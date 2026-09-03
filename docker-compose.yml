@@ -137,6 +137,12 @@ services:
       - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-10-21}
       - GUARDIAN_LLM_TIMEOUT_SECONDS=${GUARDIAN_LLM_TIMEOUT_SECONDS:-8.0}
       - GUARDIAN_STAFF_REPORT_BANDS=${GUARDIAN_STAFF_REPORT_BANDS:-hold}
+      # Twilio Lookup — verificare REALĂ a numărului la o reîncărcare de
+      # telefon (vezi app/twilio_client.py). Opțional: neconfigurat = codul
+      # cade pe „neverificat", reîncărcarea continuă normal (vezi
+      # config.py::twilio_configured).
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
     volumes:
       - ./backend/services/transactions-service/app:/app/app
       - ./backend/services/transactions-service/tests:/app/tests
@@ -415,6 +421,10 @@ services:
       - AZURE_OPENAI_EMBEDDING_API_KEY=${AZURE_OPENAI_EMBEDDING_API_KEY:-}
       - AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-3-small}
       - AZURE_OPENAI_REQUEST_TIMEOUT_SECONDS=${AZURE_OPENAI_REQUEST_TIMEOUT_SECONDS:-45.0}
+      # Duffel (test mode) — preț REAL de zbor pentru "estimate_trip_cost"
+      # (vezi app/duffel_client.py). Opțional: neconfigurat = tool-ul
+      # răspunde "indisponibil", agentul nu inventează un preț.
+      - DUFFEL_ACCESS_TOKEN=${DUFFEL_ACCESS_TOKEN:-}
     volumes:
       - ./backend/services/ai-orchestrator-service/app:/app/app
       - ./backend/services/ai-orchestrator-service/tests:/app/tests

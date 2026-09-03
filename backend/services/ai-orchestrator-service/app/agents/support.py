@@ -82,12 +82,19 @@ _READ_TOOL_MODULES: dict[str, Any] = {
     "get_transactions_by_period": support_transactions_tools,
     "get_transactions_by_date_range": support_transactions_tools,
     "get_transfer_status": support_transactions_tools,
+    "get_account_statement": support_transactions_tools,
     "get_my_support_tickets": support_ticket_tools,
     "get_exchange_rates": support_exchange_tools,
     "get_exchange_quote": support_exchange_tools,
 }
 
-WRITE_TOOLS = {"create_support_ticket"}
+WRITE_TOOLS = {
+    "create_support_ticket",
+    "propose_internal_transfer",
+    "propose_update_card_settings",
+    "propose_open_account",
+    "propose_execute_exchange",
+}
 
 CONTROL_TOOL = "respond_to_user"
 
@@ -107,6 +114,7 @@ _CONTEXT_KEY_BY_TOOL: dict[str, str] = {
     "get_my_account": "account",
     "get_my_accounts": "accounts",
     "get_my_support_tickets": "tickets",
+    "get_account_statement": "statement",
 }
 
 TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -281,6 +289,30 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "get_account_statement",
+            "description": (
+                "Pregătește descărcarea extrasului de cont (PDF) pentru o perioadă EXPLICITĂ. "
+                "Folosește-l de îndată ce userul cere un extras/statement/situație de cont pentru o "
+                "dată sau un interval — ex. 'trimite-mi extrasul pe august', 'vreau extrasul de cont "
+                "de luna trecută'. Calculează TU limitele exacte (YYYY-MM-DD) din data curentă (vezi "
+                "directiva 'Data curentă' a promptului de sistem) — e interpretare de calendar, nu "
+                "aritmetică financiară. NU inventa niciun conținut al extrasului — tool-ul doar "
+                "validează perioada; PDF-ul real e generat determinist de backend și descărcat direct "
+                "de frontend, tu doar anunți userul că poate să-l descarce."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {"type": "string", "description": "Data de început, format YYYY-MM-DD."},
+                    "date_to": {"type": "string", "description": "Data de sfârșit (inclusiv), format YYYY-MM-DD."},
+                },
+                "required": ["date_from", "date_to"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_my_support_tickets",
             "description": "Întoarce toate tichetele de suport ale userului autentificat.",
             "parameters": {"type": "object", "properties": {}, "required": []},
@@ -307,6 +339,120 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "message": {"type": "string", "maxLength": 4000},
                 },
                 "required": ["subject", "category", "message"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_internal_transfer",
+            "description": (
+                "Propune un transfer STRICT între conturile PROPRII ale userului autentificat — din "
+                "contul curent către un alt cont propriu al lui (economii/depozit/student/eur/usd/gbp). "
+                "NU poate trimite bani către altcineva — nu există parametru de IBAN sau beneficiar, "
+                "doar tipul contului propriu de destinație. IMPORTANT: nu apela acest tool decât DUPĂ "
+                "ce userul a confirmat explicit, într-un mesaj anterior, că vrea să faci transferul — "
+                "dacă nu a confirmat încă, întreabă-l mai întâi în text, prin respond_to_user."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to_account_type": {
+                        "type": "string",
+                        "enum": ["savings", "deposit", "student", "eur", "usd", "gbp"],
+                        "description": "Tipul contului PROPRIU de destinație — userul trebuie să-l aibă deja deschis.",
+                    },
+                    "amount": {
+                        "type": "number",
+                        "description": "Suma în unități întregi ale monedei contului curent (ex. 100 pentru 100 RON), NU în bani/cenți.",
+                    },
+                },
+                "required": ["to_account_type", "amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_update_card_settings",
+            "description": (
+                "Propune blocarea/deblocarea unui card propriu, activarea/dezactivarea plăților "
+                "online/contactless/ATM/internaționale, sau schimbarea limitei zilnice. Trimite DOAR "
+                "câmpurile pe care userul chiar vrea să le schimbe — restul rămân neatinse. IMPORTANT: "
+                "nu apela acest tool decât DUPĂ ce userul a confirmat explicit, într-un mesaj anterior, "
+                "că vrea schimbarea — dacă nu a confirmat încă, întreabă-l mai întâi în text, prin "
+                "respond_to_user."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "last_four": {
+                        "type": "string",
+                        "description": "Ultimele 4 cifre ale cardului, opțional — implicit primul card al userului.",
+                    },
+                    "freeze": {"type": "boolean", "description": "true = blochează cardul, false = deblochează-l."},
+                    "online_payments_enabled": {"type": "boolean"},
+                    "contactless_enabled": {"type": "boolean"},
+                    "atm_withdrawals_enabled": {"type": "boolean"},
+                    "international_payments_enabled": {"type": "boolean"},
+                    "daily_limit": {
+                        "type": "number",
+                        "description": "Noua limită zilnică, în unități întregi RON (NU în bani/cenți).",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_open_account",
+            "description": (
+                "Propune deschiderea unui cont NOU al userului (economii, sau un cont EUR/USD/GBP "
+                "pentru schimb valutar) — userul poate avea cel mult unul din fiecare tip. NU poate "
+                "deschide un cont de student (necesită document) — dacă userul cere asta, "
+                "îndrumă-l către pagina Conturi. IMPORTANT: nu apela acest tool decât DUPĂ ce userul "
+                "a confirmat explicit, într-un mesaj anterior, că vrea să deschidă contul — dacă nu a "
+                "confirmat încă, întreabă-l mai întâi în text, prin respond_to_user."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "account_type": {
+                        "type": "string",
+                        "enum": ["savings", "eur", "usd", "gbp"],
+                        "description": "Tipul contului nou de deschis.",
+                    }
+                },
+                "required": ["account_type"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_execute_exchange",
+            "description": (
+                "Propune un schimb valutar REAL (curs BNR + comision MaestroBank), STRICT între "
+                "conturile PROPRII ale userului (ex. din contul RON în contul EUR, sau invers) — "
+                "userul trebuie să aibă deja deschise ambele conturi (folosește propose_open_account "
+                "întâi, dacă nu are). NU e nevoie de niciun beneficiar — schimbul valutar e mereu "
+                "intern. IMPORTANT: nu apela acest tool decât DUPĂ ce userul a confirmat explicit, "
+                "într-un mesaj anterior, că vrea să facă schimbul — dacă nu a confirmat încă, "
+                "întreabă-l mai întâi în text, prin respond_to_user."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_currency": {"type": "string", "enum": ["RON", "EUR", "USD", "GBP"]},
+                    "to_currency": {"type": "string", "enum": ["RON", "EUR", "USD", "GBP"]},
+                    "amount": {
+                        "type": "number",
+                        "description": "Suma în unități întregi ale valutei sursă (ex. 100 pentru 100 RON/EUR), NU în bani/cenți.",
+                    },
+                },
+                "required": ["from_currency", "to_currency", "amount"],
             },
         },
     },

@@ -19,6 +19,7 @@ import pytest
 from app.models.support import ChatRequest
 from app.services import safety_guard, support_service
 from app.tools import (
+    support_account_actions_tools,
     support_accounts_tools,
     support_cards_tools,
     support_exchange_tools,
@@ -313,6 +314,209 @@ async def test_create_ticket_after_confirmation(monkeypatch, support_auth_header
 
     assert response.requires_confirmation is False
     assert "SUP-123" in response.answer
+
+
+# --- Transfer intern între conturile proprii ---------------------------------
+
+
+async def test_internal_transfer_requires_confirmation(support_auth_header: dict[str, str]):
+    """Cererea LLM-ului de a apela propose_internal_transfer NU se execută
+    direct — se oprește la confirmare, la fel ca la crearea unui tichet."""
+    fake_llm = FakeLLMClient(
+        [FakeMessage(tool_calls=[make_tool_call("propose_internal_transfer", {"to_account_type": "savings", "amount": 500})])]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Mută 500 de lei din curent în economii"),
+        support_auth_header["Authorization"],
+        llm_client=fake_llm,
+    )
+
+    assert response.requires_confirmation is True
+    assert response.metadata["pending_action"]["tool"] == "propose_internal_transfer"
+    assert response.metadata["pending_action"]["arguments"] == {"to_account_type": "savings", "amount": 500}
+
+
+async def test_internal_transfer_executes_after_confirmation(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, to_account_type, amount):
+        assert to_account_type == "savings"
+        assert amount == 500
+        return {"transfer": {"id": "TX-1", "amount_minor": 50000}, "to_account_type": "savings"}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_internal_transfer", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da",
+        pending_action=PendingAction(tool="propose_internal_transfer", arguments={"to_account_type": "savings", "amount": 500}),
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert response.context["transaction"]["id"] == "TX-1"
+
+
+async def test_internal_transfer_confirmation_surfaces_error(monkeypatch, support_auth_header: dict[str, str]):
+    """Cont de destinație inexistent (userul nu l-a deschis încă) — eroarea
+    ajunge clar în răspuns, nu o excepție netratată."""
+
+    async def fake_execute(authorization, to_account_type, amount):
+        return {"error": "Nu ai încă un cont de tip „savings”.", "status_code": 404}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_internal_transfer", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da",
+        pending_action=PendingAction(tool="propose_internal_transfer", arguments={"to_account_type": "savings", "amount": 500}),
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert "savings" in response.answer
+
+
+# --- Setări card (blocare, plăți, limită) -------------------------------------
+
+
+async def test_update_card_settings_requires_confirmation(support_auth_header: dict[str, str]):
+    fake_llm = FakeLLMClient([FakeMessage(tool_calls=[make_tool_call("propose_update_card_settings", {"freeze": True})])])
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Blochează-mi cardul"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.requires_confirmation is True
+    assert response.metadata["pending_action"]["tool"] == "propose_update_card_settings"
+    assert response.metadata["pending_action"]["arguments"] == {"freeze": True}
+
+
+async def test_update_card_settings_executes_after_confirmation(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, freeze=None):
+        assert freeze is True
+        return {"card": {"id": "card-1", "is_frozen": True}}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_update_card_settings", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da", pending_action=PendingAction(tool="propose_update_card_settings", arguments={"freeze": True})
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert response.context["card"]["is_frozen"] is True
+
+
+# --- Deschidere cont nou -------------------------------------------------
+
+
+async def test_open_account_requires_confirmation(support_auth_header: dict[str, str]):
+    fake_llm = FakeLLMClient([FakeMessage(tool_calls=[make_tool_call("propose_open_account", {"account_type": "savings"})])])
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Deschide-mi un cont de economii"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.requires_confirmation is True
+    assert response.metadata["pending_action"]["tool"] == "propose_open_account"
+    assert response.metadata["pending_action"]["arguments"] == {"account_type": "savings"}
+
+
+async def test_open_account_executes_after_confirmation(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, account_type):
+        assert account_type == "savings"
+        return {"account": {"id": "acc-2", "account_type": "savings", "iban": "RO00SAVINGS"}}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_open_account", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da", pending_action=PendingAction(tool="propose_open_account", arguments={"account_type": "savings"})
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert response.context["account"]["account_type"] == "savings"
+
+
+async def test_open_account_confirmation_surfaces_error(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, account_type):
+        return {"error": 'Ai deja un cont de tip "savings".', "status_code": 409}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_open_account", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da", pending_action=PendingAction(tool="propose_open_account", arguments={"account_type": "savings"})
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert "savings" in response.answer
+
+
+# --- Schimb valutar REAL --------------------------------------------------
+
+
+async def test_execute_exchange_requires_confirmation(support_auth_header: dict[str, str]):
+    fake_llm = FakeLLMClient(
+        [FakeMessage(tool_calls=[make_tool_call("propose_execute_exchange", {"from_currency": "RON", "to_currency": "EUR", "amount": 100})])]
+    )
+
+    response = await support_service.handle_chat(
+        ChatRequest(message="Schimbă 100 de lei în euro"), support_auth_header["Authorization"], llm_client=fake_llm
+    )
+
+    assert response.requires_confirmation is True
+    assert response.metadata["pending_action"]["tool"] == "propose_execute_exchange"
+    assert response.metadata["pending_action"]["arguments"] == {"from_currency": "RON", "to_currency": "EUR", "amount": 100}
+
+
+async def test_execute_exchange_executes_after_confirmation(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, from_currency, to_currency, amount):
+        assert (from_currency, to_currency, amount) == ("RON", "EUR", 100)
+        return {"exchange": {"id": "ex-1", "from_currency": "RON", "to_currency": "EUR", "received_minor": 2000}}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_currency_exchange", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da",
+        pending_action=PendingAction(
+            tool="propose_execute_exchange", arguments={"from_currency": "RON", "to_currency": "EUR", "amount": 100}
+        ),
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert response.context["exchange"]["id"] == "ex-1"
+
+
+async def test_execute_exchange_confirmation_surfaces_error(monkeypatch, support_auth_header: dict[str, str]):
+    async def fake_execute(authorization, from_currency, to_currency, amount):
+        return {"error": "Nu ai încă un cont în EUR.", "status_code": 400}
+
+    monkeypatch.setattr(support_account_actions_tools, "execute_currency_exchange", fake_execute)
+
+    from app.models.support import PendingAction
+
+    payload = ChatRequest(
+        message="Da",
+        pending_action=PendingAction(
+            tool="propose_execute_exchange", arguments={"from_currency": "RON", "to_currency": "EUR", "amount": 100}
+        ),
+    )
+    response = await support_service.handle_chat(payload, support_auth_header["Authorization"], llm_client=FakeLLMClient([]))
+
+    assert response.requires_confirmation is False
+    assert "EUR" in response.answer
 
 
 # --- Out of scope ------------------------------------------------------------

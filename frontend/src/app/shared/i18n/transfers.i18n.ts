@@ -5,9 +5,10 @@ export const TRANSFERS_I18N: Record<string, TranslationEntry> = {
   'transfers.subtitle': { ro: 'Trimite bani către un IBAN, în câțiva pași.', en: 'Send money to an IBAN in a few steps.' },
   'transfers.tabNew': { ro: 'Transfer nou', en: 'New transfer' },
   'transfers.tabScheduled': { ro: 'Programate', en: 'Scheduled' },
-  'transfers.modeToggleAriaLabel': { ro: 'Trimite sau solicită bani', en: 'Send or request money' },
+  'transfers.modeToggleAriaLabel': { ro: 'Trimite, solicită sau reîncarcă', en: 'Send, request, or top up' },
   'transfers.modeSend': { ro: 'Trimit', en: 'Send' },
   'transfers.modeRequest': { ro: 'Solicit', en: 'Request' },
+  'transfers.modeTopup': { ro: 'Reîncarcă telefon', en: 'Top up phone' },
   'transfers.stepDetails': { ro: 'Detalii', en: 'Details' },
   'transfers.stepReview': { ro: 'Verificare', en: 'Review' },
   'transfers.stepConfirm': { ro: 'Confirmare', en: 'Confirmation' },
@@ -136,5 +137,46 @@ export const TRANSFERS_I18N: Record<string, TranslationEntry> = {
   'transfers.transferFailedGeneric': {
     ro: 'Transferul a eșuat. Verifică datele și încearcă din nou.',
     en: 'The transfer failed. Check the details and try again.',
+  },
+
+  'transfers.topupTitle': { ro: 'Reîncarcă un număr de telefon', en: 'Top up a phone number' },
+  'transfers.topupSubtitle': {
+    ro: 'Trimite credit direct pe un număr din România — ideal pentru familie, indiferent unde te afli.',
+    en: 'Send credit directly to a Romanian number — great for family, wherever you are.',
+  },
+  'transfers.topupOperator': { ro: 'Operator', en: 'Operator' },
+  'transfers.topupPhoneNumber': { ro: 'Număr de telefon', en: 'Phone number' },
+  'transfers.topupPhonePlaceholder': { ro: '07xx xxx xxx', en: '07xx xxx xxx' },
+  'transfers.topupInvalidPhone': {
+    ro: 'Introdu un număr românesc valid (07xxxxxxxx, 10 cifre).',
+    en: 'Enter a valid Romanian number (07xxxxxxxx, 10 digits).',
+  },
+  'transfers.topupSafetyNote': {
+    ro: 'Suma este debitată real din contul tău — reîncărcarea efectivă la operator este simulată, ca la restul aplicației.',
+    en: 'The amount is really debited from your account — the actual top-up with the operator is simulated, like the rest of the app.',
+  },
+  'transfers.topupSubmit': { ro: 'Reîncarcă', en: 'Top up' },
+  'transfers.topupSuccessTitle': { ro: 'Reîncărcare reușită', en: 'Top-up successful' },
+  'transfers.topupSuccessMeta': { ro: 'către numărul', en: 'to the number' },
+  'transfers.topupSuccess': { ro: 'Reîncărcare efectuată cu succes.', en: 'Top-up completed successfully.' },
+  'transfers.newTopup': { ro: 'Fă o nouă reîncărcare', en: 'Make a new top-up' },
+  'transfers.topupOperatorUnavailable': {
+    ro: 'Operatorul selectat nu este disponibil momentan. Încearcă din nou.',
+    en: 'The selected operator is temporarily unavailable. Please try again.',
+  },
+  'transfers.topupFailedGeneric': {
+    ro: 'Reîncărcarea a eșuat. Verifică datele și încearcă din nou.',
+    en: 'The top-up failed. Check the details and try again.',
+  },
+  'transfers.topupOperatorConfirmed': { ro: 'Operator confirmat', en: 'Operator confirmed' },
+  'transfers.topupVerificationFailed': {
+    ro: 'Verificarea operatorului a eșuat — reîncărcarea a continuat fără confirmare.',
+    en: 'Operator verification failed — the top-up went through without confirmation.',
+  },
+  'transfers.topupMismatchTitle': { ro: 'Operator posibil greșit', en: 'Possibly wrong operator' },
+  'transfers.topupMismatchConfirm': { ro: 'Continuă oricum', en: 'Continue anyway' },
+  'transfers.topupMismatchFallback': {
+    ro: 'Numărul pare să aparțină altui operator decât cel selectat. Vrei să continui?',
+    en: 'The number appears to belong to a different operator than the one selected. Do you want to continue?',
   },
 };

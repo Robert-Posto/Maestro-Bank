@@ -686,41 +686,6 @@
   cursor: not-allowed;
 }
 
-/* Centrat, la fel ca la MaestroAgent (vezi copilot.css::.copilot-quick-replies)
-   — chip-urile au lățimi foarte diferite, așa că la wrap ultimul rând rămânea
-   cu un singur chip agățat în stânga, ca o listă tăiată. Centrarea
-   echilibrează fiecare rând, indiferent câte chip-uri încap pe el. */
-.support-chat__quick-replies {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--mb-space-2);
-  margin: 0 var(--mb-space-5) var(--mb-space-4);
-}
-
-.support-chat__quick-reply {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--mb-border-strong);
-  border-radius: var(--mb-radius-pill);
-  background: var(--mb-surface);
-  color: var(--mb-blue-600);
-  font: inherit;
-  font-size: var(--mb-font-size-xs);
-  font-weight: var(--mb-font-weight-medium);
-  cursor: pointer;
-  box-shadow: var(--mb-shadow-xs);
-  transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast);
-}
-
-.support-chat__quick-reply:hover:not(:disabled) {
-  background: var(--mb-blue-50);
-  border-color: var(--mb-blue-500);
-}
-
-.support-chat__quick-reply:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* Marginea laterală o ține departe de bordura panoului — fără ea, conturul
    barei ajungea lipit de marginile cardului de chat. `--mb-space-5` e exact
@@ -1447,4 +1412,54 @@
 
 .maestro-action__status--error {
   color: var(--mb-negative);
+}
+
+/* Butoane explicite de confirmare pentru acțiunile Support Agent cu miză
+   reală (transfer intern, setări card) — vezi
+   support.ts::PENDING_ACTION_TOOLS_WITH_BUTTONS. Crearea unui tichet
+   rămâne pe fluxul vechi (tastezi "da"), fără buton — nu are nevoie de
+   aceeași greutate vizuală. Stil identic cu .maestro-action__buttons, ca
+   cei doi agenți să se simtă ca o familie de componente. */
+.support-chat__pending-action {
+  display: flex;
+  gap: var(--mb-space-2);
+  margin-top: var(--mb-space-3);
+}
+
+.support-chat__pending-action-confirm,
+.support-chat__pending-action-cancel {
+  padding: 0.5rem 1rem;
+  border-radius: var(--mb-radius-sm);
+  font: inherit;
+  font-size: var(--mb-font-size-sm);
+  font-weight: var(--mb-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--mb-transition-fast), border-color var(--mb-transition-fast);
+}
+
+.support-chat__pending-action-confirm {
+  border: none;
+  color: #fff;
+  background: var(--mb-blue-600);
+}
+
+.support-chat__pending-action-confirm:hover:not(:disabled) {
+  background: var(--mb-blue-700);
+}
+
+.support-chat__pending-action-cancel {
+  border: 1px solid var(--mb-border-strong);
+  color: var(--mb-text-secondary);
+  background: var(--mb-surface);
+}
+
+.support-chat__pending-action-cancel:hover:not(:disabled) {
+  border-color: var(--mb-negative);
+  color: var(--mb-negative);
+}
+
+.support-chat__pending-action-confirm:disabled,
+.support-chat__pending-action-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

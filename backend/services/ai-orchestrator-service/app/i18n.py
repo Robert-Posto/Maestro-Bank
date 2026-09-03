@@ -138,6 +138,58 @@ T: dict[str, dict[Language, str]] = {
         "en": "The request was created with number {id}. Status: {status}.",
     },
     "viewMyTickets": {"ro": "Vezi solicitările mele", "en": "View my requests"},
+    # --- support_service.py: confirmare / rezultat transfer intern -----
+    "confirmInternalTransfer": {
+        "ro": 'Vrei să transfer {amount} din contul curent către contul tău de tip "{account_type}"? Confirmă cu "da".',
+        "en": 'Do you want me to transfer {amount} from your current account to your "{account_type}" account? Confirm with "yes".',
+    },
+    "internalTransferFailed": {
+        "ro": "Nu am putut face transferul: {error}",
+        "en": "I couldn't make the transfer: {error}",
+    },
+    "internalTransferDone": {
+        "ro": 'Transferul către contul tău de tip "{account_type}" a fost efectuat.',
+        "en": 'The transfer to your "{account_type}" account was completed.',
+    },
+    # --- support_service.py: confirmare / rezultat setări card ----------
+    "confirmUpdateCardSettings": {
+        "ro": 'Vrei să aplic schimbarea cerută asupra cardului tău? Confirmă cu "da".',
+        "en": 'Do you want me to apply the requested change to your card? Confirm with "yes".',
+    },
+    "cardSettingsUpdateFailed": {
+        "ro": "Nu am putut actualiza cardul: {error}",
+        "en": "I couldn't update the card: {error}",
+    },
+    "cardSettingsUpdateDone": {
+        "ro": "Setările cardului au fost actualizate.",
+        "en": "Your card settings were updated.",
+    },
+    # --- support_service.py: confirmare / rezultat deschidere cont nou ---
+    "confirmOpenAccount": {
+        "ro": 'Vrei să-ți deschid un cont nou de tip "{account_type}"? Confirmă cu "da".',
+        "en": 'Do you want me to open a new "{account_type}" account for you? Confirm with "yes".',
+    },
+    "openAccountFailed": {
+        "ro": "Nu am putut deschide contul: {error}",
+        "en": "I couldn't open the account: {error}",
+    },
+    "openAccountDone": {
+        "ro": 'Contul de tip "{account_type}" a fost deschis.',
+        "en": 'Your "{account_type}" account was opened.',
+    },
+    # --- support_service.py: confirmare / rezultat schimb valutar --------
+    "confirmExecuteExchange": {
+        "ro": 'Vrei să schimb {amount} {from_currency} în {to_currency}, la cursul de azi? Confirmă cu "da".',
+        "en": 'Do you want me to exchange {amount} {from_currency} into {to_currency}, at today\'s rate? Confirm with "yes".',
+    },
+    "executeExchangeFailed": {
+        "ro": "Nu am putut face schimbul valutar: {error}",
+        "en": "I couldn't complete the currency exchange: {error}",
+    },
+    "executeExchangeDone": {
+        "ro": "Schimbul valutar a fost efectuat.",
+        "en": "The currency exchange was completed.",
+    },
 }
 
 

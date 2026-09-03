@@ -448,3 +448,11 @@ class FraudHoldingAccountView(BaseModel):
     și transactions-service/app/holds.py."""
 
     account_id: str
+
+
+class TopupMerchantIbanView(BaseModel):
+    """IBAN-ul contului-pseudo al unui operator de reîncărcare telefon —
+    vezi service.py::get_topup_merchant_iban și
+    transactions-service/app/service.py::create_topup."""
+
+    iban: str

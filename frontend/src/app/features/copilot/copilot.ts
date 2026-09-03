@@ -1,4 +1,15 @@
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  afterRenderEffect,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -109,11 +120,16 @@ export class Copilot implements OnInit, OnDestroy {
   });
 
   constructor() {
-    effect(() => {
+    // afterRenderEffect, NU effect() simplu — vezi support.ts pentru
+    // explicația completă: effect()+queueMicrotask putea rula ÎNAINTE ca
+    // Angular să fi scris efectiv ultimul mesaj în DOM, deci scrollTop se
+    // calcula din scrollHeight-ul vechi — părea că istoricul "pierde"
+    // ultimul mesaj la reîncărcarea unei conversații, deși era deja acolo.
+    afterRenderEffect(() => {
       this.chatMessages();
       this.sending();
       const el = this.messagesEl()?.nativeElement;
-      if (el) queueMicrotask(() => (el.scrollTop = el.scrollHeight));
+      if (el) el.scrollTop = el.scrollHeight;
     });
   }
 

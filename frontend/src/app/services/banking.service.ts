@@ -141,6 +141,20 @@ export interface TransactionView {
    * — nu blochează transferul, doar informează userul. null = fără
    * avertisment. */
   content_warning: string | null;
+  /** Prezent DOAR pe reîncărcări de telefon (vezi transactions-service::
+   * PhoneVerificationOut) — null pentru orice altă tranzacție.
+   * `checked=false` distinge explicit DE CE n-a fost verificat
+   * (`unavailable_reason`), ca userul să nu creadă că numărul a fost
+   * confirmat când Twilio nu era configurat/a picat. */
+  phone_verification: PhoneVerificationView | null;
+}
+
+export interface PhoneVerificationView {
+  checked: boolean;
+  carrier_name: string | null;
+  line_type: string | null;
+  operator_match: boolean | null;
+  unavailable_reason: 'not_configured' | 'request_failed' | null;
 }
 
 export interface TransferPayload {
@@ -153,6 +167,19 @@ export interface TransferPayload {
    * (Security settings, Cardul meu), transferuri peste
    * PAYMENT_CONFIRMATION_THRESHOLD_MINOR. */
   card_pin?: string;
+}
+
+export type TopupOperator = 'orange' | 'vodafone' | 'digi' | 'telekom';
+
+export interface TopupPayload {
+  operator: TopupOperator;
+  phone_number: string;
+  amount_minor: number;
+  /** Prima încercare n-o trimite — dacă backend-ul detectează (Twilio
+   * Lookup) că numărul aparține altui operator, respinge cu 428 înainte
+   * de a mișca banii (vezi transfers.ts) și userul confirmă explicit
+   * într-un dialog; abia atunci se retrimite cu acest câmp pe true. */
+  confirm_mismatch?: boolean;
 }
 
 /** Sincronizat cu backend — vezi transactions-service/app/service.py::
@@ -246,6 +273,13 @@ export class BankingService {
 
   createTransfer(payload: TransferPayload): Observable<TransactionView> {
     return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/transfers`, payload);
+  }
+
+  /** Reîncărcare telefon (diaspora) — vezi transactions-service/app/service.py
+   * ::create_topup: un transfer normal către contul-pseudo al operatorului,
+   * cu debit REAL din cont, vizibil în istoricul de tranzacții. */
+  createTopup(payload: TopupPayload): Observable<TransactionView> {
+    return this.http.post<TransactionView>(`${API_BASE_URL}/transactions/topups`, payload);
   }
 
   /** Verificare LIVE a descrierii, ÎNAINTE de a trimite transferul (vezi

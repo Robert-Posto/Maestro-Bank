@@ -11,7 +11,7 @@ Doar validare și delegare către app/service.py — logica de business
 trăiește acolo.
 """
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from app import service
 from app.models import (
@@ -30,6 +30,7 @@ from app.models import (
     InternalVerifyPinResponse,
     ProvisionRequest,
     ProvisionResponse,
+    TopupMerchantIbanView,
 )
 
 router = APIRouter(prefix="/internal/accounts", tags=["internal"])
@@ -114,3 +115,14 @@ async def credit_account_internal(account_id: str, payload: InternalCreditReques
 @router.get("/by-user-and-type/{user_id}/{account_type}", response_model=InternalAccountView)
 async def get_account_by_user_and_type_internal(user_id: str, account_type: str):
     return await service.get_account_by_user_and_type(user_id, account_type)
+
+
+@router.get("/topup-merchant/{operator}", response_model=TopupMerchantIbanView)
+async def get_topup_merchant_iban(operator: str):
+    """Apelat DOAR de transactions-service — vezi
+    app/service.py::get_topup_merchant_iban / ensure_topup_merchant_accounts
+    și transactions-service/app/service.py::create_topup."""
+    iban = await service.get_topup_merchant_iban(operator)
+    if iban is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Operator necunoscut: {operator}")
+    return TopupMerchantIbanView(iban=iban)
